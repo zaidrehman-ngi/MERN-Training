@@ -30,3 +30,23 @@ I think if / else if reads better here because there are only a few conditions. 
 
 =============================================================================================================
 
+Exercise 4 - Task 2
+The checkout took 855.551ms.
+
+Exercise 4 - Task 4
+The .then() version was harder because we had to keep nesting callbacks to use the member variable. With async/await, we can define member once and use it easily in the next lines.
+
+Exercise 4 - Task 5
+The checkout took 431.781ms.
+
+Exercise 4 - Task 6
+No, the loans call needs member.id, and we only get member.id after the member call finishes. So they cannot run at the same time.
+
+Exercise 4 - Task 7
+Node prints 'Error: members: m-404 not found'. The promise is rejected and there is no try/catch to handle it, so the process stops.
+
+Exercise 4 - Task 9
+The reason is that we are directly returning the result without await, so I think the Promise is not being returned. That means it will not resolve or reject, and since there is no Promise to reject, the catch block will never run.
+
+=============================================================================================================
+
