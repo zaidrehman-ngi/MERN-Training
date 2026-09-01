@@ -21,3 +21,12 @@ Exercise 1 - Task 8
 The function declaration works because its definition is hoisted. The const function expression and arrow function are in the Temporal Dead Zone (TDZ) because of assigning them to a const variable, so they cannot be accessed before they are initialized.
 
 =============================================================================================================
+
+Exercise 2 - Task 5
+It is correct, not a bug. Hyperion was damaged, so `break` stopped the whole loop before Ubik could be processed.
+
+Exericse 2 - Task 6
+I think if / else if reads better here because there are only a few conditions. Switch is better when there are many possible values to check.
+
+=============================================================================================================
+
