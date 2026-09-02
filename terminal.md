@@ -126,3 +126,82 @@ Library API is running
 
 =================================================================================================================
 
+Exercise 2 - PART A - Task 4
+
+Commands:
+
+rmdir /s /q node_modules
+del package-lock.json
+npm install
+npm list express
+
+Output:
+
+library-api@1.0.0 D:\MERN-Training\library-api
+└── express@5.2.1
+
+
+Exercise 2 - PART B - Task 6
+
+Command:
+
+npm install lodash@4.17.11
+
+Output:
+
+added 1 package, and audited 159 packages in 2s
+
+48 packages are looking for funding
+run `npm fund` for details
+
+1 critical severity vulnerability
+
+Command:
+
+npm audit
+
+Output:
+
+lodash <=4.17.23
+Severity: critical
+
+Command Injection in lodash
+Prototype Pollution in lodash
+Regular Expression Denial of Service (ReDoS) in lodash
+Lodash vulnerable to Code Injection via _.template imports key names
+Lodash vulnerable to Prototype Pollution via array path bypass in _.unset and _.omit
+Lodash has Prototype Pollution Vulnerability in _.unset and _.omit functions
+
+fix available via npm audit fix
+
+node_modules/lodash
+
+1 critical severity vulnerability
+
+
+Exercise 2 - PART B - Task 7
+
+Command:
+
+npm audit fix
+
+Output:
+
+changed 1 package, and audited 159 packages in 3s
+
+48 packages are looking for funding
+run `npm fund` for details
+
+found 0 vulnerabilities
+
+
+Command:
+
+npm audit
+
+Output:
+
+found 0 vulnerabilities
+
+=================================================================================================================
+
