@@ -84,3 +84,28 @@ We found one critical security issue in the Lodash package we were using. We upd
 
 ================================================================================================================
 
+Exercise 3 - Task 1
+Added a start script to run the app with Node and a dev script to run it with Nodemon. Tested both scripts successfully.
+
+
+Exercise 3 - Task 2
+npm run dev works because nodemon is installed locally in the project's node_modules folder as a devDependency. npm automatically looks in node_modules/.bin when running scripts, so it can find and run nodemon without a global installation.
+
+
+Exercise 3 - Task 3
+npm start works without run because start is a built-in npm script that npm treats specially. The start and test scripts are handled differently from custom scripts, so start can be run using npm start, while a custom script such as dev requires npm run dev.
+
+
+Exercise 3 - Task 4
+The clean script removes the node_modules folder, while the reset script first runs clean and then reinstalls the dependencies. The commands are chained with && so the second command only runs if the first command completes successfully. With a single &, the next command can run even if the previous command fails.
+
+
+Exercise 3 - Task 5
+The greet script takes a command-line argument using process.argv. The -- is used by npm to indicate that the following values should be passed to the script as arguments. In this case, npm run greet Zaid also works because npm passes Zaid to the script, but -- makes the intention explicit and is useful when passing arguments that could otherwise be interpreted as npm options.
+
+
+Exercise 3 - Task 6
+prestart runs automatically before start, and poststart runs automatically after it. A useful pretest hook could run checks such as linting or validating the test environment before the tests start.
+
+================================================================================================================
+

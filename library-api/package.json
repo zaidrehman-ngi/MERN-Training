@@ -6,6 +6,13 @@
   "author": "",
   "type": "commonjs",
   "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "clean": "if exist rmdir /s /q node_modules",
+    "reset": "npm run clean && npm install",
+    "greet": "node index.js",
+    "prestart": "echo checking environment...",
+    "poststart": "echo application started",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {

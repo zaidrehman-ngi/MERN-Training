@@ -205,3 +205,179 @@ found 0 vulnerabilities
 
 =================================================================================================================
 
+Exercise 3 - Task 1
+
+Command:
+
+npm start
+
+Output:
+
+> library-api@1.0.0 start
+> node index.js
+
+Library API is running
+
+
+Command:
+
+npm run dev
+
+Output:
+
+> library-api@1.0.0 dev
+> nodemon index.js
+
+[nodemon] 3.1.14
+[nodemon] starting `node index.js`
+Library API is running
+[nodemon] clean exit - waiting for changes before restart
+
+
+Exercise 3 - Task 3
+
+Command:
+
+npm start
+
+Output:
+
+> library-api@1.0.0 start
+> node index.js
+
+Library API is running
+
+
+Command:
+
+npm dev
+
+Output:
+
+Unknown command: "dev"
+
+Did you mean this?
+  npm run dev # run the "dev" package script
+
+To see a list of supported npm commands, run:
+  npm help
+
+
+Exercise 3 - Task 4
+
+Command:
+
+npm run clean
+
+Output:
+
+> library-api@1.0.0 clean
+> rmdir /s /q node_modules
+
+
+Command:
+
+dir
+
+Output:
+
+Directory of D:\MERN-Training\library-api
+
+09/01/2026  06:59 PM                18 .gitignore
+09/01/2026  07:09 PM                38 index.js
+09/02/2026  12:32 PM            71,506 package-lock.json
+09/02/2026  01:35 PM               532 package.json
+
+
+Command:
+
+npm run reset
+
+Output:
+
+> library-api@1.0.0 reset
+> npm run clean && npm install
+
+
+> library-api@1.0.0 clean
+> rmdir /s /q node_modules
+
+The system cannot find the file specified.
+
+
+Command:
+
+npm run reset
+
+Output:
+
+> library-api@1.0.0 reset
+> npm run clean && npm install
+
+
+> library-api@1.0.0 clean
+> if exist rmdir /s /q node_modules
+
+
+added 158 packages, and audited 159 packages in 3s
+
+48 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+
+Exercise 3 - Task 5
+
+Command:
+
+npm run greet -- Zaid
+
+Output:
+
+> library-api@1.0.0 greet
+> node index.js Zaid
+
+Library API is running
+Hello, Zaid!
+
+
+Command:
+
+npm run greet Zaid
+
+Output:
+
+> library-api@1.0.0 greet
+> node index.js Zaid
+
+Library API is running
+Hello, Zaid!
+
+
+Exercise 3 - Task 6
+
+Command:
+
+npm start
+
+Output:
+
+> library-api@1.0.0 prestart
+> echo checking environment...
+
+checking environment...
+
+> library-api@1.0.0 start
+> node index.js
+
+Library API is running
+Hello, undefined!
+
+> library-api@1.0.0 poststart
+> echo application started
+
+application started
+
+=================================================================================================================
+
