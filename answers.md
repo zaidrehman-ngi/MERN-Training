@@ -109,3 +109,25 @@ prestart runs automatically before start, and poststart runs automatically after
 
 ================================================================================================================
 
+Exercise 4 - PART A - Task 1
+The current Node.js version is v24.20.0. I created a .nvmrc file containing v24.20.0. NVM for Windows did not read the .nvmrc automatically with nvm use, so I used nvm use 24.20.0 to switch to the required version.
+
+
+Exercise 4 - PART A - Task 2
+The .nvmrc file tells NVM which Node.js version to use for the project, while the engines field declares the Node.js version required by the project. In short, .nvmrc is used to select the version, while engines defines the project’s Node.js requirement.
+
+
+Exercise 4 - PART B - Task 4
+format rewrites the files, while format:check only checks whether the files are formatted correctly. format:check belongs in a CI pipeline because it checks formatting without modifying the code and fails if formatting is incorrect.
+
+
+Exercise 4 - PART C - Task 5
+The config file created was eslint.config.mjs, not .eslintrc. Older tutorials use the legacy .eslintrc format, while newer ESLint versions use the flat config format with eslint.config.js or eslint.config.mjs.
+
+
+Exercise 4 - PART C - Task 6
+The author probably meant if (x === 10), which checks whether x is equal to 10. Instead, x = 10 assigns 10 to x. The assignment expression evaluates to 10, which is truthy, so the condition becomes true and console.log('hi') runs.
+
+
+Exercise 4 - PART C - Task 8
+eslint-config-prettier disables ESLint rules that may conflict with Prettier's formatting rules. The check script runs the linter first and then the formatting check using &&, so it fails if either check fails. This makes npm run check a single command to run before pushing.

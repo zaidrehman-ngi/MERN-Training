@@ -5,6 +5,9 @@
   "license": "ISC",
   "author": "",
   "type": "commonjs",
+  "engines": {
+    "node": "24.20.0"
+  },
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
@@ -13,7 +16,11 @@
     "greet": "node index.js",
     "prestart": "echo checking environment...",
     "poststart": "echo application started",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "check": "npm run lint && npm run format:check"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
@@ -21,7 +28,11 @@
     "lodash": "^4.17.11"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "eslint": "^10.9.1",
-    "nodemon": "^3.1.14"
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.12.0",
+    "nodemon": "^3.1.14",
+    "prettier": "^3.9.6"
   }
 }
