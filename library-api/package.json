@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "dotenv": "^17.4.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "lodash": "^4.17.11"
   },
   "devDependencies": {
     "eslint": "^10.9.1",
