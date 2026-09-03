@@ -115,6 +115,3 @@ For an unexpected server error:
 }
 
 This structure allows the frontend to identify the error type, show a clear message, and handle individual field errors separately. A bare string would not provide this structured information.
-
-================================================================================
-

@@ -75,6 +75,3 @@ The book does not exist, so returning 404 clearly tells the client that there is
 The desired final state is already true because the book does not exist. Returning 204 would also be reasonable because DELETE is idempotent, so repeating the same request does not change the final state.
 
 I will use 404 for this Library System because it is more useful to the client to know that the requested book was not found.
-
-================================================================================
-

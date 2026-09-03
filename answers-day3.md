@@ -203,3 +203,122 @@ The rename is not a five-minute change because the old field name may already be
 
 ================================================================================
 
+# Exercise 4
+
+## Part A
+
+### Task 1 — Install bcrypt
+
+`bcrypt` is a dependency because it is required by the application at runtime for password hashing and verification. It needs to be available in the production environment, so it should not be a devDependency.
+
+
+### Task 2 — Hashing the Password
+
+My guess: The two hashes will be identical because the same password should produce the same hash for login verification.
+
+Actual result: The two hashes were different even though the password was the same. This happens because bcrypt generates a new random salt each time the password is hashed.
+
+
+### Task 3 — Hash Breakdown
+
+Hash:
+
+$2b$12$ZD0qdvpmbeA.KwTae2l4JubgCBXPovlQKSAJTE8lAZAPJ68YdLhLG
+
+| Part | Value |
+|------|-------|
+| Algorithm/version | 2b |
+| Cost | 12 |
+| Salt | ZD0qdvpmbeA.KwTae2l4Ju |
+| Digest | bgCBXPovlQKSAJTE8lAZAPJ68YdLhLG |
+
+The salt is stored in plain sight because it is not meant to be secret. Its purpose is to make the same password produce different hashes and prevent attackers from effectively using precomputed password tables. During login, bcrypt uses the stored salt to verify the password.
+
+
+### Task 4 — Password Verification
+
+The correct password returned `true`, while the wrong password returned `false`.
+
+No decryption was needed because bcrypt is a one-way hashing algorithm; it verifies the password by comparing it with the stored hash instead of recovering the original password.
+
+
+### Task 5 — Same Password for Different Members
+
+The two members used the same password, but their stored hashes did not match because bcrypt generated a different random salt for each hash.
+
+This helps defeat rainbow table and precomputed hash attacks. If the hashes had matched, an attacker with 40,000 rows could identify users with the same password and use precomputed password hashes to quickly find common passwords across many accounts.
+
+
+### Task 6 — Cost Factor Timing
+
+| Cost factor | Time |
+|-------------|------|
+| 8 | 14.76 ms |
+| 10 | 61.98 ms |
+| 12 | 231.65 ms |
+| 14 | 1016.54 ms |
+
+I would ship cost 12 because it provides a good balance between password security and login performance. Cost 14 takes about 1.02 seconds per hash on my system, which becomes expensive at high login volume.
+
+At 500 logins per minute, cost 14 would require about 508 seconds, or 8.47 minutes, of sequential hashing work. The exact server impact depends on how many requests can be processed in parallel and the available CPU resources. It becomes unacceptable when hashing consumes enough CPU that normal requests become slow or the server cannot handle the expected login traffic.
+
+
+## PART B
+
+### Task 8 — AES-256-GCM Encryption
+
+The same phone number was encrypted twice, and the two ciphertexts were different because a new random IV was generated for each encryption.
+
+Reusing an IV with the same AES-GCM key can break the security of the encryption and authentication. IVs should therefore be unique for each encryption.
+
+This is similar to the salt behavior in bcrypt because the same input does not produce the same output. However, they have different purposes. A bcrypt salt protects password hashes from precomputed and rainbow table attacks, while a GCM IV ensures that each encryption is unique and maintains the security of the encryption and authentication.
+
+
+### Task 10 — Tampering Detection
+
+I flipped a single byte of the ciphertext and tried to decrypt it. GCM detected that the ciphertext had been changed because the authentication tag no longer matched, so decryption failed with an authentication error.
+
+A mode without an authentication tag might have accepted the modified ciphertext and returned altered plaintext to the application without detecting the tampering. The application could then process corrupted or manipulated data as if it were valid.
+
+This shows why AES-GCM provides both encryption and authentication.
+
+
+### Task 11 — Key Management
+
+The real encryption key is stored in the `.env` file, which is excluded from Git using `.gitignore`. The `.env.example` file contains only a placeholder and does not contain the real key.
+
+The key can be read by the application running on the server and by authorized people who have access to the server's environment or secret configuration. It should not be committed to the repository or shared with developers who do not need access to it.
+
+The partner library made a critical mistake by storing the encryption key in `config.js` inside the repository. Once the attacker cloned the repository and obtained the database dump, they had both the encrypted data and the key needed to decrypt it.
+
+
+## PART C
+
+### Task 13 — What to Store and How
+
+| Field | Decision | Algorithm / Key Location | Reason |
+|---|---|---|---|
+| Member password | Hash | bcrypt | The password only needs to be verified during login, so it should not be recoverable. |
+| JWT signing secret | Do not store | Keep it in an environment variable or secret manager | The signing secret is a server secret and should not be stored in the database. |
+| Member phone number | Encrypt | AES-256-GCM; key stored in an environment variable or secret manager | The application needs to read the phone number, so it must be reversible but the data should remain protected. |
+| Password-reset token held server-side | Hash | bcrypt | The server only needs to check whether the supplied token matches, so the original token does not need to be recoverable. |
+| CNIC captured at registration | Encrypt | AES-256-GCM; key stored in an environment variable or secret manager | The CNIC is sensitive data and may need to be read back, so it should be encrypted with the key kept outside the database. |
+| Book ISBN | Store as plain text | None | ISBNs are identifiers rather than secrets, and the application needs to search and display them. |
+
+
+### Task 14
+
+#### Why is salted SHA-256 wrong for passwords?
+
+Salted SHA-256 is still too fast for password storage. Even with a unique salt, an attacker with a database dump can test a very large number of password guesses quickly. Passwords should use a slow, password-specific hashing algorithm such as bcrypt, which makes offline guessing much more expensive.
+
+#### Why is encrypting passwords a design error?
+
+Passwords should not be encrypted because the application does not need to recover the original password; it only needs to verify it. Encryption is reversible, so anyone who gains access to the encryption key can recover all passwords. The partner library's mistake was using reversible encryption for passwords instead of one-way password hashing, even if the key had been stored securely outside the repository.
+
+
+### Task 15 — Hashed Phone Numbers
+
+I would tell the developer: Phone numbers should have been encrypted with AES-256-GCM because the application needs to read the original number back.
+
+The already hashed phone-number column cannot be decrypted because hashing is one-way. We need to recover the phone numbers from another trusted source or ask members to provide and verify their phone numbers again, then encrypt and store them correctly.

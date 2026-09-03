@@ -12,7 +12,6 @@ export default defineConfig([
     },
     rules: {
       ...js.configs.recommended.rules,
-      'no-console': 'error',
     },
   },
   prettier,
