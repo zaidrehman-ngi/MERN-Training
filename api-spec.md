@@ -8,6 +8,8 @@
 2. Use lowercase kebab-case for paths.
 3. Use camelCase for JSON keys, independently of path casing.
 4. Allow at most one level of nesting; use query parameters for deeper relationships.
+5. Use 400 for missing or malformed request fields, 422 for valid requests with invalid field values, and 409 for conflicts with existing resources.
+6. PUT replaces the complete resource and requires all book fields, while PATCH is used for partial updates.
 
 ## Corrected Endpoints
 
@@ -72,4 +74,47 @@ GET /api/v1/books accepts:
 - limit — number of results per page
 
 ===============================================================================
+
+# Exercise 2
+
+## PART C
+
+### Error Response Shape
+
+All endpoints use the same error response structure:
+
+{
+  "error": "VALIDATION_ERROR",
+  "message": "Some fields are invalid.",
+  "details": [
+    {
+      "field": "title",
+      "message": "Title is required."
+    },
+    {
+      "field": "isbn",
+      "message": "ISBN is not valid."
+    }
+  ]
+}
+
+For an expired token:
+
+{
+  "error": "TOKEN_EXPIRED",
+  "message": "Your authentication token has expired.",
+  "details": []
+}
+
+For an unexpected server error:
+
+{
+  "error": "INTERNAL_SERVER_ERROR",
+  "message": "Something went wrong. Please try again later.",
+  "details": []
+}
+
+This structure allows the frontend to identify the error type, show a clear message, and handle individual field errors separately. A bare string would not provide this structured information.
+
+================================================================================
 
