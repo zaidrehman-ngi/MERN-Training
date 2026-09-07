@@ -96,3 +96,64 @@ Even with Google sign-in, the library still needs its own member record because 
 The “Sign in with Google” button looks simple, but there is much more happening behind it. Google must first confirm the member’s identity and safely send that information back to our system. We also need to make sure that the response actually belongs to the person who started the login and that temporary information cannot be misused. OAuth gives an application permission to access information, but it does not by itself provide a complete login system. For login, we need OpenID Connect, which adds identity information to OAuth. The library must also create or connect the member’s Google account to its own member record, where we keep things such as membership status, permissions, fines, and borrowing history. Finally, the whole process needs to be tested for security, failed logins, account linking, and expired sessions. So the button itself may take minutes, but building the complete and secure system behind it is why it is not realistically an afternoon’s work.
 
 
+# Exercise 3
+
+### PART A - Task 2 - Proving the Rate Limiter Works
+
+Request 1: { allowed: true, remaining: 4, resetIn: 10 }
+Request 2: { allowed: true, remaining: 3, resetIn: 10 }
+Request 3: { allowed: true, remaining: 2, resetIn: 10 }
+Request 4: { allowed: true, remaining: 1, resetIn: 10 }
+Request 5: { allowed: true, remaining: 0, resetIn: 10 }
+Request 6: { allowed: false, remaining: 0, resetIn: 10 }
+Request 7: { allowed: false, remaining: 0, resetIn: 10 }
+Request 8: { allowed: false, remaining: 0, resetIn: 10 }
+After waiting:
+Request 9: { allowed: true, remaining: 4, resetIn: 10 }
+
+
+### PART A - Task 3 - Breaking the Fixed-Window Limiter
+
+The fixed-window limiter has a boundary problem. An attacker can make 5 requests near the end of one window and another 5 requests at the start of the next window.
+
+In this test, all 10 requests were allowed within about 1 second:
+
+```text
+--- End of first window ---
+End request 1: { allowed: true, remaining: 3, resetIn: 1 }
+End request 2: { allowed: true, remaining: 2, resetIn: 1 }
+End request 3: { allowed: true, remaining: 1, resetIn: 1 }
+End request 4: { allowed: true, remaining: 0, resetIn: 1 }
+--- Start of next window ---
+Start request 1: { allowed: true, remaining: 4, resetIn: 10 }
+Start request 2: { allowed: true, remaining: 3, resetIn: 10 }
+Start request 3: { allowed: true, remaining: 2, resetIn: 10 }
+Start request 4: { allowed: true, remaining: 1, resetIn: 10 }
+Start request 5: { allowed: true, remaining: 0, resetIn: 10 }
+Total time: 1033 ms
+````
+
+The flaw is called the fixed-window boundary problem. It allows an attacker to effectively make 10 requests in a very short period by crossing the window boundary.
+
+
+### PART A - Task 4 - Better Rate-Limit Designs
+
+- Sliding window: Tracks requests continuously over the previous time window, so an attacker cannot get a sudden burst by crossing a window boundary.
+- Token bucket: Uses tokens that refill over time, allowing limited bursts while controlling the overall request rate.
+
+For the login endpoint, I would choose a sliding window because it continuously limits password-guessing attempts and avoids the fixed-window boundary problem.
+
+
+### PART B - Task 5 - Rate Limits for API Endpoints
+
+A rate-limited request should return `429 Too Many Requests`. The `Retry-After` response header tells the client how many seconds to wait before trying again.
+
+| Endpoint | Limit | Window | Key |
+|---|---:|---:|---|
+| Login | 5 failed attempts | 15 minutes | Account/email + IP |
+| Book search | 60 requests | 1 minute | User/IP |
+| Password reset | 3 requests | 15 minutes | Email + IP |
+
+Login should have a lower limit because it can be targeted by password-guessing attacks. Book search can have a higher limit because users may search frequently and it is lower risk. Password reset should have a lower limit because it can be abused to repeatedly trigger reset requests.
+
+
