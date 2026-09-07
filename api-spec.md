@@ -115,3 +115,157 @@ For an unexpected server error:
 }
 
 This structure allows the frontend to identify the error type, show a clear message, and handle individual field errors separately. A bare string would not provide this structured information.
+
+
+## Sample Response Payloads
+
+### User
+
+```json
+{
+  "id": 1,
+  "name": "Aisha Khan",
+  "email": "aisha@example.com",
+  "phone": "03001234567",
+  "role": "user",
+  "membershipStatus": "active"
+}
+````
+
+### Book
+
+```json
+{
+  "id": 12,
+  "title": "Dune",
+  "author": "Frank Herbert",
+  "isbn": "9780441172719",
+  "year": 1965,
+  "availableCopies": 4
+}
+```
+
+### Borrow Request
+
+```json
+{
+  "id": 9,
+  "userId": 1,
+  "bookId": 12,
+  "status": "pending",
+  "requestedAt": "2026-09-07T10:00:00Z"
+}
+```
+
+### Login
+
+```json
+{
+  "accessToken": "example-access-token",
+  "user": {
+    "id": 1,
+    "name": "Aisha Khan",
+    "email": "aisha@example.com",
+    "role": "user"
+  }
+}
+```
+
+### Logout
+
+```json
+{
+  "message": "Logged out successfully."
+}
+```
+
+### Refresh Token
+
+```json
+{
+  "accessToken": "example-refreshed-access-token"
+}
+```
+
+### List Users
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "name": "Aisha Khan",
+      "email": "aisha@example.com",
+      "phone": "03001234567",
+      "role": "user",
+      "membershipStatus": "active"
+    },
+    {
+      "id": 2,
+      "name": "Omar Ali",
+      "email": "omar@example.com",
+      "phone": "03111234567",
+      "role": "user",
+      "membershipStatus": "active"
+    }
+  ]
+}
+```
+
+### List Books
+
+```json
+{
+  "data": [
+    {
+      "id": 12,
+      "title": "Dune",
+      "author": "Frank Herbert",
+      "isbn": "9780441172719",
+      "year": 1965,
+      "availableCopies": 4
+    },
+    {
+      "id": 13,
+      "title": "Neuromancer",
+      "author": "William Gibson",
+      "isbn": "9780441569595",
+      "year": 1984,
+      "availableCopies": 2
+    }
+  ]
+}
+```
+
+### List Borrow Requests
+
+```json
+{
+  "data": [
+    {
+      "id": 9,
+      "userId": 1,
+      "bookId": 12,
+      "status": "pending",
+      "requestedAt": "2026-09-07T10:00:00Z"
+    },
+    {
+      "id": 10,
+      "userId": 2,
+      "bookId": 13,
+      "status": "approved",
+      "requestedAt": "2026-09-06T09:30:00Z"
+    }
+  ]
+}
+```
+
+### Return Borrowed Book
+
+```json
+{
+  "message": "Book returned successfully.",
+  "borrowRequestId": 9,
+  "status": "returned"
+}
+```
