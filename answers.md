@@ -157,3 +157,33 @@ A rate-limited request should return `429 Too Many Requests`. The `Retry-After` 
 Login should have a lower limit because it can be targeted by password-guessing attacks. Book search can have a higher limit because users may search frequently and it is lower risk. Password reset should have a lower limit because it can be abused to repeatedly trigger reset requests.
 
 
+# Exercise 4
+
+### PART A - Task 1
+
+If the host is hardcoded in ten places, we would have to update every request when the server URL changes in Week 5. Using {{baseUrl}} lets us change the host in one place.
+
+
+### PART B - Task 4 - Mock Server
+
+Mock server URL: `http://localhost:4510`
+
+
+### PART C - Task 6 - Collection Authorization
+
+Collection-level authorization uses Bearer `{{accessToken}}`.
+
+Requests that must not inherit it:
+- `Register User` — Public endpoint; users need to register before they have a token.
+- `Login` — Public endpoint; users need to authenticate before receiving a token.
+
+
+### PART C - Task 8 - Intentional Test Failure
+
+I intentionally changed the `Register User` status test from 201 to 200.
+
+The collection run failed with:
+
+`Status code is 201 | AssertionError: expected response to have status code 200 but got 201`
+
+This confirmed that the test suite correctly detects a failed assertion.
