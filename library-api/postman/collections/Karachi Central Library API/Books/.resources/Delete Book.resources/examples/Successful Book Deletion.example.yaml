@@ -1,0 +1,11 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/books/12"
+  method: DELETE
+response:
+  statusCode: 204
+  statusText: No Content
+  body:
+    type: json
+    content: ""
+order: 1788783859490

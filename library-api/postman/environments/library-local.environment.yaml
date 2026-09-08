@@ -1,0 +1,6 @@
+name: library-local
+values:
+  - key: baseUrl
+    value: 'http://localhost:4510'
+  - key: accessToken
+    value: ''

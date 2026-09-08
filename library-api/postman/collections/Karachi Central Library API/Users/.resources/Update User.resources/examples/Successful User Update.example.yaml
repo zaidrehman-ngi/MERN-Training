@@ -1,0 +1,27 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/users/1"
+  method: PATCH
+response:
+  statusCode: 200
+  statusText: ""
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: "{\r
+
+      \  \"id\": 1,\r
+
+      \  \"name\": \"Aisha Khan\",\r
+
+      \  \"email\": \"aisha@example.com\",\r
+
+      \  \"phone\": \"03001234567\",\r
+
+      \  \"role\": \"user\",\r
+
+      \  \"membershipStatus\": \"active\"\r
+
+      }"
+order: 1788783466324

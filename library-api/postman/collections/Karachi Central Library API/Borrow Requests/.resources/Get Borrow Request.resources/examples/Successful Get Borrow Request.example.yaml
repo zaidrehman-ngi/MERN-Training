@@ -1,0 +1,25 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/borrow-requests/12"
+  method: GET
+response:
+  statusCode: 200
+  statusText: ""
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: "{\r
+
+      \  \"id\": 9,\r
+
+      \  \"userId\": 1,\r
+
+      \  \"bookId\": 12,\r
+
+      \  \"status\": \"pending\",\r
+
+      \  \"requestedAt\": \"2026-09-07T10:00:00Z\"\r
+
+      }"
+order: 1788784023465

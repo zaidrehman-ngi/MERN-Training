@@ -1,0 +1,21 @@
+$kind: http-example
+request:
+  url: "{{baseUrl}}/api/v1/borrow-requests/12/return"
+  method: POST
+response:
+  statusCode: 200
+  statusText: ""
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: "{\r
+
+      \  \"message\": \"Book returned successfully.\",\r
+
+      \  \"borrowRequestId\": 9,\r
+
+      \  \"status\": \"returned\"\r
+
+      }"
+order: 1788784200831

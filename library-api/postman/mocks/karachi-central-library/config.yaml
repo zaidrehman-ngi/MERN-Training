@@ -1,0 +1,13 @@
+id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+version: 1
+name: 'Karachi Central Library Mock Server'
+protocol: http
+port: 4510
+autoRestartOnChange: true
+logging:
+  level: verbose
+  showBody: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true
