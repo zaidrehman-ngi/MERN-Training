@@ -1,189 +1,90 @@
-# Exercise 1
+Exercise 1 - Task 1
+Please return undefined
+Please return undefined
+Please return undefined
 
-### Task 1 — JWT Anatomy
+Exercise 1 - Task 2
+The loop runs first and stores the functions in the emails array without executing them. The functions are executed later when forEach runs. By that time, i has become 3, so books[3] is undefined. That's why all three emails print undefined.
 
-My guess: I thought the signing secret would be required to read the contents of Token A.
+Exercise 1 - Task 3
+Change var to let. With let, each loop iteration has its own value of `i`, so each function gets the correct book.
 
-Actual result: The secret was not required. I split the token into its three parts and decoded the header and payload using `atob()`. This showed that the JWT contents are encoded, not encrypted.
+Exercise 1 - Task 4
+undefined because var is hoisted, but the value is assigned after the console.log()
 
-A JWT has three parts:
+Exercise 1 - Task 5
+The error is `ReferenceError: Cannot access 'count' before initialization`.
 
-| Part | Description |
-|---|---|
-| Header | Encoded JSON containing information such as the signing algorithm and token type. |
-| Payload | Encoded JSON containing claims such as the user ID, email, role, and expiry. |
-| Signature | A cryptographic signature generated using the header, payload, and signing secret. It protects the token from being modified without detection. |
+I prefer `let` because it shows the mistake immediately instead of silently giving `undefined`. This makes errors easier to find and fix.
 
-The header and payload are encoded, not encrypted, so anyone who has the token can read them without the secret. The signature is not encryption; it is used to verify the token's integrity and authenticity.
+Exercise 1 - Task 8
+The function declaration works because its definition is hoisted. The const function expression and arrow function are in the Temporal Dead Zone (TDZ) because of assigning them to a const variable, so they cannot be accessed before they are initialized.
 
+=============================================================================================================
 
-### Task 2 — Sensitive Data in the JWT
+Exercise 2 - Task 5
+It is correct, not a bug. Hyperion was damaged, so `break` stopped the whole loop before Ubik could be processed.
 
-Two fields that should never have been included in the JWT are `cnic` and `passwordHash`.
+Exericse 2 - Task 6
+I think if / else if reads better here because there are only a few conditions. Switch is better when there are many possible values to check.
 
-The `cnic` is sensitive personal information and should not be exposed in a readable JWT payload.
+=============================================================================================================
 
-The `passwordHash` is also sensitive and should never be placed in a JWT. Although it is hashed with bcrypt, the JWT payload is only encoded, not encrypted, so anyone holding the token can read the hash and potentially perform offline password-guessing attacks.
+Exercise 4 - Task 2
+The checkout took 855.551ms.
 
-Someone holding the stolen phone now has the member's CNIC in plaintext and their bcrypt password hash, along with their member ID, email, role, and token validity information.
+Exercise 4 - Task 4
+The .then() version was harder because we had to keep nesting callbacks to use the member variable. With async/await, we can define member once and use it easily in the next lines.
 
+Exercise 4 - Task 5
+The checkout took 431.781ms.
 
-### Task 4 — Tampering the JWT
+Exercise 4 - Task 6
+No, the loans call needs member.id, and we only get member.id after the member call finishes. So they cannot run at the same time.
 
-I changed the `role` in Token A from `librarian` to `admin` while keeping the original signature.
+Exercise 4 - Task 7
+Node prints 'Error: members: m-404 not found'. The promise is rejected and there is no try/catch to handle it, so the process stops.
 
-`jwt.verify()` failed with `invalid signature` because the token payload was modified without creating a new valid signature.
+Exercise 4 - Task 9
+The reason is that we are directly returning the result without await, so I think the Promise is not being returned. That means it will not resolve or reject, and since there is no Promise to reject, the catch block will never run.
 
-However, `jwt.decode()` still showed `role: 'admin'` because it only decodes the token and does not verify its signature.
+=============================================================================================================
 
-A server using `jwt.decode()` for authentication could trust the tampered `role: admin` claim and give the attacker admin privileges.
+Exercise 5 - PART A - Task 2
+search start — sync
+timer 0 — timer
+promise 1 — promise
+async body — sync
+after await — promise
+timer 10 — timer
+promise inside timer — promise
+search end — sync
 
+Exercise 5 - PART A - Task 3
+timer 0 is a timer, so it goes to the macrotask queue. The event loop first runs synchronous code, then promise callbacks (microtasks), and then timer callbacks. That's why timer 0 doesn't run second.
 
-### Task 5 — Re-signing and Expiration
+Exercise 5 - PART A - Task 4
+after await ran after search end.
 
-The JWT signature protects the integrity and authenticity of the token, ensuring that changes to its contents can be detected. If the signing secret leaks, an attacker can create validly signed tokens with modified claims, such as `role: admin`, so the secret must be kept secure and rotated if compromised.
+This tells us that await pauses the async function and continues the code after await later as a promise callback. It does not block the whole program.
 
-Token B failed verification with `jwt expired` because its `exp` (expiration time) claim had passed.
+Exercise 5 - PART A - Task 5
+normal code runs first, then promise callbacks run, then timer callbacks run.
 
+Exercise 5 - PART B - Task 6
+User B's timer was stuck for about 300ms because slowSearch blocked the main thread for 300ms.
 
-# Exercise 2
+Exercise 5 - PART B - Task 7
+While the loop is running, the main thread is blocked, so every other user's JavaScript work has to wait until the loop finishes.
 
-### Task 1 — What Each Party Holds
+Exercise 5 - PART C - Task 8
+The five searches took 1.499s in total.
 
-After a successful Google sign-in:
+Exercise 5 - PART C - Task 10
+3 unique queries.
+Expected time: about 900ms.
+Actual time: 899.624ms.
+The timing matches because only the 3 unique queries called slowSearch.
 
-- Member: Has their Google account and is signed in to the library account.
-- Library browser app: Holds the temporary authorization code and later uses the session/token provided by the library.
-- Library server: Receives the authorization result from Google and keeps the member's library account/session information.
-- Google: Holds the member's Google account and verifies their identity.
-
-The member's Google password is only seen by Google. The library browser app and library server never receive or need the Google password.
-
-
-### Task 2 — Authorization Code Flow
-
-1. The member clicks “Sign in with Google” on the library website.
-2. The library browser app redirects the member to Google's sign-in page.
-3. The member signs in to Google, and Google verifies their identity.
-4. Google sends a short-lived authorization code back to the library browser.
-5. The browser sends this code to the library server.
-6. The library server sends the code to Google to exchange it for the required token and user information.
-7. Google verifies the code and sends the information back to the library server.
-8. The library server identifies the member and signs them into their library account.
-
-
-### Task 3 — Why the Server Exchanges the Code
-
-The browser should not receive the token directly because anything stored or handled by browser-side JavaScript can potentially be exposed through attacks such as XSS. If an attacker steals the token, they may be able to use it to make authenticated requests as the member.
-
-Instead, the browser receives only a short-lived authorization code, and the library server exchanges that code with Google for the token. This keeps the more sensitive token on the server instead of exposing it to the browser.
-
-
-### Task 4 — The State Parameter
-
-The `state` parameter is a random value that connects the Google login response to the login request originally started by the member's browser. It prevents login CSRF, where an attacker could send their own Google authorization response to a member. Without `state`, the member could unknowingly be signed into the library using the attacker's Google account.
-
-
-### Task 5 — OAuth, Login, and Member Records
-
-OAuth 2.0 is used to give an application permission to access something on a user's behalf, while login is about confirming who the user is. For proper login and identity verification, OpenID Connect (OIDC) is used on top of OAuth, so the library needs OIDC for Google sign-in.
-
-Even with Google sign-in, the library still needs its own member record because Google only tells us about the user's Google identity. The library needs to store information such as the member's Google account ID, name, email, membership status, permissions, and borrowing history so it can manage the member within the library system.
-
-
-### Task 6 — Why Google Sign-In Is Not an Afternoon's Work
-
-The “Sign in with Google” button looks simple, but there is much more happening behind it. Google must first confirm the member’s identity and safely send that information back to our system. We also need to make sure that the response actually belongs to the person who started the login and that temporary information cannot be misused. OAuth gives an application permission to access information, but it does not by itself provide a complete login system. For login, we need OpenID Connect, which adds identity information to OAuth. The library must also create or connect the member’s Google account to its own member record, where we keep things such as membership status, permissions, fines, and borrowing history. Finally, the whole process needs to be tested for security, failed logins, account linking, and expired sessions. So the button itself may take minutes, but building the complete and secure system behind it is why it is not realistically an afternoon’s work.
-
-
-# Exercise 3
-
-### PART A - Task 2 - Proving the Rate Limiter Works
-
-Request 1: { allowed: true, remaining: 4, resetIn: 10 }
-Request 2: { allowed: true, remaining: 3, resetIn: 10 }
-Request 3: { allowed: true, remaining: 2, resetIn: 10 }
-Request 4: { allowed: true, remaining: 1, resetIn: 10 }
-Request 5: { allowed: true, remaining: 0, resetIn: 10 }
-Request 6: { allowed: false, remaining: 0, resetIn: 10 }
-Request 7: { allowed: false, remaining: 0, resetIn: 10 }
-Request 8: { allowed: false, remaining: 0, resetIn: 10 }
-After waiting:
-Request 9: { allowed: true, remaining: 4, resetIn: 10 }
-
-
-### PART A - Task 3 - Breaking the Fixed-Window Limiter
-
-The fixed-window limiter has a boundary problem. An attacker can make 5 requests near the end of one window and another 5 requests at the start of the next window.
-
-In this test, all 10 requests were allowed within about 1 second:
-
-```text
---- End of first window ---
-End request 1: { allowed: true, remaining: 3, resetIn: 1 }
-End request 2: { allowed: true, remaining: 2, resetIn: 1 }
-End request 3: { allowed: true, remaining: 1, resetIn: 1 }
-End request 4: { allowed: true, remaining: 0, resetIn: 1 }
---- Start of next window ---
-Start request 1: { allowed: true, remaining: 4, resetIn: 10 }
-Start request 2: { allowed: true, remaining: 3, resetIn: 10 }
-Start request 3: { allowed: true, remaining: 2, resetIn: 10 }
-Start request 4: { allowed: true, remaining: 1, resetIn: 10 }
-Start request 5: { allowed: true, remaining: 0, resetIn: 10 }
-Total time: 1033 ms
-````
-
-The flaw is called the fixed-window boundary problem. It allows an attacker to effectively make 10 requests in a very short period by crossing the window boundary.
-
-
-### PART A - Task 4 - Better Rate-Limit Designs
-
-- Sliding window: Tracks requests continuously over the previous time window, so an attacker cannot get a sudden burst by crossing a window boundary.
-- Token bucket: Uses tokens that refill over time, allowing limited bursts while controlling the overall request rate.
-
-For the login endpoint, I would choose a sliding window because it continuously limits password-guessing attempts and avoids the fixed-window boundary problem.
-
-
-### PART B - Task 5 - Rate Limits for API Endpoints
-
-A rate-limited request should return `429 Too Many Requests`. The `Retry-After` response header tells the client how many seconds to wait before trying again.
-
-| Endpoint | Limit | Window | Key |
-|---|---:|---:|---|
-| Login | 5 failed attempts | 15 minutes | Account/email + IP |
-| Book search | 60 requests | 1 minute | User/IP |
-| Password reset | 3 requests | 15 minutes | Email + IP |
-
-Login should have a lower limit because it can be targeted by password-guessing attacks. Book search can have a higher limit because users may search frequently and it is lower risk. Password reset should have a lower limit because it can be abused to repeatedly trigger reset requests.
-
-
-# Exercise 4
-
-### PART A - Task 1
-
-If the host is hardcoded in ten places, we would have to update every request when the server URL changes in Week 5. Using {{baseUrl}} lets us change the host in one place.
-
-
-### PART B - Task 4 - Mock Server
-
-Mock server URL: `http://localhost:4510`
-
-
-### PART C - Task 6 - Collection Authorization
-
-Collection-level authorization uses Bearer `{{accessToken}}`.
-
-Requests that must not inherit it:
-- `Register User` — Public endpoint; users need to register before they have a token.
-- `Login` — Public endpoint; users need to authenticate before receiving a token.
-
-
-### PART C - Task 8 - Intentional Test Failure
-
-I intentionally changed the `Register User` status test from 201 to 200.
-
-The collection run failed with:
-
-`Status code is 201 | AssertionError: expected response to have status code 200 but got 201`
-
-This confirmed that the test suite correctly detects a failed assertion.
+Exercise 5 - PART C - Task 11
+If there are 100,000 different searches, the Map will keep growing and use more memory. Eventually, the server may run out of memory, causing performance issues or a crash.

@@ -1,9 +1,0 @@
-node_modules
-.env
-/.postman/**
-
-# Keep Postman support files local while allowing only the collection and environment exports.
-/postman/**
-!/postman/
-!/postman/library-api.postman_collection.json
-!/postman/library-api.postman_environment.json
