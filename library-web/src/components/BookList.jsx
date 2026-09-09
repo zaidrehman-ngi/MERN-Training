@@ -1,10 +1,10 @@
-import BookCard from "./BookCard";
+import BookRow from "./BookRow";
 
 function BookList({ books }) {
   return (
-    <div className="book-grid">
+    <div className="panel__body">
       {books.map((book) => (
-        <BookCard key={book.id} book={book} />
+        <BookRow key={book.id} book={book} />
       ))}
     </div>
   );

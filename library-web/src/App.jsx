@@ -1,23 +1,17 @@
-import BookCard from "./components/BookCard";
-import books from "./data/books";
-
-const copies = 3;
-
-function handleBorrow(id) {
-  console.log("Book clicked:", id);
-}
+import Header from "./components/Header";
+import Sidebar from "./components/Sidebar";
+import Main from "./components/Main";
+import Footer from "./components/Footer";
 
 function App() {
-  const dune = books[0];
+  const branchName = "Clifton Branch";
 
   return (
     <div>
-      <BookCard
-        title="Dune"
-        copies={copies}
-        book={dune}
-        onBorrow={handleBorrow}
-      />
+      <Header />
+      <Sidebar />
+      <Main branchName={branchName} />
+      <Footer />
     </div>
   );
 }
