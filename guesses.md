@@ -42,3 +42,12 @@ I expected `{NaN}` to render nothing, but React renders `NaN` and shows a warnin
 I expected the object `{title: 'Dune'}` to render, but React does not allow plain objects to be rendered directly as React children.
 
 I expected `new Date()` to render the current date, but a Date object cannot be rendered directly as a React child and causes an error.
+
+
+# Exercise 4
+
+## Task 5 — Guess
+
+I guessed that the first function would run when the page loads, before clicking the button, because `onBorrow(book.id)` is a function call inside the braces.
+
+I guessed that the second function would only run when the button is clicked, because the braces contain an arrow function that calls `onBorrow(book.id)` later.

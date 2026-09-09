@@ -1,10 +1,23 @@
-import BookList from "./components/BookList";
+import BookCard from "./components/BookCard";
 import books from "./data/books";
 
+const copies = 3;
+
+function handleBorrow(id) {
+  console.log("Book clicked:", id);
+}
+
 function App() {
+  const dune = books[0];
+
   return (
     <div>
-      <BookList books={books} />
+      <BookCard
+        title="Dune"
+        copies={copies}
+        book={dune}
+        onBorrow={handleBorrow}
+      />
     </div>
   );
 }

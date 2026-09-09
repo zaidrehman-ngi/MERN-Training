@@ -128,3 +128,153 @@ The JSX `style` prop takes a JavaScript object so React can work with each CSS p
 
 **Why can you put a ternary inside braces but not an `if` statement?**
 A ternary is an expression because it produces a value, so it can be used inside JSX braces. An `if` statement is a statement and does not directly produce a value, so it cannot be placed inside JSX braces.
+
+
+# Exercise 3
+
+## Task 1 — JSX Transformation
+
+My handwritten `React.createElement()` equivalent was:
+
+```js
+React.createElement(
+  "section",
+  { className: "shelf" },
+  React.createElement(
+    "h2",
+    null,
+    "New arrivals"
+  ),
+  React.createElement(
+    BookCard,
+    { title: "Dune", copies: 3 }
+  )
+)
+```
+
+The Babel compiler produced the following modern JSX transform:
+
+```js
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+
+_jsxs("section", {
+  className: "shelf",
+  children: [
+    _jsx("h2", {
+      children: "New arrivals"
+    }),
+    _jsx(BookCard, {
+      title: "Dune",
+      copies: 3
+    })
+  ]
+});
+```
+
+The main difference is that Babel used `_jsx` and `_jsxs` from `react/jsx-runtime` instead of `React.createElement()`. It also represents children using a `children` property. `_jsxs` was used for `section` because it has multiple children, while `_jsx` was used for `h2` and `BookCard`.
+
+
+## Task 2 — Component Naming
+
+Lowercase JSX names such as `section` and `h2` are treated as HTML elements, so the compiler converts them to strings. Capitalized names such as `BookCard` are treated as JavaScript component references, so they remain bare identifiers.
+
+When I renamed the component to `bookCard` and used `<bookCard />`, React treated it as a browser/HTML tag instead of a component. Nothing rendered on the screen, and the console showed warnings that `<bookCard>` was an unrecognized tag and should use PascalCase for React components.
+
+
+## Task 3 — JSX from `React.createElement()`
+
+The `React.createElement()` code converted back to JSX is:
+
+```jsx
+<ul className="fines">
+  <li>Dune — Rs 60</li>
+  <li style={{ color: 'crimson' }}>Hyperion — Rs 100</li>
+</ul>
+```
+
+I ran both the `React.createElement()` version and the JSX version in the Vite project. Both produced the same DOM:
+
+```html
+<ul class="fines">
+  <li>Dune — Rs 60</li>
+  <li style="color: crimson;">Hyperion — Rs 100</li>
+</ul>
+```
+
+Therefore, both forms produce the same DOM.
+
+
+## Task 4 — JavaScript Behind JSX
+
+**Why must a component return a single root element?**
+`React.createElement()` returns a single value, so a component's return value must also be a single element/value. Multiple sibling elements need to be wrapped in a parent element or fragment.
+
+**Why can a ternary go inside braces but not an `if` statement?**
+JSX braces expect a JavaScript expression that produces a value. A ternary is an expression, while `if` is a statement, so `if` cannot be used directly inside braces.
+
+**Why is the attribute `className` instead of `class`?**
+JSX attributes become JavaScript object properties, and `class` is a reserved JavaScript keyword. Therefore, `className` is used instead.
+
+
+## Task 5 — Who Transforms JSX?
+
+In my Vite project, Babel is not configured or imported. The project uses Vite 8.2.2 with `@vitejs/plugin-react` 6.1.0, and Vite 8 uses Oxc for JavaScript and JSX transformation.
+
+The transformation happens during Vite's development/build process, before the code reaches the browser. The browser receives regular JavaScript with the JSX already transformed into JavaScript calls such as `_jsx` and `_jsxs`; there is no JSX at runtime.
+
+
+# Exercise 4
+
+## Task 1 — Grid and Fragments
+
+The extra wrapper `<div>` made the `BookCard` elements nested instead of being direct children of the grid. After removing the wrappers, the Elements panel confirmed that all three `BookCard` elements are direct children of `.book-grid` with no extra elements.
+
+
+## Task 2 — Fragments
+
+Fragments can be written using the short syntax `<>...</>` or the long syntax `<React.Fragment>...</React.Fragment>`.
+
+The short syntax cannot accept props such as `key`. When a `key` is required, the long syntax must be used:
+
+```jsx
+<React.Fragment key={book.id}>
+  <h3>{book.title}</h3>
+  <p>{book.author}</p>
+</React.Fragment>
+```
+
+
+## Task 3 — The `children` Prop
+
+The `children` prop changes depending on what is passed between the component's tags:
+
+* **Two children:** `Array` of React elements
+* **One child:** A single React element object
+* **No children:** `undefined`
+
+This shows that `children` does not always have the same type, so code that assumes it is always an array can cause bugs.
+
+
+## Task 4 — Passing Different Types Through JSX
+
+I passed four different types of values into `BookCard`:
+
+* A string: `title="Dune"`
+* A number from a variable: `copies={copies}`
+* An object: `book={dune}`
+* A function: `onBorrow={handleBorrow}`
+
+The `onBorrow` function was connected to the Borrow button. Clicking the button logged the book ID:
+
+```text
+Book clicked: bk-4471
+```
+
+
+## Task 5 — Function Call vs Function Expression
+
+In the first line, the braces contain `onBorrow(book.id)`, which is a function call. So the function runs immediately when the component loads, before clicking the button.
+
+In the second line, the braces contain an arrow function `() => onBorrow(book.id)`. The function is not called immediately. It runs only when the button is clicked.
+
+So, what we put inside the braces makes the difference: the first one calls the function immediately, while the second one gives `onClick` a function to run later.

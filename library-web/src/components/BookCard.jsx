@@ -1,13 +1,9 @@
-function borrow(id) {
-  console.log("borrow requested for", id);
-}
-
-function BookCard({ book }) {
+function BookCard({ title, copies, book, onBorrow }) {
   return (
     <div className="book-card" data-book-id={book.id}>
-      <img src="/covers/dune.jpg" alt={`${book.title} cover`} />
+      <img src="/covers/dune.jpg" alt={`${title} cover`} />
 
-      <h3 className="book-card__title">{book.title}</h3>
+      <h3 className="book-card__title">{title}</h3>
 
       <p className="author">
         {book.author} &middot; {book.year}
@@ -17,13 +13,10 @@ function BookCard({ book }) {
         className="badge"
         style={{ backgroundColor: "#1a7f4b", padding: "2px 6px" }}
       >
-        {book.onShelf} of {book.totalCopies} on shelf
+        {copies} copies
       </span>
 
-      <label htmlFor={`qty-${book.id}`}>Copies to borrow</label>
-      <input id={`qty-${book.id}`} type="number" maxLength="2" />
-
-      <button className="btn" onClick={() => borrow(book.id)}>
+      <button className="btn" onClick={() => onBorrow(book.id)}>
         Borrow
       </button>
     </div>
