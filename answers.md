@@ -2,10 +2,10 @@
 
 ## Task 1 — Component Tree
 
-After reading `LegacyBookPanel.jsx`, I identified the following component structure:
+After reading `src/legacy/LegacyBookPanel.jsx`, I identified the following component structure:
 
 ```text
-LegacyBookPanel
+CataloguePanel
 ├── PanelHeader
 │   └── FilterChips
 │       └── FilterChip
@@ -22,7 +22,7 @@ LegacyBookPanel
 
 ## Task 2 — Component Jobs
 
-* **LegacyBookPanel:** Manages the overall library panel.
+* **CataloguePanel:** Manages the overall library panel.
 * **PanelHeader:** Displays the panel heading with branch information.
 * **FilterChips:** Displays the available filter options.
 * **FilterChip:** Renders one filter button.
@@ -66,9 +66,9 @@ No component boundaries were changed during implementation. The planned structur
 
 ## Task 5 — Prop Drilling
 
-The branchName prop is passed from App through Main and LegacyBookPanel to PanelHeader and PanelFooter.
+The branchName prop is passed from App through Main and CataloguePanel to PanelHeader and PanelFooter.
 
-Main and LegacyBookPanel receive branchName but do not use it themselves; they only pass it to the next component. So, 2 components are involved in prop drilling.
+Main and CataloguePanel receive branchName but do not use it themselves; they only pass it to the next component. So, 2 components are involved in prop drilling.
 
 This problem is called prop drilling. My instinct for fixing it would be to use React Context so the value can be accessed by the components that need it without passing it through every intermediate component.
 
@@ -161,3 +161,38 @@ React did not receive an invalid component in this case because the import faile
 ## Task 4 — Barrel File
 
 A barrel file provides a single entry point for re-exporting multiple modules, which makes imports shorter, but it can also make circular dependencies easier to create when modules depend on each other through the barrel. A barrel file does not automatically increase the final bundle size because modern ESM bundlers can use tree-shaking to remove unused exports, although side effects or dependency structures can affect this. I would not keep the barrel file in this project because I find separate imports clearer and easier to understand, especially when the project is still small. I would prefer importing each component directly from its own file.
+
+
+# Exercise 4
+
+## Task 1 — Folder Structure
+
+A type-based structure works well when the application is small and the code can be easily organized by technical responsibility such as components, layout, data, and styles.
+
+A feature-based structure works well when the application has multiple larger features, with each feature containing its own components, data, hooks, and related logic.
+
+I chose a type-based structure for this project because the application is still small and currently has one main domain. It keeps the folder structure simple and makes files easy to find without introducing feature folders that are not needed yet. The trade-off is that a type-based structure can become harder to navigate as the application grows and develops many components across different features.
+
+
+## Task 3 — Onboarding Test
+
+I tested the three tickets using only the folder structure:
+
+* Change the footer wording → `src/layout/Footer.jsx` — easy to identify.
+* Add the shelf location to the book card → `src/components/BookCard.jsx` — easy to identify.
+* Add a new page for borrow requests → no clear location because there was no `pages` folder.
+
+The first two tickets passed the onboarding test. The third exposed a structure problem, so I added a `pages` folder for page-level components.
+
+The updated structure now makes it clear that new pages belong in `src/pages/`.
+
+
+## Task 5 — Scaling the Structure
+
+With two hundred components, I would move from a purely type-based structure toward a feature-based structure.
+
+The current type-based structure works well while the application is small because files are easy to find by their technical role. With two hundred components, the `components/` folder would become difficult to navigate and components from different parts of the application would be mixed together.
+
+I would group larger areas of the application by feature, such as `books/`, `members/`, and `borrow-requests/`, with their related components, data, hooks, and logic kept together. Shared components that are used across multiple features could remain in a common `components/` folder.
+
+I would not consider the current structure a mistake. It is appropriate for the current size of the application, but I would evolve it as the number of components and features grows.

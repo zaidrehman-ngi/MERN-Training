@@ -1,7 +1,7 @@
-import Header from "./components/Header";
-import Sidebar from "./components/Sidebar";
-import Main from "./components/Main";
-import Footer from "./components/Footer";
+import Header from "./layout/Header";
+import Sidebar from "./layout/Sidebar";
+import Main from "./layout/Main";
+import Footer from "./layout/Footer";
 
 function App() {
   const branchName = "Clifton Branch";

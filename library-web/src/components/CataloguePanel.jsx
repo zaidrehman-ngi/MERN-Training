@@ -2,7 +2,7 @@ import PanelHeader from "./PanelHeader";
 import BookList from "./BookList";
 import PanelFooter from "./PanelFooter";
 
-function LegacyBookPanel({
+function CataloguePanel({
   title,
   branchName,
   books,
@@ -31,4 +31,4 @@ function LegacyBookPanel({
   );
 }
 
-export default LegacyBookPanel;
+export default CataloguePanel;

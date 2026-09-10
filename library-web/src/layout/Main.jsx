@@ -1,10 +1,10 @@
-import LegacyBookPanel from "./LegacyBookPanel";
+import CataloguePanel from "../components/CataloguePanel";
 import { books } from "../data/books";
 
 function Main({ branchName }) {
   return (
     <main>
-      <LegacyBookPanel
+      <CataloguePanel
         title="Catalogue"
         branchName={branchName}
         books={books}
