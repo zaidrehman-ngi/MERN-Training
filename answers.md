@@ -122,3 +122,42 @@ Function components do not have these problems because they do not use class-bas
 * Function components could not use state or lifecycle features on their own before React 16.8.
 * React 16.8 introduced Hooks, which allowed function components to use state and other React features without converting them to classes.
 
+
+# Exercise 3
+
+## Task 1 — Default vs Named Imports
+
+Default export:
+
+import Header from "./components/Header";
+
+Named export:
+
+import { Sidebar } from "./components/Sidebar";
+
+A default export can be renamed at the import site because the exported value does not have to be imported using a specific name. A named export must use the exported name, unless it is explicitly renamed with the as keyword.
+
+
+## Task 2 — Actual Results
+
+The default Header export worked when imported as Banner. The component rendered successfully even though the import name did not match the component name.
+
+The named Sidebar import failed immediately because Sidbar does not match the exported name Sidebar. The error was: "The requested module '/src/components/Sidebar.jsx' does not provide an export named 'Sidbar'."
+
+The Header case is worse from a code maintenance perspective because it does not produce an error. The component still works, but using a different import name can make the code misleading and make it harder to identify the actual component when reading or searching the codebase.
+
+
+## Task 3 — Named Export Imported as Default
+
+The full error was:
+
+Uncaught SyntaxError: The requested module '/src/components/Sidebar.jsx?t=1789025760694' does not provide an export named 'default' (at App.jsx:2:8)
+
+Sidebar was exported as a named export, but I imported it as a default export. The module therefore could not provide the default export that the import requested.
+
+React did not receive an invalid component in this case because the import failed before the component could be rendered. If the import had succeeded, React would expect Sidebar to be a component type that can be used to create a React element, as explained by the React.createElement concept from Exercise 3.
+
+
+## Task 4 — Barrel File
+
+A barrel file provides a single entry point for re-exporting multiple modules, which makes imports shorter, but it can also make circular dependencies easier to create when modules depend on each other through the barrel. A barrel file does not automatically increase the final bundle size because modern ESM bundlers can use tree-shaking to remove unused exports, although side effects or dependency structures can affect this. I would not keep the barrel file in this project because I find separate imports clearer and easier to understand, especially when the project is still small. I would prefer importing each component directly from its own file.
