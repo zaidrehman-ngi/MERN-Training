@@ -1,24 +1,17 @@
-function BookCard({ title, copies, book, onBorrow }) {
+function BookCard({ book }) {
   return (
     <div className="book-card" data-book-id={book.id}>
-      <img src="/covers/dune.jpg" alt={`${title} cover`} />
+      <img src={book.coverUrl} alt={`${book.title} cover`} />
 
-      <h3 className="book-card__title">{title}</h3>
+      <h3 className="book-card__title">{book.title}</h3>
 
       <p className="author">
         {book.author} &middot; {book.year}
       </p>
 
-      <span
-        className="badge"
-        style={{ backgroundColor: "#1a7f4b", padding: "2px 6px" }}
-      >
-        {copies} copies
+      <span className="badge">
+        {book.onShelf} of {book.totalCopies} on shelf
       </span>
-
-      <button className="btn" onClick={() => onBorrow(book.id)}>
-        Borrow
-      </button>
     </div>
   );
 }

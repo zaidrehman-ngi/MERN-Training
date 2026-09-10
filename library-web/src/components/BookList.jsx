@@ -1,10 +1,10 @@
-import BookRow from "./BookRow";
+import BookCard from "./BookCard";
 
 function BookList({ books }) {
   return (
-    <div className="panel__body">
+    <div>
       {books.map((book) => (
-        <BookRow key={book.id} book={book} />
+        <BookCard key={book.id} book={book} />
       ))}
     </div>
   );

@@ -1,66 +1,53 @@
-import Header from "./layout/Header";
-import Sidebar from "./layout/Sidebar";
-import Main from "./layout/Main";
-import Footer from "./layout/Footer";
-
-function App() {
-  const branchName = "Clifton Branch";
-
-  return (
-    <div>
-      <Header />
-      <Sidebar />
-      <Main branchName={branchName} />
-      <Footer />
-    </div>
-  );
-}
-
-export default App;
-
-// import BookCard from "./components/BookCard";
-// import BookCardClass from "./components/BookCardClass";
+// import { useState } from "react";
+// import PropStateBug from "./components/PropStateBug";
 
 // function App() {
-//   const book = {
-//     id: "bk-4471",
-//     author: "Frank Herbert",
-//     year: 1965,
-//   };
-
-//   function handleBorrow(id) {
-//     console.log("Book clicked:", id);
-//   }
+//   const [onShelf, setOnShelf] = useState(1);
 
 //   return (
 //     <div>
-//       <BookCard title="Dune" copies={3} book={book} onBorrow={handleBorrow} />
-//       <BookCardClass
-//         title="Dune"
-//         copies={3}
-//         book={book}
-//         onBorrow={handleBorrow}
-//       />
+//       <PropStateBug onShelf={onShelf} />
+
+//       <button onClick={() => setOnShelf(2)}>Return book</button>
 //     </div>
 //   );
 // }
 
 // export default App;
 
-// import LegacyBookPanel from "./legacy/LegacyBookPanel";
-// import { books } from "./data/books";
+// import PropMutationBug from "./components/PropMutationBug";
 
 // function App() {
+//   const book = {
+//     id: "bk-3",
+//     title: "Hyperion",
+//     onShelf: 1,
+//   };
+
 //   return (
-//     <LegacyBookPanel
-//       title="Catalogue"
-//       branchName="Clifton Branch"
-//       books={books}
-//       totalCount={1284}
-//       onFilterChange={(filter) => console.log("filter:", filter)}
-//       onBorrow={(id) => console.log("borrow:", id)}
-//     />
+//     <div>
+//       <p>Parent before child: {book.onShelf} on shelf</p>
+
+//       <PropMutationBug book={book} />
+
+//       <p>Parent after child: {book.onShelf} on shelf</p>
+
+//       {console.log("Parent book after child:", book)}
+//     </div>
 //   );
 // }
 
 // export default App;
+
+import Catalogue from "./components/Catalogue";
+import { books } from "./data/books";
+
+function App() {
+  return (
+    <div>
+      <Catalogue books={books} />
+    </div>
+  );
+}
+
+export default App;
