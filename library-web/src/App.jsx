@@ -40,14 +40,57 @@
 // export default App;
 
 import Catalogue from "./components/Catalogue";
-import { books } from "./data/books";
+import { MESSY_BOOKS } from "./data/books.fixture";
 
 function App() {
   return (
     <div>
-      <Catalogue books={books} />
+      <Catalogue books={MESSY_BOOKS} />
     </div>
   );
 }
 
 export default App;
+
+// ==================== Exercise 2 Task 2 Test Cases ====================
+
+// import BookCard from "./components/BookCard";
+
+// function App() {
+//   return (
+//     <div>
+//       {/* Test 1 — Omit required book prop */}
+//       <BookCard />
+
+//       {/* Test 2 — Pass string where number is expected */}
+//       <BookCard
+//         book={{
+//           id: "test-1",
+//           title: "Test Book",
+//           author: "Test Author",
+//           year: "2000",
+//           onShelf: 1,
+//           totalCopies: 1,
+//           finePerDay: 20,
+//           status: "available",
+//         }}
+//       />
+
+//       {/* Test 3 — Pass invalid status */}
+//       <BookCard
+//         book={{
+//           id: "test-2",
+//           title: "Test Book",
+//           author: "Test Author",
+//           year: 2000,
+//           onShelf: 1,
+//           totalCopies: 1,
+//           finePerDay: 20,
+//           status: "RESERVED_STACK",
+//         }}
+//       />
+//     </div>
+//   );
+// }
+
+// export default App;

@@ -59,3 +59,89 @@ When a filter chip is clicked:
 4. React re-renders Catalogue with the new state.
 5. Catalogue derives the filtered books and passes them to BookList as props.
 6. BookList re-renders the matching BookCard components, so the new list appears on the screen.
+
+
+# Exercise 2
+
+## Task 1 — Reproduce the Outage
+
+### Error
+
+Uncaught TypeError: Cannot read properties of null (reading 'split')
+at BookCard (BookCard.jsx:2:31)
+
+### Component Stack
+
+BookCard (BookCard.jsx:2:31)
+BookList (BookList.jsx:6)
+Catalogue (Catalogue.jsx:43)
+App (App.jsx:48)
+main.jsx:8
+
+The error was caused by the 1961 book record having `author: null`. The `BookCard` tried to call `.split(" ")` on the null value.
+
+One bad record caused the BookCard rendering to fail, which caused the catalogue page to go blank instead of rendering the remaining books.
+
+
+## Task 2 — PropTypes Validation
+
+Installed `prop-types` and added a full `BookCard.propTypes` definition using `shape`, `string`, `number`, `oneOf`, `func`, and `isRequired`.
+
+### Violations Tested
+
+- Omitted the required `book` prop: the component threw `Uncaught TypeError: Cannot read properties of undefined (reading 'id')`. No PropTypes warning appeared.
+- Passed `"2000"` as the `year` where a number was expected: no console warning appeared and the component rendered normally.
+- Passed `"RESERVED_STACK"` as the `status`: no console warning appeared and the component rendered normally.
+
+No PropTypes warnings appeared in the console for any of the three violations.
+
+
+## Task 3 — React 19 and PropTypes
+
+`npm ls react` shows that this project is using React 19.2.8 and React DOM 19.2.8.
+
+React 19 removed PropTypes checking from React. This means the `propTypes` block is ignored and React does not show warnings for invalid props.
+
+React 19 also removed `defaultProps` for function components. Default parameters should be used instead.
+
+Therefore, the `BookCard.propTypes` block I added is present in the code, but React 19 does not use it for runtime validation.
+
+
+## Task 4 — React 18 PropTypes Warnings
+
+The React 18.3.1 test project showed the PropTypes warnings that are no longer shown by React 19.
+
+### Test 1 — Missing Required Prop
+
+Warning:
+
+`Warning: Failed prop type: The prop \`book\` is marked as required in \`BookCard\`, but its value is \`undefined\`.`
+
+The component then crashed with:
+
+`Uncaught TypeError: Cannot read properties of undefined (reading 'author')`
+
+PropTypes detected the missing prop, but it did not prevent the component from crashing.
+
+### Test 2 — Wrong Type
+
+Warning:
+
+`Warning: Failed prop type: Invalid prop \`book.year\` of type \`string\` supplied to \`BookCard\`, expected \`number\`.`
+
+### Test 3 — Invalid Value
+
+Warning:
+
+`Warning: Failed prop type: Invalid prop \`book.status\` of value \`RESERVED_STACK\` supplied to \`BookCard\`, expected one of ["available","out","overdue"].`
+
+React 18 displayed runtime warnings for all three invalid prop cases, while React 19 no longer performs these PropTypes checks.
+
+
+## Task 5 — PropTypes vs Runtime Safety
+
+A correct `propTypes` block would not have prevented the white screen, even in React 18. PropTypes only reports a warning when a prop has the wrong type; it does not stop the component from using invalid data.
+
+The actual fix is to handle missing or invalid data safely in the component. In `BookCard`, the author, year, and cover now have sensible fallback values, so every record in `MESSY_BOOKS` renders without crashing or showing `undefined`.
+
+PropTypes checks types while the program is running and in development only. TypeScript can check types before the program runs, but it has not been covered yet in this training programme. TypeScript would have caught the 1961 record's `author: null` if the author field had been typed as a non-nullable string, while PropTypes would only have reported it at runtime.
