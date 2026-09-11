@@ -187,3 +187,28 @@ Task 4 is a good example: the interval continued running after the component was
 | Run once on mount | `componentDidMount` | `useEffect(() => { ... }, [])` |
 | Run when a specific value changes | `componentDidUpdate` | `useEffect(() => { ... }, [value])` |
 | Clean up on unmount | `componentWillUnmount` | `useEffect(() => { return () => { ... } }, [])` |
+
+
+# Exercise 4
+
+## Task 5 — What BookCard Deliberately Leaves Out
+
+### 1. State and Filtering
+
+BookCard does not manage library state or filtering. The component only receives a `book` through props.
+
+If filtering had been built into BookCard, it would become tied to the catalogue page and would be harder to reuse in other places such as a search results page or a different view.
+
+### 2. Data Fetching
+
+BookCard does not fetch books from an API or know where the book data came from. The data is provided through the `book` prop.
+
+If API calls had been built into BookCard, every card would become responsible for loading its own data and would be tightly coupled to a specific API. This would make it harder to reuse the component with different data sources.
+
+### 3. Action and Selection Logic
+
+BookCard does not decide what should happen when the user clicks "View Book". It receives an `onSelect` callback from the component that renders it.
+
+If navigation or selection logic had been built into BookCard, it would be tied to one specific page or routing flow. Later, the same card could not easily be reused in another page with different behaviour.
+
+These choices keep BookCard focused on presenting a book and handling its own display, while the component that renders it remains responsible for data, state, and application-specific behaviour.
