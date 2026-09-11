@@ -39,18 +39,18 @@
 
 // export default App;
 
-import Catalogue from "./components/Catalogue";
-import { MESSY_BOOKS } from "./data/books.fixture";
+// import Catalogue from "./components/Catalogue";
+// import { MESSY_BOOKS } from "./data/books.fixture";
 
-function App() {
-  return (
-    <div>
-      <Catalogue books={MESSY_BOOKS} />
-    </div>
-  );
-}
+// function App() {
+//   return (
+//     <div>
+//       <Catalogue books={MESSY_BOOKS} />
+//     </div>
+//   );
+// }
 
-export default App;
+// export default App;
 
 // ==================== Exercise 2 Task 2 Test Cases ====================
 
@@ -94,3 +94,78 @@ export default App;
 // }
 
 // export default App;
+
+// import { useState } from "react";
+// import LifecycleProbe from "./components/LifecycleProbe";
+
+// function App() {
+//   const [count, setCount] = useState(1);
+
+//   return (
+//     <div>
+//       <LifecycleProbe count={count} />
+
+//       <button onClick={() => setCount(count + 1)}>
+//         Change Prop
+//       </button>
+//     </div>
+//   );
+// }
+
+// export default App;
+
+// import { useState } from "react";
+// import LifecycleProbe from "./components/LifecycleProbe";
+
+// function App() {
+//   const [showProbe, setShowProbe] = useState(true);
+
+//   return (
+//     <div>
+//       {showProbe && <LifecycleProbe />}
+
+//       <button onClick={() => setShowProbe(false)}>Remove Probe</button>
+//     </div>
+//   );
+// }
+
+// export default App;
+
+// import LifecycleProbe from "./components/LifecycleProbe";
+
+// function App() {
+//   return (
+//     <div>
+//       <LifecycleProbe>
+//         <LifecycleProbe />
+//         <LifecycleProbe />
+//         <LifecycleProbe />
+//       </LifecycleProbe>
+//     </div>
+//   );
+// }
+
+// export default App;
+
+import { useState } from "react";
+import LifecycleProbe from "./components/LifecycleProbe";
+
+function App() {
+  const [showProbe, setShowProbe] = useState(true);
+
+  return (
+    <div>
+      {showProbe && (
+        <LifecycleProbe>
+          <LifecycleProbe />
+          <LifecycleProbe />
+          <LifecycleProbe />
+        </LifecycleProbe>
+      )}
+
+      <button onClick={() => setShowProbe(false)}>Remove Probe</button>
+    </div>
+  );
+}
+
+export default App;

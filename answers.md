@@ -145,3 +145,45 @@ A correct `propTypes` block would not have prevented the white screen, even in R
 The actual fix is to handle missing or invalid data safely in the component. In `BookCard`, the author, year, and cover now have sensible fallback values, so every record in `MESSY_BOOKS` renders without crashing or showing `undefined`.
 
 PropTypes checks types while the program is running and in development only. TypeScript can check types before the program runs, but it has not been covered yet in this training programme. TypeScript would have caught the 1961 record's `author: null` if the author field had been typed as a non-nullable string, while PropTypes would only have reported it at runtime.
+
+
+# Exercise 3
+
+## Task 3 — Parent and Children Mount Order
+
+The children run their `componentDidMount` methods before the parent because React mounts the child components and their rendered output before completing the parent's mount.
+
+A component is considered mounted after its rendered output has been committed to the DOM. Once the child components are mounted, the parent's `componentDidMount` runs.
+
+React StrictMode also caused the components to be deliberately unmounted and mounted again during development, which produced the additional `componentWillUnmount` and `componentDidMount` logs.
+
+
+## Task 4 — Cleaning Up the Interval
+
+The interval continued running after the `LifecycleProbe` was removed from the page because `setInterval` creates a browser timer that does not automatically stop when the component unmounts. The timer still held the callback and continued executing it every second.
+
+I stored the interval ID on the component and called `clearInterval(this.intervalId)` inside `componentWillUnmount()`.
+
+After clicking "Remove Probe", `componentWillUnmount` ran and the interval logs stopped. This confirmed that work started when a component mounts should be cleaned up when the component unmounts.
+
+
+## Task 5 — React StrictMode and Double Firing
+
+Without `React.StrictMode`, the four LifecycleProbe components mounted normally: each constructor and render ran once, followed by each componentDidMount.
+
+With `React.StrictMode`, the components were deliberately mounted, unmounted, and mounted again during development. This caused the constructor, render, and componentDidMount logs to appear again, with componentWillUnmount appearing between the two mount cycles.
+
+StrictMode is used to help find unsafe code and bugs during development. It deliberately re-runs certain lifecycle behavior so that problems such as missing cleanup, side effects during rendering, and other code that is not safe to run more than once become easier to notice.
+
+This extra development-only behavior does not happen in the same way in production builds.
+
+Task 4 is a good example: the interval continued running after the component was removed because it was not cleaned up. StrictMode helps expose this type of side-effect and cleanup bug during development.
+
+
+## Task 6 — Class Lifecycle to Hooks
+
+| Purpose | Class method | Hook form |
+|---|---|---|
+| Run once on mount | `componentDidMount` | `useEffect(() => { ... }, [])` |
+| Run when a specific value changes | `componentDidUpdate` | `useEffect(() => { ... }, [value])` |
+| Clean up on unmount | `componentWillUnmount` | `useEffect(() => { return () => { ... } }, [])` |
