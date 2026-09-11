@@ -147,25 +147,67 @@
 
 // export default App;
 
-import { useState } from "react";
-import LifecycleProbe from "./components/LifecycleProbe";
+// import { useState } from "react";
+// import LifecycleProbe from "./components/LifecycleProbe";
+
+// function App() {
+//   const [showProbe, setShowProbe] = useState(true);
+
+//   return (
+//     <div>
+//       {showProbe && (
+//         <LifecycleProbe>
+//           <LifecycleProbe />
+//           <LifecycleProbe />
+//           <LifecycleProbe />
+//         </LifecycleProbe>
+//       )}
+
+//       <button onClick={() => setShowProbe(false)}>Remove Probe</button>
+//     </div>
+//   );
+// }
+
+// export default App;
+
+// ==================== Exercise 4 Task 3 ====================
+
+import { ALL_BOOKS } from "./data/books.fixture";
+import BookCard from "./components/BookCard/BookCard";
 
 function App() {
-  const [showProbe, setShowProbe] = useState(true);
+  const handleSelect = (book) => {
+    console.log("Selected book:", book);
+  };
 
   return (
     <div>
-      {showProbe && (
-        <LifecycleProbe>
-          <LifecycleProbe />
-          <LifecycleProbe />
-          <LifecycleProbe />
-        </LifecycleProbe>
-      )}
+      <h1>Library Catalogue</h1>
 
-      <button onClick={() => setShowProbe(false)}>Remove Probe</button>
+      {ALL_BOOKS.map((book) => (
+        <BookCard
+          key={book.id}
+          book={book}
+          onSelect={handleSelect}
+          variant="default"
+        />
+      ))}
     </div>
   );
 }
 
 export default App;
+
+// ==================== Exercise 4 Task 4 ====================
+
+// import Gallery from "./components/BookCard/Gallery";
+
+// function App() {
+//   return (
+//     <div>
+//       <Gallery />
+//     </div>
+//   );
+// }
+
+// export default App;
