@@ -92,12 +92,68 @@
 
 // ==================== Exercise 1 Task 6 ====================
 
-import KeyboardAccessibleRow from "./sandbox/KeyboardAccessibleRow";
+// import KeyboardAccessibleRow from "./sandbox/KeyboardAccessibleRow";
+
+// function App() {
+//   return (
+//     <div>
+//       <KeyboardAccessibleRow />
+//     </div>
+//   );
+// }
+
+// export default App;
+
+// ==================== Exercise 2 Task 1 ====================
+
+// import ConditionalBadge from "./sandbox/ConditionalBadge";
+
+// function App() {
+//   return (
+//     <div>
+//       <ConditionalBadge />
+//     </div>
+//   );
+// }
+
+// export default App;
+
+// ==================== Exercise 2 Task 3 ====================
+
+// import CatalogueBody from "./sandbox/CatalogueBody";
+
+// function App() {
+//   return (
+//     <div>
+//       <CatalogueBody />
+//     </div>
+//   );
+// }
+
+// export default App;
+
+// ==================== Exercise 2 Task 4 ====================
+
+// import ConditionalAttributes from "./sandbox/ConditionalAttributes";
+
+// function App() {
+//   return (
+//     <div>
+//       <ConditionalAttributes />
+//     </div>
+//   );
+// }
+
+// export default App;
+
+// ==================== Exercise 2 Task 5 ====================
+
+import HideToggle from "./sandbox/HideToggle";
 
 function App() {
   return (
     <div>
-      <KeyboardAccessibleRow />
+      <HideToggle />
     </div>
   );
 }
