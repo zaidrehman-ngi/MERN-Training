@@ -191,3 +191,19 @@ If the mapped item needs to return two sibling elements without adding an extra 
 `</React.Fragment>`
 
 The short `<>...</>` Fragment syntax cannot receive a key, so `React.Fragment` is needed when the Fragment itself must carry the key.
+
+
+# Exercise 4
+
+## Task 2 — State vs Derived Data
+
+The selected filter and search text belong in state because they are values directly chosen and changed by the user.
+
+The filtered book list does not belong in state because it can be derived during render from `selectedFilter`, `searchText`, and `ALL_BOOKS`.
+
+
+## Task 5 — BookCard API
+
+I did not edit BookCard today. Task 4 tempted me to add the checkbox to BookCard, but the checkbox was only needed to prove the key behavior, so I kept it in Catalogue instead.
+
+This avoided making BookCard responsible for page-specific UI and state. Since the BookCard prop API did not need to change, no update to COMPONENTS.md was required.

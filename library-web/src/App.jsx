@@ -162,14 +162,24 @@
 
 // ==================== Exercise 3 Task 1 ====================
 
-import KeyWarning from "./sandbox/KeyWarning";
+// import KeyWarning from "./sandbox/KeyWarning";
+
+// function App() {
+//   return (
+//     <div>
+//       <KeyWarning />
+//     </div>
+//   );
+// }
+
+// export default App;
+
+// ==================== Exercise 4 ====================
+
+import Catalogue from "./pages/Catalogue";
 
 function App() {
-  return (
-    <div>
-      <KeyWarning />
-    </div>
-  );
+  return <Catalogue />;
 }
 
 export default App;
