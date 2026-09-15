@@ -1,185 +1,86 @@
-// ==================== Exercise 1 Task 1 ====================
+// Exercise 1 - Task 2
 
-// import Counter from "./sandbox/Counter";
-// import HoverCard from "./sandbox/HoverCard";
-// import Toggle from "./sandbox/Toggle";
+// import { useState } from "react";
 
 // function App() {
-//   return (
-//     <div>
-//       <h1>Event Sandbox</h1>
+//   const [count, setCount] = useState(0);
 
-//       <Toggle />
-//       <Counter />
-//       <HoverCard />
-//     </div>
-//   );
-// }
+//   const handleClick = () => {
+//     setCount((currentCount) => currentCount + 1);
+//     setCount((currentCount) => currentCount + 1);
+//     setCount((currentCount) => currentCount + 1);
 
-// export default App;
-
-// ==================== Exercise 1 Task 2 ====================
-
-// function App() {
-//   const handleClick = (event) => {
-//     console.log("React event:", event);
-//     console.log("Native event:", event.nativeEvent);
+//     console.log("count:", count);
 //   };
 
 //   return (
 //     <div>
-//       <button onClick={handleClick}>Click Me</button>
+//       <p>Count: {count}</p>
+//       <button onClick={handleClick}>Add 3</button>
 //     </div>
 //   );
 // }
 
 // export default App;
 
-// ==================== Exercise 1 Task 3 ====================
+// Exercise 1 - Task 3
+
+// import { useState } from "react";
 
 // function App() {
-//   const handleClick = (e) => {
-//     console.log("target:", e.target);
-//     console.log("currentTarget:", e.currentTarget);
-//     console.log("same:", e.target === e.currentTarget);
+//   const [name, setName] = useState("");
+
+//   return (
+//     <div>
+//       <h2>Controlled Input</h2>
+
+//       <input
+//         type="text"
+//         value={name}
+//         onChange={(e) => setName(e.target.value)}
+//       />
+
+//       <p>Name: {name}</p>
+//     </div>
+//   );
+// }
+
+// export default App;
+
+// Exercise 1 - Task 4
+
+// import { useState } from "react";
+
+// function App() {
+//   const [name, setName] = useState("");
+
+//   const handleSubmit = (e) => {
+//     e.preventDefault();
+
+//     const formData = new FormData(e.currentTarget);
+//     const submittedName = formData.get("name");
+
+//     console.log("Submitted name:", submittedName);
+//   };
+
+//   const handleReset = () => {
+//     setName("");
 //   };
 
 //   return (
-//     <div onClick={handleClick}>
-//       <button>Click Me</button>
-//     </div>
-//   );
-// }
-
-// export default App;
-
-// ==================== Exercise 1 Task 4 ====================
-
-// function App() {
-//   const handleRowClick = () => {
-//     console.log("opening detail page");
-//   };
-
-//   const handleBorrow = (e) => {
-//     e.stopPropagation();
-//     console.log("borrowing book");
-//   };
-
-//   return (
-//     <div onClick={handleRowClick}>
-//       <h2>Dune</h2>
-
-//       <button onClick={handleBorrow}>Borrow</button>
-//     </div>
-//   );
-// }
-
-// export default App;
-
-// ==================== Exercise 1 Task 5 ====================
-
-// import HandlerPatterns from "./sandbox/HandlerPatterns";
-
-// function App() {
-//   return (
 //     <div>
-//       <HandlerPatterns />
+//       <h2>Uncontrolled Input</h2>
+
+//       <form onSubmit={handleSubmit}>
+//         <input type="text" name="name" defaultValue="Zaid" />
+
+//         <button type="submit">Submit</button>
+//         <button type="button" onClick={handleReset}>
+//           Reset
+//         </button>
+//       </form>
 //     </div>
 //   );
 // }
 
 // export default App;
-
-// ==================== Exercise 1 Task 6 ====================
-
-// import KeyboardAccessibleRow from "./sandbox/KeyboardAccessibleRow";
-
-// function App() {
-//   return (
-//     <div>
-//       <KeyboardAccessibleRow />
-//     </div>
-//   );
-// }
-
-// export default App;
-
-// ==================== Exercise 2 Task 1 ====================
-
-// import ConditionalBadge from "./sandbox/ConditionalBadge";
-
-// function App() {
-//   return (
-//     <div>
-//       <ConditionalBadge />
-//     </div>
-//   );
-// }
-
-// export default App;
-
-// ==================== Exercise 2 Task 3 ====================
-
-// import CatalogueBody from "./sandbox/CatalogueBody";
-
-// function App() {
-//   return (
-//     <div>
-//       <CatalogueBody />
-//     </div>
-//   );
-// }
-
-// export default App;
-
-// ==================== Exercise 2 Task 4 ====================
-
-// import ConditionalAttributes from "./sandbox/ConditionalAttributes";
-
-// function App() {
-//   return (
-//     <div>
-//       <ConditionalAttributes />
-//     </div>
-//   );
-// }
-
-// export default App;
-
-// ==================== Exercise 2 Task 5 ====================
-
-// import HideToggle from "./sandbox/HideToggle";
-
-// function App() {
-//   return (
-//     <div>
-//       <HideToggle />
-//     </div>
-//   );
-// }
-
-// export default App;
-
-// ==================== Exercise 3 Task 1 ====================
-
-// import KeyWarning from "./sandbox/KeyWarning";
-
-// function App() {
-//   return (
-//     <div>
-//       <KeyWarning />
-//     </div>
-//   );
-// }
-
-// export default App;
-
-// ==================== Exercise 4 ====================
-
-import Catalogue from "./pages/Catalogue";
-
-function App() {
-  return <Catalogue />;
-}
-
-export default App;
