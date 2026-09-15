@@ -1,0 +1,37 @@
+.book-card {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+}
+
+.book-card__cover {
+  width: 100px;
+  height: 140px;
+  object-fit: cover;
+}
+
+.book-card__title {
+  margin: 0 0 8px;
+}
+
+.book-card__author,
+.book-card__year {
+  margin: 4px 0;
+}
+
+.book-card--compact {
+  padding: 10px;
+}
+
+.book-card--compact .book-card__cover {
+  width: 70px;
+  height: 100px;
+}
+
+.book-card-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
