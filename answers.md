@@ -56,3 +56,57 @@ On submit, I used `FormData` with the form element from `e.currentTarget` to rea
 I then reproduced the reset bug by calling `setName("")`. The state was reset correctly, but the input did not clear because the input's current value was owned by the DOM, not by React state. `defaultValue` only sets the initial value and does not control the value on later renders.
 
 The console was right because the React state really was `""`. The screen was also right because the DOM still had `Ahmed` as the input's current value. They disagreed because React state and the uncontrolled input were storing different values.
+
+
+# Exercise 2
+
+## Task 1 — Controlled Form Fields
+
+I used one `useState` object to store all eight form fields instead of creating separate state for each field.
+
+I also used one `handleChange` for the text fields, select, and radio buttons by reading the input's `name` and `value`.
+
+The trade-off is that checkboxes do not use `e.target.value` to represent their checked state. They use `e.target.checked`, which is a boolean. This means the checkbox needs separate handling even though the other fields can share the same change handler.
+
+The form fields are all controlled, so React state is the source of truth for their current values.
+
+
+## Task 2 — Validation Rules
+
+| Field | Rule | Message shown to member |
+|---|---|---|
+| Full name | Required | Please enter your full name. |
+| Email | Required and must have a valid email shape | Please enter a valid email address. |
+| Password | Required and at least 8 characters | Password must be at least 8 characters long. |
+| Confirm password | Required and must match password | Passwords do not match. Please enter the same password again. |
+| Phone | Required and accepts common Karachi formats such as `03001234567` or `0300-1234567` | Please enter a valid phone number. |
+| Home branch | Required | Please select your home branch. |
+| Membership tier | Required | Please select a membership tier. |
+| Agree to terms | Must be checked | Please agree to the terms and conditions. |
+
+
+## Task 3 — Validation Timing
+
+I chose to validate each field when the user leaves it instead of validating on every keystroke or waiting until submit.
+
+I track completed fields using a `touched` state object and only show a field's error after it has been touched. The validation functions check the current form values, but the errors are not shown while the user is still typing.
+
+I will also validate the entire form on submit so untouched invalid fields cannot be missed.
+
+The trade-off is that a member may not see an error until they leave a field, but this avoids interrupting them with validation errors while they are still typing.
+
+
+## Task 4 — Accessibility
+
+I added real labels for every form field using `htmlFor` and matching `id` values. Each error message is associated with its field using `aria-describedby`, and `aria-invalid` communicates the invalid state instead of relying on red text alone.
+
+I tested it with Windows Narrator by focusing each invalid field and verifying that its label, invalid state, and associated error message were announced correctly.
+
+
+## Task 5 — Submit Handling
+
+I used `onSubmit` with `e.preventDefault()` so the page does not reload when the form is submitted.
+
+On submit, I mark all fields as touched so that any errors are shown, then check all validation results. If there are errors, the function returns without submitting the form. If there are no errors, the form data is submitted.
+
+I decided not to disable the submit button until the form is valid. A disabled button can leave a member unsure why they cannot continue if they have made a mistake they have not noticed. Instead, I keep the button enabled and show clear validation messages when they try to submit, so they can see exactly what needs to be fixed.
