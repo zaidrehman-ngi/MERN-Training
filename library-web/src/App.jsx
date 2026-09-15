@@ -148,12 +148,26 @@
 
 // ==================== Exercise 2 Task 5 ====================
 
-import HideToggle from "./sandbox/HideToggle";
+// import HideToggle from "./sandbox/HideToggle";
+
+// function App() {
+//   return (
+//     <div>
+//       <HideToggle />
+//     </div>
+//   );
+// }
+
+// export default App;
+
+// ==================== Exercise 3 Task 1 ====================
+
+import KeyWarning from "./sandbox/KeyWarning";
 
 function App() {
   return (
     <div>
-      <HideToggle />
+      <KeyWarning />
     </div>
   );
 }

@@ -116,3 +116,78 @@ With `display: none`, the panel remains in the React tree and is only hidden vis
 I would deliberately use `display: none` when I want to keep the component mounted and preserve its state while temporarily hiding it. If the component should not exist or do any work while hidden, I would prefer conditional rendering.
 
 This connects to the cleanup concept from Friday: when a component is unmounted, its effects should clean up subscriptions, timers, listeners, or other ongoing work so they do not continue after the component is gone.
+
+
+# Exercise 3
+
+## Task 1 — Missing Key Warning
+
+I rendered all books using `.map()` without providing a `key` prop.
+
+React showed this warning:
+
+Each child in a list should have a unique "key" prop. Check the render method of `div`. It was passed a child from KeyWarning. See https://react.dev/link/warning-keys for more information.
+
+This is a warning, not an error. The page still works, which is why this kind of issue can easily make it into a shipped application.
+
+
+## Task 2 — Index Key Bug
+
+After checking the third book and removing the first book, the checkbox stayed checked on the third row, but that row now contained the fourth book.
+
+This reproduced the bug: the checkbox appeared to move to the wrong book.
+
+
+## Task 3 — Stable Keys
+
+I changed only `key={index}` to `key={book.id}` and repeated the same sequence: I checked the third book and removed the first book.
+
+This time, the checkbox stayed with the correct book instead of moving to the wrong row.
+
+Nothing else in the file changed. The difference came entirely from giving React a stable key that identifies the book itself rather than its current position in the list.
+
+
+## Task 4 — What a Key Is For
+
+A key tells React which item in a list is which between two renders. React uses the key to match the previous rendered item with the corresponding item in the next render so it can decide which elements to keep, update, move, or remove.
+
+With `key={index}`, the row's identity was based on its position. When the first book was removed, the remaining books shifted indexes, so React reused existing rows for different books.
+
+The checkbox was affected even though it was not part of the book data because the checkbox was part of the reused DOM row. React reused that row and therefore reused the same checkbox element, including its browser-managed checked state.
+
+With `key={book.id}`, each row keeps the identity of the book it represents, so React can correctly match rows when the list changes. The checkbox therefore stays with the correct book.
+
+
+## Task 5 — Rules for Keys
+
+### 1. The key goes on the element returned by the map
+
+The key should be placed on the outermost element returned for each item in the `.map()`.
+
+My code proves this:
+
+`{books.map((book) => (`
+`  <div key={book.id}>`
+
+The `<div>` is the element representing each book, so it carries the key.
+
+### 2. Keys only need to be unique among the siblings in that list
+
+A key does not need to be globally unique across the whole application. It only needs to uniquely identify each item among the other siblings in the same list.
+
+My code uses:
+
+`<div key={book.id}>`
+
+Each book has a unique `id`, so the rows can be identified correctly within this list.
+
+### 3. Use a keyed Fragment when returning multiple siblings without a wrapper
+
+If the mapped item needs to return two sibling elements without adding an extra wrapper element, I can use `React.Fragment` and put the key on the Fragment:
+
+`<React.Fragment key={book.id}>`
+`  <h3>{book.title}</h3>`
+`  <button>Remove</button>`
+`</React.Fragment>`
+
+The short `<>...</>` Fragment syntax cannot receive a key, so `React.Fragment` is needed when the Fragment itself must carry the key.

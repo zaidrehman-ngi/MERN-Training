@@ -21,3 +21,10 @@ The console showed:
 The actual result matched my prediction.
 
 
+# Exercise 3
+
+## Task 2 — Index Key Bug
+
+### Guess
+
+I predict that after ticking the third book and removing the first book, the checkbox will remain checked on the third row. However, after the first book is removed, the third row will contain the fourth book, so the checkbox will appear to have moved to the wrong book.
