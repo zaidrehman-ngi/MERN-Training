@@ -85,10 +85,20 @@
 
 // export default App;
 
-import Register from "./pages/Register/Register";
+// import Register from "./pages/Register/Register";
+
+// function App() {
+//   return <Register />;
+// }
+
+// export default App;
+
+// Exercise 3
+
+import Catalogue from "./pages/Catalogue";
 
 function App() {
-  return <Register />;
+  return <Catalogue />;
 }
 
 export default App;

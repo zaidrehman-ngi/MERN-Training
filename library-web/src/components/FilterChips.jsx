@@ -1,23 +1,14 @@
-import FilterChip from "./FilterChip";
-
-const filters = [
-  { label: "All", filter: "all" },
-  { label: "Available", filter: "available" },
-  { label: "Overdue", filter: "overdue" },
-];
-
 function FilterChips({ onFilterChange }) {
   return (
-    <>
-      {filters.map((item) => (
-        <FilterChip
-          key={item.filter}
-          label={item.label}
-          filter={item.filter}
-          onFilterChange={onFilterChange}
-        />
-      ))}
-    </>
+    <div>
+      <button onClick={() => onFilterChange("all")}>All</button>
+
+      <button onClick={() => onFilterChange("available")}>Available</button>
+
+      <button onClick={() => onFilterChange("out")}>Out</button>
+
+      <button onClick={() => onFilterChange("overdue")}>Overdue</button>
+    </div>
   );
 }
 

@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { ALL_BOOKS } from "../data/books.fixture";
 import BookCard from "../components/BookCard/BookCard";
+import SearchBox from "../components/SearchBox";
+import ResultCount from "../components/ResultCount";
+import FilterChips from "../components/FilterChips";
 
 function Catalogue() {
   const [selectedFilter, setSelectedFilter] = useState("all");
@@ -42,26 +45,11 @@ function Catalogue() {
 
       {catalogueState === "results" && (
         <>
-          <div>
-            <button onClick={() => setSelectedFilter("all")}>All</button>
+          <FilterChips onFilterChange={setSelectedFilter} />
 
-            <button onClick={() => setSelectedFilter("available")}>
-              Available
-            </button>
+          <SearchBox searchText={searchText} onSearchChange={setSearchText} />
 
-            <button onClick={() => setSelectedFilter("out")}>Out</button>
-
-            <button onClick={() => setSelectedFilter("overdue")}>
-              Overdue
-            </button>
-          </div>
-
-          <input
-            type="search"
-            placeholder="Search by title or author"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-          />
+          <ResultCount count={filteredBooks.length} />
 
           {filteredBooks.length === 0 ? (
             <p>No books found. Try changing your search or filter.</p>

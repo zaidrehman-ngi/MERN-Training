@@ -35,3 +35,12 @@ I decided not to disable the submit button until the form is valid.
 A disabled button can leave a member unsure why they cannot continue, especially if they have made a mistake they have not noticed. Instead, I will keep the button enabled and validate the full form when it is submitted.
 
 If there are errors, the form will not submit and all invalid fields will show clear messages explaining what the member needs to fix. This gives the member a clear path to correct the form instead of making the button appear unresponsive.
+
+
+# Exercise 3
+
+## Task 5 — Re-rendering Decision
+
+Lifting the search and filter state into `Catalogue` makes the state consistent across the screen, but it also means updates to that state cause the parent and its children to render again.
+
+I will not optimize these renders yet. I will first measure the actual performance problem before using `React.memo`, `useMemo`, or `useCallback` in Week 4.

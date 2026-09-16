@@ -110,3 +110,46 @@ I used `onSubmit` with `e.preventDefault()` so the page does not reload when the
 On submit, I mark all fields as touched so that any errors are shown, then check all validation results. If there are errors, the function returns without submitting the form. If there are no errors, the form data is submitted.
 
 I decided not to disable the submit button until the form is valid. A disabled button can leave a member unsure why they cannot continue if they have made a mistake they have not noticed. Instead, I keep the button enabled and show clear validation messages when they try to submit, so they can see exactly what needs to be fixed.
+
+
+# Exercise 3
+
+## Task 1 — Reproduce the Bug
+
+SearchBox and ResultCount each have their own `searchText` state. When I type into SearchBox, only the state inside SearchBox changes.
+
+ResultCount cannot know about the new search term because its state lives inside a different component instance. The two components are siblings, so neither one can directly access the other's local state.
+
+Both components are therefore reading their own separate copy of the same fact instead of sharing one state value.
+
+
+## Task 2 — Lifting State
+
+The `Catalogue` component is the single source of truth for the search term because it is the nearest common parent of `SearchBox` and `ResultCount`, so both children now receive the same value from it.
+
+
+## Task 3 — Stateless Children
+
+SearchBox is now reusable because it no longer owns its search state. The parent decides what value it displays and what happens when the user types.
+
+For example, the same SearchBox could be used in a Borrowed Books section by giving it the borrowed-books search value and its corresponding change handler.
+
+In Task 1, SearchBox owned its own state, so it was tied to that specific search state and could not be controlled by another part of the catalogue.
+
+
+## Task 4 — One Owner for Catalogue State
+
+Catalogue now owns the two pieces of user-controlled state: `searchText` and `selectedFilter`. `SearchBox` and `FilterChips` receive their values and change handlers as props, while `ResultCount` receives the derived count.
+
+The filtered book list remains derived during render from `ALL_BOOKS`, `searchText`, and `selectedFilter` instead of being stored in state.
+
+
+## Task 5 — The Cost of Lifting State
+
+When the user types one character, `SearchBox` calls `setSearchText`, which updates state in `Catalogue`. This causes `Catalogue` to render again, recalculates the derived `filteredBooks`, and causes its child components to render again as part of the parent render.
+
+The components that re-render do not all need to because only the search value and the filtered results are affected by the new character. For example, `FilterChips` does not need to change when the search text changes.
+
+This is the problem of unnecessary re-renders. The three tools we will learn in Week 4 to control this are `React.memo`, `useMemo`, and `useCallback`.
+
+I will not add these optimizations now because the exercise has not shown that the current rendering is actually a performance problem. Optimization should be based on measured performance rather than something simply feeling slow.
