@@ -102,3 +102,21 @@ function App() {
 }
 
 export default App;
+
+// Exercise 4
+
+// import EffectRuns from "./components/EffectRuns";
+
+// function App() {
+//   return <EffectRuns />;
+// }
+
+// export default App;
+
+// import EffectLoop from "./components/EffectLoop";
+
+// function App() {
+//   return <EffectLoop />;
+// }
+
+// export default App;

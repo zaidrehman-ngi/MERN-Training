@@ -153,3 +153,77 @@ The components that re-render do not all need to because only the search value a
 This is the problem of unnecessary re-renders. The three tools we will learn in Week 4 to control this are `React.memo`, `useMemo`, and `useCallback`.
 
 I will not add these optimizations now because the exercise has not shown that the current rendering is actually a performance problem. Optimization should be based on measured performance rather than something simply feeling slow.
+
+
+# Exercise 4
+
+## Task 1 — Effect Run Counts
+
+The three effects behaved differently based on their dependency arrays.
+
+- Effect A has no second argument, so it runs after every render. It ran 4 times: twice on the initial render because of React Strict Mode in development, then once after each filter change.
+- Effect B has an empty dependency array, so it normally runs after the initial mount. It ran 2 times because React Strict Mode runs mount effects an extra time in development.
+- Effect C has `filter` as a dependency, so it runs after the initial mount and whenever the `filter` value changes. It ran 4 times: twice on the initial render because of Strict Mode, then once after each filter change.
+
+The second argument of `useEffect` is the dependency array. React compares each dependency with its value from the previous render using `Object.is`. If a dependency changed, the effect runs again. If the dependency array is empty, there are no dependencies to watch.
+
+
+## Task 2 — Catalogue Loading States
+
+I replaced the manual catalogue state switcher with `loadBooks()` from the mock API inside a `useEffect`.
+
+The catalogue now handles all four states:
+
+- Loading — shown while the API request is pending.
+- Error — shown when `loadBooks()` rejects.
+- Empty — shown when the request succeeds but returns no books.
+- Results — shown when books are returned successfully.
+
+I used `failNext()` to force the next API request to fail and confirmed that the error message appeared correctly.
+
+The spinner also stopped after the failed request because `setLoading(false)` runs inside `finally()`, so loading ends whether the request succeeds or fails.
+
+
+## Task 3 — Effect Loop
+
+The loop happened because the effect had no dependency array and updated state inside the effect.
+
+The cycle was:
+
+1. The component renders.
+2. The effect runs after the render.
+3. `loadBooks()` completes and `setBooks()` updates the state.
+4. The state update causes the component to render again.
+5. The effect runs again, starting another request, and the cycle repeats.
+
+This caused the API call count to keep increasing.
+
+I fixed the loop by adding an empty dependency array `[]` to the effect. This tells React that the effect has no values from the component that it needs to watch, so it should not run again after every render. It runs on the initial mount instead. In development, React Strict Mode runs the mount effect twice, which is why the API call count stopped at 2.
+
+
+## Task 4 — Race Condition
+
+The race condition happened because the requests were sent in this order:
+
+1. `Out` request was sent first.
+2. `All` request was sent next and took 1500ms.
+3. `Available` request was sent last and took 300ms.
+4. The `Available` response arrived first and displayed the available books.
+5. The older `All` response arrived later and overwrote the screen with all books.
+
+The problem was that the responses could arrive in a different order from the requests.
+
+I fixed this using the `useEffect` cleanup function. Each effect run starts with `ignore = false`, and its cleanup sets `ignore = true` when the dependencies change. This makes the previous request's response ignored, so only the latest effect can update the screen.
+
+I repeated the `Out → All → Available` sequence after the fix, and the screen correctly remained on the Available books.
+
+
+## Task 5 — StrictMode Double Firing
+
+I refreshed the Catalogue page and confirmed that the effect runs twice on mount in development because of React Strict Mode.
+
+With the cleanup added in Task 4, the double run does not cause a visible problem. The cleanup marks the previous effect as inactive, so its response is ignored if a newer effect has already started.
+
+This is the kind of situation Strict Mode is designed to help reveal during development. It can expose effects that are not safe to run more than once or that do not clean up properly.
+
+If I had skipped Task 4, the double firing would have revealed that the Task 2 code could have multiple requests active at the same time. An older response could then overwrite newer catalogue data, causing the same race condition we reproduced in Task 4.
