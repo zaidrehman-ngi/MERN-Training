@@ -1,0 +1,110 @@
+.support-ticket {
+  max-width: 720px;
+  margin: 40px auto;
+  padding: 24px;
+  font-family: Arial, sans-serif;
+}
+
+.support-ticket h1 {
+  margin-bottom: 8px;
+}
+
+.support-ticket__description {
+  margin-top: 0;
+  margin-bottom: 24px;
+  color: #555;
+}
+
+.support-ticket form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.support-ticket__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.support-ticket__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.support-ticket__field label,
+.support-ticket__checkbox label {
+  font-weight: 600;
+}
+
+.support-ticket input,
+.support-ticket select,
+.support-ticket textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.support-ticket textarea {
+  resize: vertical;
+}
+
+.support-ticket__error {
+  margin: 0;
+  color: #c62828;
+  font-size: 14px;
+}
+
+.support-ticket__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.support-ticket__checkbox input {
+  width: auto;
+}
+
+.support-ticket__actions {
+  display: flex;
+  gap: 12px;
+}
+
+.support-ticket button {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.support-ticket button[type="submit"] {
+  background: #2563eb;
+  color: white;
+}
+
+.support-ticket button[type="submit"]:disabled {
+  background: #999;
+  cursor: not-allowed;
+}
+
+.support-ticket button[type="button"] {
+  background: #eee;
+}
+
+.support-ticket__success {
+  margin: 0;
+  padding: 12px;
+  border-radius: 6px;
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+@media (max-width: 600px) {
+  .support-ticket__row {
+    grid-template-columns: 1fr;
+  }
+}

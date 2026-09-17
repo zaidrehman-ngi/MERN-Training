@@ -1,68 +1,7 @@
-import { useState } from "react";
+import useForm from "../hooks/useForm";
 import "./Register.css";
 
 function Register() {
-  const [form, setForm] = useState({
-    fullName: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    phone: "",
-    homeBranch: "",
-    membershipTier: "",
-    agreeToTerms: false,
-  });
-
-  const [touched, setTouched] = useState({});
-
-  const handleBlur = (e) => {
-    const { name } = e.target;
-
-    setTouched((currentTouched) => ({
-      ...currentTouched,
-      [name]: true,
-    }));
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-
-    setForm((currentForm) => ({
-      ...currentForm,
-      [name]: value,
-    }));
-  };
-
-  const handleTermsChange = (e) => {
-    setForm((currentForm) => ({
-      ...currentForm,
-      agreeToTerms: e.target.checked,
-    }));
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    setTouched({
-      fullName: true,
-      email: true,
-      password: true,
-      confirmPassword: true,
-      phone: true,
-      homeBranch: true,
-      membershipTier: true,
-      agreeToTerms: true,
-    });
-
-    const hasErrors = Object.values(errors).some((error) => error);
-
-    if (hasErrors) {
-      return;
-    }
-
-    console.log("Registration submitted:", form);
-  };
-
   function validateFullName(value) {
     if (!value.trim()) {
       return "Please enter your full name.";
@@ -131,19 +70,39 @@ function Register() {
     return "";
   }
 
-  const errors = {
-    fullName: validateFullName(form.fullName),
-    email: validateEmail(form.email),
-    password: validatePassword(form.password),
+  const validate = (values) => ({
+    fullName: validateFullName(values.fullName),
+    email: validateEmail(values.email),
+    password: validatePassword(values.password),
     confirmPassword: validateConfirmPassword(
-      form.confirmPassword,
-      form.password,
+      values.confirmPassword,
+      values.password,
     ),
-    phone: validatePhone(form.phone),
-    homeBranch: validateHomeBranch(form.homeBranch),
-    membershipTier: validateMembershipTier(form.membershipTier),
-    agreeToTerms: validateAgreeToTerms(form.agreeToTerms),
+    phone: validatePhone(values.phone),
+    homeBranch: validateHomeBranch(values.homeBranch),
+    membershipTier: validateMembershipTier(values.membershipTier),
+    agreeToTerms: validateAgreeToTerms(values.agreeToTerms),
+  });
+
+  const initialValues = {
+    fullName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    phone: "",
+    homeBranch: "",
+    membershipTier: "",
+    agreeToTerms: false,
   };
+
+  const { values, errors, touched, handleChange, handleBlur, handleSubmit } =
+    useForm({
+      initialValues,
+      validate,
+      onSubmit: (values) => {
+        console.log("Registration submitted:", values);
+      },
+    });
 
   return (
     <main>
@@ -155,7 +114,7 @@ function Register() {
           id="fullName"
           type="text"
           name="fullName"
-          value={form.fullName}
+          value={values.fullName}
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={touched.fullName && !!errors.fullName}
@@ -172,7 +131,7 @@ function Register() {
           id="email"
           type="email"
           name="email"
-          value={form.email}
+          value={values.email}
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={touched.email && !!errors.email}
@@ -189,7 +148,7 @@ function Register() {
           id="password"
           type="password"
           name="password"
-          value={form.password}
+          value={values.password}
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={touched.password && !!errors.password}
@@ -206,7 +165,7 @@ function Register() {
           id="confirmPassword"
           type="password"
           name="confirmPassword"
-          value={form.confirmPassword}
+          value={values.confirmPassword}
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={touched.confirmPassword && !!errors.confirmPassword}
@@ -225,7 +184,7 @@ function Register() {
           id="phone"
           type="tel"
           name="phone"
-          value={form.phone}
+          value={values.phone}
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={touched.phone && !!errors.phone}
@@ -241,7 +200,7 @@ function Register() {
         <select
           id="homeBranch"
           name="homeBranch"
-          value={form.homeBranch}
+          value={values.homeBranch}
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={touched.homeBranch && !!errors.homeBranch}
@@ -269,7 +228,7 @@ function Register() {
               type="radio"
               name="membershipTier"
               value="standard"
-              checked={form.membershipTier === "standard"}
+              checked={values.membershipTier === "standard"}
               onChange={handleChange}
               onBlur={handleBlur}
               aria-invalid={touched.membershipTier && !!errors.membershipTier}
@@ -288,7 +247,7 @@ function Register() {
               type="radio"
               name="membershipTier"
               value="premium"
-              checked={form.membershipTier === "premium"}
+              checked={values.membershipTier === "premium"}
               onChange={handleChange}
               onBlur={handleBlur}
               aria-invalid={touched.membershipTier && !!errors.membershipTier}
@@ -311,8 +270,8 @@ function Register() {
             id="agreeToTerms"
             type="checkbox"
             name="agreeToTerms"
-            checked={form.agreeToTerms}
-            onChange={handleTermsChange}
+            checked={values.agreeToTerms}
+            onChange={handleChange}
             onBlur={handleBlur}
             aria-invalid={touched.agreeToTerms && !!errors.agreeToTerms}
             aria-describedby={
