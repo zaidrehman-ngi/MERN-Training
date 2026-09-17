@@ -1,15 +1,15 @@
-import { useState } from "react";
+import useToggle from "../hooks/useToggle";
 
 function Toggle() {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, toggle] = useToggle(false);
+  // const [isOpen, toggle, panel] = useToggle(false);
 
   return (
     <div>
-      <button onClick={() => setIsOpen(!isOpen)}>
-        {isOpen ? "Hide Panel" : "Show Panel"}
-      </button>
+      <button onClick={toggle}>{isOpen ? "Hide Panel" : "Show Panel"}</button>
 
       {isOpen && <p>This is the toggle panel.</p>}
+      {/* {panel} */}
     </div>
   );
 }

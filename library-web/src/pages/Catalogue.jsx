@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+// import { loadBooks, getCallCount } from "../data/mockApi";
 import { loadBooks } from "../data/mockApi";
 import BookCard from "../components/BookCard/BookCard";
 import SearchBox from "../components/SearchBox";
 import ResultCount from "../components/ResultCount";
 import FilterChips from "../components/FilterChips";
+import useDebounce from "../hooks/useDebounce";
 
 function Catalogue() {
   const [selectedFilter, setSelectedFilter] = useState("all");
@@ -11,6 +13,7 @@ function Catalogue() {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const debouncedSearchText = useDebounce(searchText, 500);
 
   useEffect(() => {
     let ignore = false;
@@ -21,7 +24,7 @@ function Catalogue() {
 
     loadBooks({
       filter: selectedFilter,
-      search: searchText,
+      search: debouncedSearchText,
     })
       .then((books) => {
         if (!ignore) {
@@ -43,11 +46,12 @@ function Catalogue() {
     return () => {
       ignore = true;
     };
-  }, [selectedFilter, searchText]);
+  }, [selectedFilter, debouncedSearchText]);
 
   return (
     <main>
       <h1>Catalogue</h1>
+      {/* <p>API calls: {getCallCount()}</p> */}
 
       {loading && <p>Loading books...</p>}
 
