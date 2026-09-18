@@ -12,13 +12,13 @@
 
 // export default App;
 
-// import Catalogue from "./pages/Catalogue";
+import Catalogue from "./pages/Catalogue";
 
-// function App() {
-//   return <Catalogue />;
-// }
+function App() {
+  return <Catalogue />;
+}
 
-// export default App;
+export default App;
 
 // import AddBook from "./pages/AddBook/AddBook";
 
@@ -36,15 +36,23 @@
 
 // export default App;
 
-import { BranchProvider } from "./context/BranchContext";
-import Main from "./layout/Main";
+// import { BranchProvider } from "./context/BranchContext";
+// import Main from "./layout/Main";
 
-function App() {
-  return (
-    <BranchProvider>
-      <Main />
-    </BranchProvider>
-  );
-}
+// function App() {
+//   return (
+//     <BranchProvider>
+//       <Main />
+//     </BranchProvider>
+//   );
+// }
 
-export default App;
+// export default App;
+
+// import BookSearchTest from "./components/BookSearchTest";
+
+// function App() {
+//   return <BookSearchTest />;
+// }
+
+// export default App;

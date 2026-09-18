@@ -137,3 +137,82 @@ I fixed this by using `useMemo` so the context value only changes when `branch` 
 When `branch` changes but `member` does not, all consumers of the same Context still re-render because the Context value changes.
 
 If `branch` and `member` update at very different rates, I would split them into separate Contexts so consumers only re-render when the value they need changes.
+
+
+# Exercise 4
+
+## Task 1 — Seven Problems
+
+1. **Conditional Hook:** `useState` is called inside an `if` block. This can break when `showAdminColumns` changes because Hooks must be called in the same order on every render.
+
+2. **Missing dependency:** The effect uses `search` but only depends on `filter`. Changing the search text therefore does not trigger a new search.
+
+3. **Race condition:** Multiple `loadBooks` requests can overlap, allowing an older response to overwrite newer results. This can show the user stale data.
+
+4. **State mutation:** `results.push(...books)` directly mutates the existing state array. This can cause incorrect results and unreliable state updates.
+
+5. **Data mutation:** `book.title` is modified directly. This can unexpectedly change the original book data if the same object is used elsewhere.
+
+6. **Unstable key:** The table rows use the array index as the key. When the list changes, React can associate the wrong item with an existing DOM element.
+
+7. **Not reusable:** The Hook receives the screen-specific `showAdminColumns` option and returns table row JSX. This ties it to one screen instead of returning reusable book-search data.
+
+
+## Task 2 — Testing the Four Sequences
+
+### Sequence 1 — Search
+
+Typing `dune` exposed:
+
+* **#2 — Missing search dependency:** The effect did not respond to changes in the search value.
+* **#4 — State mutation:** Results accumulated because the existing array was mutated with `push()`.
+* **#5 — Data mutation:** Unavailable book titles were modified repeatedly, causing `(unavailable)` to appear more than once.
+
+### Sequence 2 — Available → All
+
+This exposed **#3 — Race condition**. The requests can overlap, allowing an older response to overwrite newer results.
+
+### Sequence 3 — Available → All → Available
+
+This exposed **#4 — State mutation**. Results from previous requests accumulated, causing the number of rows to keep increasing.
+
+### Sequence 4 — `showAdminColumns: true`
+
+This did not expose any additional problem. The conditional Hook (#1) was not triggered because `showAdminColumns` remained `true`.
+
+### Problems Not Exposed
+
+* **#1 — Conditional Hook**
+* **#6 — Unstable key**
+* **#7 — Not reusable**
+
+These problems were not exposed by the four sequences and could therefore reach production without this review.
+
+
+## Task 3 — Why the Hook Is Not Reusable
+
+Two things make this Hook specific to one screen:
+
+1. **Screen-specific parameter:** `showAdminColumns` makes the Hook responsible for an admin screen's UI concerns. A reusable search Hook should not know which columns a particular screen needs.
+
+2. **Returns JSX:** The Hook returns `<tr>` elements, so it is tied to a table layout. A different page such as a grid or search dropdown could not reuse the returned markup.
+
+The Hook should return the search data and its state instead of JSX. Each component should decide how to display that data, whether as a table, grid, dropdown, or another UI.
+
+**Hooks reuse logic; components reuse UI.**
+
+
+## Task 4 — Rewriting useBookSearch
+
+I rewrote `useBookSearch` to accept only `search` and `filter` and return book-search data and state instead of JSX. The Hook now returns `results`, `loading`, and `error`, allowing the consuming component to decide how the books should be displayed.
+
+I used the `useDebounce` Hook from Exercise 1 with a 500ms delay, so the search request is not triggered for every character typed. I also kept the request cleanup to prevent an older request from updating the results after a newer request.
+
+I replaced the `useEffect` and related API logic in `Catalogue` with `useBookSearch(searchText, selectedFilter)`. The Catalogue now only manages its UI state and rendering, while the Hook handles searching, loading, errors, and results.
+
+I tested the loading, error, empty, and results states, along with search debouncing and filter changes. The Catalogue worked correctly after the refactor.
+
+
+## Task 5 — Final Review
+
+If I were starting `useForm` again, I would test the complete form submission flow earlier, including a fully valid form, instead of mainly checking validation behaviour. I would also define and test the validation error handling more carefully because the Add a Book form exposed an issue where valid fields with empty error messages were incorrectly treated as errors. Finally, I would think about the second form while designing the Hook from the start so I could identify the reusable parts and test the Hook with more than one type of form earlier.

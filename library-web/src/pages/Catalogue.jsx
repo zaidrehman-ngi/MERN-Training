@@ -1,57 +1,23 @@
-import { useEffect, useState } from "react";
-// import { loadBooks, getCallCount } from "../data/mockApi";
-import { loadBooks } from "../data/mockApi";
+import { useState } from "react";
 import BookCard from "../components/BookCard/BookCard";
 import SearchBox from "../components/SearchBox";
 import ResultCount from "../components/ResultCount";
 import FilterChips from "../components/FilterChips";
-import useDebounce from "../hooks/useDebounce";
+import { useBookSearch } from "../hooks/useBookSearch";
 
 function Catalogue() {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [searchText, setSearchText] = useState("");
-  const [books, setBooks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const debouncedSearchText = useDebounce(searchText, 500);
 
-  useEffect(() => {
-    let ignore = false;
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    setError("");
-
-    loadBooks({
-      filter: selectedFilter,
-      search: debouncedSearchText,
-    })
-      .then((books) => {
-        if (!ignore) {
-          setBooks(books);
-        }
-      })
-      .catch((error) => {
-        if (!ignore) {
-          setError(error.message);
-          setBooks([]);
-        }
-      })
-      .finally(() => {
-        if (!ignore) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      ignore = true;
-    };
-  }, [selectedFilter, debouncedSearchText]);
+  const {
+    results: books,
+    loading,
+    error,
+  } = useBookSearch(searchText, selectedFilter);
 
   return (
     <main>
       <h1>Catalogue</h1>
-      {/* <p>API calls: {getCallCount()}</p> */}
 
       {loading && <p>Loading books...</p>}
 
