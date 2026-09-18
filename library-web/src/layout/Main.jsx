@@ -1,12 +1,11 @@
 import CataloguePanel from "../components/CataloguePanel";
 import { books } from "../data/books";
 
-function Main({ branchName }) {
+function Main() {
   return (
     <main>
       <CataloguePanel
         title="Catalogue"
-        branchName={branchName}
         books={books}
         totalCount={1284}
         onFilterChange={(filter) => console.log("filter:", filter)}

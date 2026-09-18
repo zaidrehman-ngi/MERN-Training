@@ -28,10 +28,23 @@
 
 // export default App;
 
-import SupportTicketForm from "./pages/SupportTicketForm/SupportTicketForm";
+// import SupportTicketForm from "./pages/SupportTicketForm/SupportTicketForm";
+
+// function App() {
+//   return <SupportTicketForm />;
+// }
+
+// export default App;
+
+import { BranchProvider } from "./context/BranchContext";
+import Main from "./layout/Main";
 
 function App() {
-  return <SupportTicketForm />;
+  return (
+    <BranchProvider>
+      <Main />
+    </BranchProvider>
+  );
 }
 
 export default App;

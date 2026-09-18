@@ -79,3 +79,61 @@ Copilot used only the documented API to create a third form: a Support Ticket fo
 Copilot asked no questions because the documentation was sufficient to build the third form without needing clarification. I then created the form from its response and tested it. The validation errors appeared correctly, valid submission worked, and the form's other documented behaviour worked as expected.
 
 This confirmed that `useForm` is general enough to support different forms and that `HOOKS.md` provides enough information for another developer to use the Hook without seeing its implementation.
+
+
+# Exercise 3
+
+## Task 1 — Measuring branchName Prop Drilling
+
+4 components currently receive `branchName`: `Main`, `CataloguePanel`, `PanelHeader`, and `PanelFooter`.
+
+Only 2 of them actually use/render it: `PanelHeader` and `PanelFooter`.
+
+The other 2 components, `Main` and `CataloguePanel`, only receive `branchName` to pass it down.
+
+The ratio is 2 ÷ 4 = 50%, meaning half of the components receiving `branchName` are only passing it through.
+
+
+## Task 2 — Replacing Prop Drilling with Context
+
+I created `BranchContext` with a `BranchProvider` that holds the current branch and signed-in member. The app is wrapped with `BranchProvider` in `App.jsx`.
+
+`PanelHeader` and `PanelFooter` now read the branch directly from `BranchContext` using `useContext`.
+
+I removed the `branchName` prop from `Main` and `CataloguePanel` because they only received it to pass it to the next component.
+
+After removing the prop-drilling chain, I ran the app and confirmed that the branch name still appears correctly in both `PanelHeader` and `PanelFooter`.
+
+This removed the need for intermediate components to know about or pass along the branch name.
+
+
+## Task 3 — Missing Provider
+
+The result matched my guess. Without `BranchProvider`, `useContext(BranchContext)` returned `null`, and destructuring `branch` caused a runtime `TypeError`.
+
+The screen became blank because `PanelHeader` crashed while rendering.
+
+This is dangerous because moving or reusing a component outside the required Provider tree can cause a runtime crash.
+
+
+## Task 4 — useBranch
+
+I created `useBranch()` to call `useContext(BranchContext)`, throw a clear error when `BranchProvider` is missing, and return the context value.
+
+I switched `PanelHeader` and `PanelFooter` to use `useBranch()`.
+
+Benefits over calling `useContext` directly:
+
+* Provides a clear and consistent missing-provider error.
+* Hides the Context implementation from consumers and gives them a reusable `useBranch()` API.
+
+
+## Task 5 — Context Re-renders
+
+With `value={{ branch, member }}`, changing unrelated state in the Provider caused all three consumers to re-render because a new object was created on every Provider render.
+
+I fixed this by using `useMemo` so the context value only changes when `branch` or `member` changes.
+
+When `branch` changes but `member` does not, all consumers of the same Context still re-render because the Context value changes.
+
+If `branch` and `member` update at very different rates, I would split them into separate Contexts so consumers only re-render when the value they need changes.

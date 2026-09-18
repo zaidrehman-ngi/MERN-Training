@@ -4,7 +4,6 @@ import PanelFooter from "./PanelFooter";
 
 function CataloguePanel({
   title,
-  branchName,
   books,
   totalCount,
   onFilterChange,
@@ -14,7 +13,6 @@ function CataloguePanel({
     <div className="panel">
       <PanelHeader
         title={title}
-        branchName={branchName}
         bookCount={books.length}
         onFilterChange={onFilterChange}
       />
@@ -24,7 +22,6 @@ function CataloguePanel({
       <PanelFooter
         bookCount={books.length}
         totalCount={totalCount}
-        branchName={branchName}
         onBorrow={onBorrow}
       />
     </div>
