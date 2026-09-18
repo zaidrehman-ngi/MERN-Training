@@ -1,0 +1,58 @@
+// import Toggle from "./sandbox/Toggle";
+// import TogglePanel from "./sandbox/TogglePanel";
+
+// function App() {
+//   return (
+//     <>
+//       <Toggle />
+//       <TogglePanel />
+//     </>
+//   );
+// }
+
+// export default App;
+
+import Catalogue from "./pages/Catalogue";
+
+function App() {
+  return <Catalogue />;
+}
+
+export default App;
+
+// import AddBook from "./pages/AddBook/AddBook";
+
+// function App() {
+//   return <AddBook />;
+// }
+
+// export default App;
+
+// import SupportTicketForm from "./pages/SupportTicketForm/SupportTicketForm";
+
+// function App() {
+//   return <SupportTicketForm />;
+// }
+
+// export default App;
+
+// import { BranchProvider } from "./context/BranchContext";
+// import Main from "./layout/Main";
+
+// function App() {
+//   return (
+//     <BranchProvider>
+//       <Main />
+//     </BranchProvider>
+//   );
+// }
+
+// export default App;
+
+// import BookSearchTest from "./components/BookSearchTest";
+
+// function App() {
+//   return <BookSearchTest />;
+// }
+
+// export default App;
