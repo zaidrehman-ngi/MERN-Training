@@ -1,26 +1,31 @@
 import { Routes, Route } from "react-router-dom";
-import Navbar from "./components/Navbar/Navbar";
+import AppLayout from "./layout/AppLayout";
 import Home from "./routes/Home";
 import Books from "./routes/Books";
 import Users from "./routes/Users";
 import BorrowRequests from "./routes/BorrowRequests";
 import NotFound from "./routes/NotFound";
 import AddBook from "./pages/AddBook/AddBook";
+import BookDetail from "./routes/BookDetail";
 
 function App() {
   return (
-    <>
-      <Navbar />
-
-      <Routes>
+    <Routes>
+      <Route element={<AppLayout />}>
         <Route path="/" element={<Home />} />
-        <Route path="/books" element={<Books />} />
-        <Route path="/books/add" element={<AddBook />} />
+
+        <Route path="/books">
+          <Route index element={<Books />} />
+          <Route path="add" element={<AddBook />} />
+          <Route path=":id" element={<BookDetail />} />
+        </Route>
+
         <Route path="/users" element={<Users />} />
         <Route path="/borrow-requests" element={<BorrowRequests />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </>
+      </Route>
+
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
 }
 

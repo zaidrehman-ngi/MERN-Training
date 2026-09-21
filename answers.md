@@ -52,3 +52,28 @@ In development, the dev server can return the React application's `index.html` f
 On a static host, the server needs to be configured with an SPA fallback so that requests for unknown paths return `index.html` instead of a 404. React Router can then read the URL and render the correct page.
 
 If the fallback is not configured, opening `/books/bk-3` directly will result in a `404 Not Found` response because the server looks for a file at that path and cannot find one.
+
+
+# Exercise 2
+
+## Task 2 — useParams and ID Types
+
+`useParams` always returns URL parameters as strings, even when the value looks like a number. Because of this, a numeric ID in the fixture does not match the string returned from the URL when using strict equality.
+
+This will also matter when working with other URL parameters in this application, such as numeric IDs for members, loans, or other records. They will need to be converted to numbers before numeric comparisons or calculations.
+
+
+## Task 4 — Shared Layout and Nested Routes
+
+I moved the shared Header, Navbar, and Sidebar into an `AppLayout` route and used `Outlet` to render the child routes. The Books route now uses an index route for `/books`, while `/books/bk-3` renders `BookDetail` inside the same layout.
+
+I confirmed in DevTools that the Header does not unmount or remount while navigating between the routes.
+
+
+## Task 5 — Query String State
+
+I moved the search term and selected filter from component state into the URL query string using React Router's `useSearchParams` hook.
+
+The search term is stored as `q` and the selected filter as `filter`, so a URL such as `/books?filter=overdue&q=dune` reproduces the same screen state.
+
+I tested the URL by opening it in a new tab, using the browser Back button, and refreshing the page. In all three cases, the search term and filter state were preserved correctly.
