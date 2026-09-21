@@ -1,58 +1,27 @@
-// import Toggle from "./sandbox/Toggle";
-// import TogglePanel from "./sandbox/TogglePanel";
-
-// function App() {
-//   return (
-//     <>
-//       <Toggle />
-//       <TogglePanel />
-//     </>
-//   );
-// }
-
-// export default App;
-
-import Catalogue from "./pages/Catalogue";
+import { Routes, Route } from "react-router-dom";
+import Navbar from "./components/Navbar/Navbar";
+import Home from "./routes/Home";
+import Books from "./routes/Books";
+import Users from "./routes/Users";
+import BorrowRequests from "./routes/BorrowRequests";
+import NotFound from "./routes/NotFound";
+import AddBook from "./pages/AddBook/AddBook";
 
 function App() {
-  return <Catalogue />;
+  return (
+    <>
+      <Navbar />
+
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/books" element={<Books />} />
+        <Route path="/books/add" element={<AddBook />} />
+        <Route path="/users" element={<Users />} />
+        <Route path="/borrow-requests" element={<BorrowRequests />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
+  );
 }
 
 export default App;
-
-// import AddBook from "./pages/AddBook/AddBook";
-
-// function App() {
-//   return <AddBook />;
-// }
-
-// export default App;
-
-// import SupportTicketForm from "./pages/SupportTicketForm/SupportTicketForm";
-
-// function App() {
-//   return <SupportTicketForm />;
-// }
-
-// export default App;
-
-// import { BranchProvider } from "./context/BranchContext";
-// import Main from "./layout/Main";
-
-// function App() {
-//   return (
-//     <BranchProvider>
-//       <Main />
-//     </BranchProvider>
-//   );
-// }
-
-// export default App;
-
-// import BookSearchTest from "./components/BookSearchTest";
-
-// function App() {
-//   return <BookSearchTest />;
-// }
-
-// export default App;

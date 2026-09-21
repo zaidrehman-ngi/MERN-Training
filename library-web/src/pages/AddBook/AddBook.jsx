@@ -1,7 +1,10 @@
 import useForm from "../../hooks/useForm";
 import "./AddBook.css";
+import { useNavigate } from "react-router-dom";
 
 function AddBook() {
+  const navigate = useNavigate();
+
   const initialValues = {
     title: "",
     author: "",
@@ -66,6 +69,7 @@ function AddBook() {
       validate,
       onSubmit: (values) => {
         console.log("Book submitted:", values);
+        navigate("/books");
       },
     });
 
