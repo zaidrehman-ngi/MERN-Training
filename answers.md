@@ -77,3 +77,43 @@ I moved the search term and selected filter from component state into the URL qu
 The search term is stored as `q` and the selected filter as `filter`, so a URL such as `/books?filter=overdue&q=dune` reproduces the same screen state.
 
 I tested the URL by opening it in a new tab, using the browser Back button, and refreshing the page. In all three cases, the search term and filter state were preserved correctly.
+
+
+# Exercise 3
+
+## Task 2 — Inline BookCard
+
+I added dedicated BookCard tokens for the normal and compact cover dimensions, plus a shared border-width token. These values belong in `tokens.css` so the inline-styled component can use the same named design values directly instead of rebuilding dimensions with `calc(...)` or relying on the browser's `thin` border keyword.
+
+I experimentally attempted the remaining behaviors using only React's `style` prop. None could be implemented as requested. A normal inline style object represents the element's current styles; it cannot define the `:hover` or `:focus-visible` pseudo-classes, and it cannot contain an `@media` responsive rule. The hover state, keyboard-only focus ring, and narrow-screen vertical layout therefore remain unimplemented without CSS or JavaScript workarounds.
+
+## Task 3 — CSS Modules BookCard
+
+I created `BookCardModule` and moved the BookCard styling into `BookCardModule.module.css`. CSS Modules scopes each local class to the component, so the build transforms names such as `card` into generated names such as `BookCardModule_card__...`. This prevents class-name collisions and unintended style leakage from a large global stylesheet.
+
+The CSS Module implements card and button hover states, a `:focus-visible` ring on the View Book button, and a media query that stacks the card vertically on a narrow screen. The status badge uses separate module classes mapped from the normalized `available`, `out`, and `overdue` status values, with the neutral token fallback for unknown statuses.
+
+I temporarily rendered `BookCardModule` in `Books.jsx`. Browser testing confirmed the normal card, compact styles, status colours, hover states, keyboard focus ring, and narrow-screen vertical stacking. DevTools showed a generated CSS Module class name on the card, confirming that the local class was transformed and scoped by the build.
+
+## Task 4 — Styled Components BookCard
+
+I created `BookCardStyled` using styled-components and temporarily rendered it from `Books.jsx`. The card and button hover states, button `:focus-visible` ring, compact variant, and narrow-screen stacking are defined in the styled component templates using the existing design tokens.
+
+The status badge colour is driven directly by the normalized `$status` prop inside the styled `Status` component. Its interpolation selects the available, out, overdue, or neutral token without requiring a separate CSS class mapping in the component.
+
+DevTools showed generated styled-components class names such as `sc-bdvwhi cHEJmF` for the card and `sc-jRQBiJ jkleIB` for the available status, rather than CSS Modules names such as `_card_2ak56_1`. The first class identifies the styled component and the second class reflects its generated style variant; the status second class changed for the out and overdue prop values. Styled-components generates these names from component definitions at runtime, while CSS Modules transforms local stylesheet class names. Both approaches keep component styles scoped and avoid global class-name collisions.
+
+The dependency cost was the addition of `styled-components` `^6.5.3` to `package.json` and the corresponding package and transitive dependency entries in `package-lock.json`. Browser testing confirmed the normal card, status colours, hover states, keyboard focus-visible ring, compact dimensions, and narrow-screen vertical stacking.
+
+
+## Task 5 — Styling Comparison
+
+| Approach          | Scoping          | Props / Dynamic Values           | Pseudo-classes / Media Queries | Browser Output                   | Debugging                                           | Designer Colour Change                  |
+| ----------------- | ---------------- | -------------------------------- | ------------------------------ | -------------------------------- | --------------------------------------------------- | --------------------------------------- |
+| Inline styles     | Element-level    | Easy                             | Not directly supported         | Inline `style`                   | Easy to see, but mixed with component code          | Less convenient                         |
+| CSS Modules       | Component-scoped | Needs class mapping              | Fully supported                | Generated scoped CSS classes     | Easy; styles are in a separate CSS file             | Easy; colour is in CSS                  |
+| styled-components | Component-scoped | Easy; props can be used directly | Fully supported                | Generated classes + injected CSS | Can be less obvious because styles are inside React | Less convenient for non-React designers |
+
+All three can produce the same final UI. They mainly differ in how styles are organised and maintained.
+
+All three use the same `tokens.css`, so colours, spacing, and sizes are already shared. This reduces the practical difference between the approaches.

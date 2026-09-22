@@ -1,5 +1,8 @@
 import { useSearchParams } from "react-router-dom";
-import BookCard from "../components/BookCard/BookCard";
+import BookCardStyled from "../components/BookCard/BookCardStyled";
+// import BookCard from "../components/BookCard/BookCard";
+// import BookCardInline from "../components/BookCard/BookCardInline";
+// import BookCardModule from "../components/BookCard/BookCardModule";
 import SearchBox from "../components/SearchBox";
 import ResultCount from "../components/ResultCount";
 import FilterChips from "../components/FilterChips";
@@ -53,7 +56,10 @@ function Books() {
                 {books.map((book) => (
                   <div key={book.id}>
                     <input type="checkbox" />
-                    <BookCard book={book} />
+                    {/* <BookCard book={book} /> */}
+                    {/* <BookCardInline book={book} /> */}
+                    {/* <BookCardModule book={book} /> */}
+                    <BookCardStyled book={book} />
                   </div>
                 ))}
               </div>

@@ -56,6 +56,13 @@
   --space-6: 32px;
   --space-7: 48px;
 
+  /* ---- BookCard ---- */
+  --book-cover-width: 100px;
+  --book-cover-height: 140px;
+  --book-cover-width-compact: 70px;
+  --book-cover-height-compact: 100px;
+  --border-width-card: 1px;
+
   /* ---- type ---- */
   --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
