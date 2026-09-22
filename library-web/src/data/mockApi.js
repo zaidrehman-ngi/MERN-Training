@@ -106,3 +106,23 @@ export function loadBooks({ filter = "all", search = "" } = {}) {
     }, delay ?? 0);
   });
 }
+
+import { USERS } from "./users.fixture";
+
+export function loadUsers() {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(USERS);
+    }, 500);
+  });
+}
+
+import { BORROW_REQUESTS } from "./borrowRequests.fixture";
+
+export function loadBorrowRequests() {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(BORROW_REQUESTS);
+    }, 500);
+  });
+}

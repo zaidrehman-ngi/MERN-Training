@@ -1,8 +1,8 @@
-import { useSearchParams } from "react-router-dom";
-import BookCardStyled from "../components/BookCard/BookCardStyled";
+import { useSearchParams, useNavigate } from "react-router-dom";
+// import BookCardStyled from "../components/BookCard/BookCardStyled";
 // import BookCard from "../components/BookCard/BookCard";
 // import BookCardInline from "../components/BookCard/BookCardInline";
-// import BookCardModule from "../components/BookCard/BookCardModule";
+import BookCardModule from "../components/BookCard/BookCardModule";
 import SearchBox from "../components/SearchBox";
 import ResultCount from "../components/ResultCount";
 import FilterChips from "../components/FilterChips";
@@ -12,6 +12,7 @@ function Books() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedFilter = searchParams.get("filter") ?? "all";
   const searchText = searchParams.get("q") ?? "";
+  const navigate = useNavigate();
 
   const {
     results: books,
@@ -58,8 +59,13 @@ function Books() {
                     <input type="checkbox" />
                     {/* <BookCard book={book} /> */}
                     {/* <BookCardInline book={book} /> */}
-                    {/* <BookCardModule book={book} /> */}
-                    <BookCardStyled book={book} />
+                    <BookCardModule
+                      book={book}
+                      onSelect={(selectedBook) =>
+                        navigate(`/books/${selectedBook.id}`)
+                      }
+                    />
+                    {/* <BookCardStyled book={book} /> */}
                   </div>
                 ))}
               </div>

@@ -1,0 +1,31 @@
+.navbar {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-bottom: var(--border-width-card) solid var(--colour-line);
+  background: var(--colour-surface);
+}
+
+.link {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--colour-body);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+
+.link:hover,
+.link:focus-visible {
+  color: var(--colour-accent);
+  background: var(--colour-accent-soft);
+}
+
+.link:focus-visible {
+  outline: var(--border-width-card) solid var(--colour-accent);
+  outline-offset: var(--space-1);
+}
+
+.linkActive {
+  color: var(--colour-accent);
+  background: var(--colour-accent-soft);
+}

@@ -1,5 +1,5 @@
 import useForm from "../../hooks/useForm";
-import "./AddBook.css";
+import styles from "./AddBook.module.css";
 import { useNavigate } from "react-router-dom";
 
 function AddBook() {
@@ -74,11 +74,11 @@ function AddBook() {
     });
 
   return (
-    <main>
+    <main className={styles.page}>
       <h1>Add a Book</h1>
 
-      <form onSubmit={handleSubmit}>
-        <label htmlFor="title">Title</label>
+      <form className={styles.form} onSubmit={handleSubmit}>
+        <label className={styles.label} htmlFor="title">Title</label>
         <input
           id="title"
           type="text"
@@ -87,15 +87,16 @@ function AddBook() {
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={touched.title && !!errors.title}
+          className={styles.control}
           aria-describedby={
             touched.title && errors.title ? "title-error" : undefined
           }
         />
         {touched.title && errors.title && (
-          <p id="title-error">{errors.title}</p>
+          <p className={styles.error} id="title-error">{errors.title}</p>
         )}
 
-        <label htmlFor="author">Author</label>
+        <label className={styles.label} htmlFor="author">Author</label>
         <input
           id="author"
           type="text"
@@ -104,15 +105,16 @@ function AddBook() {
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={touched.author && !!errors.author}
+          className={styles.control}
           aria-describedby={
             touched.author && errors.author ? "author-error" : undefined
           }
         />
         {touched.author && errors.author && (
-          <p id="author-error">{errors.author}</p>
+          <p className={styles.error} id="author-error">{errors.author}</p>
         )}
 
-        <label htmlFor="isbn">ISBN</label>
+        <label className={styles.label} htmlFor="isbn">ISBN</label>
         <input
           id="isbn"
           type="text"
@@ -121,13 +123,16 @@ function AddBook() {
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={touched.isbn && !!errors.isbn}
+          className={styles.control}
           aria-describedby={
             touched.isbn && errors.isbn ? "isbn-error" : undefined
           }
         />
-        {touched.isbn && errors.isbn && <p id="isbn-error">{errors.isbn}</p>}
+        {touched.isbn && errors.isbn && (
+          <p className={styles.error} id="isbn-error">{errors.isbn}</p>
+        )}
 
-        <label htmlFor="copies">Copies</label>
+        <label className={styles.label} htmlFor="copies">Copies</label>
         <input
           id="copies"
           type="number"
@@ -137,15 +142,16 @@ function AddBook() {
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={touched.copies && !!errors.copies}
+          className={styles.control}
           aria-describedby={
             touched.copies && errors.copies ? "copies-error" : undefined
           }
         />
         {touched.copies && errors.copies && (
-          <p id="copies-error">{errors.copies}</p>
+          <p className={styles.error} id="copies-error">{errors.copies}</p>
         )}
 
-        <label htmlFor="branch">Branch</label>
+        <label className={styles.label} htmlFor="branch">Branch</label>
         <select
           id="branch"
           name="branch"
@@ -153,6 +159,7 @@ function AddBook() {
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={touched.branch && !!errors.branch}
+          className={styles.control}
           aria-describedby={
             touched.branch && errors.branch ? "branch-error" : undefined
           }
@@ -163,10 +170,10 @@ function AddBook() {
           <option value="gulshan">Gulshan</option>
         </select>
         {touched.branch && errors.branch && (
-          <p id="branch-error">{errors.branch}</p>
+          <p className={styles.error} id="branch-error">{errors.branch}</p>
         )}
 
-        <button type="submit">Add Book</button>
+        <button className={styles.submit} type="submit">Add Book</button>
       </form>
     </main>
   );

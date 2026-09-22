@@ -117,3 +117,37 @@ The dependency cost was the addition of `styled-components` `^6.5.3` to `package
 All three can produce the same final UI. They mainly differ in how styles are organised and maintained.
 
 All three use the same `tokens.css`, so colours, spacing, and sizes are already shared. This reduces the practical difference between the approaches.
+
+
+# Exercise 4
+
+## Task 2
+
+I used the **callback prop (`onSelect`)** approach, similar to the `onBorrow` pattern from Week 2. `Books.jsx` handles the routing with `useNavigate` and passes an `onSelect` callback to `BookCardModule`. This keeps `BookCardModule` independent of React Router and reusable in an app without routing.
+
+The other option was using **`children`**, where the parent would provide the navigation element/content. That would also keep the component router-independent, but it would require changing the card structure/API to support and position the provided content.
+
+
+## Task 4
+
+I am assuming that `/members` will also have a list page, following the same structure as the existing Books and Users pages.
+
+### Files I would create
+
+1. `src/hooks/useMembers.js` — handle loading, error, and member data.
+2. `src/components/MemberCard/MemberCard.jsx` — display a member in the list.
+3. `src/components/MemberCard/MemberCard.module.css` — style the member card.
+4. `src/routes/Members.jsx` — create the members list page.
+5. `src/routes/MemberDetail.jsx` — create the member detail page for `/members/:id`.
+
+If the backend/API is not available yet, I would also create `src/data/members.fixture.js` for mock member data. With a real backend, the data would come from the API instead.
+
+### Files I would modify
+
+6. `src/data/mockApi.js` — if we are still using mock data, add the member data loader. With a real backend, this would be replaced by the API/service layer.
+7. `src/App.jsx` — add the `/members` and `/members/:id` routes.
+8. `src/components/Navbar/Navbar.jsx` — add navigation to the Members page.
+
+The list is long because each resource currently has its own data setup, hook, card, styling, and route files. This structure is clear, but repeating the same setup for every resource makes adding a new route take more work.
+
+To make future routes cheaper, I would make more use of reusable components for common parts such as cards and loading, error, and empty states. I would also reuse common data-fetching patterns where appropriate instead of creating unnecessary resource-specific code each time.

@@ -1,32 +1,41 @@
 import { NavLink } from "react-router-dom";
-import "./Navbar.css";
+import styles from "./Navbar.module.css";
 
 function Navbar() {
   return (
-    <nav className="navbar">
+    <nav className={styles.navbar}>
       <NavLink
         to="/"
         end
         className={({ isActive }) =>
-          isActive ? "navbar__link navbar__link--active" : "navbar__link"
+          isActive ? `${styles.link} ${styles.linkActive}` : styles.link
         }
       >
         Home
       </NavLink>
-      
+
       <NavLink
         to="/books"
         className={({ isActive }) =>
-          isActive ? "navbar__link navbar__link--active" : "navbar__link"
+          isActive ? `${styles.link} ${styles.linkActive}` : styles.link
         }
       >
         Books
       </NavLink>
 
       <NavLink
+        to="/books/add"
+        className={({ isActive }) =>
+          isActive ? `${styles.link} ${styles.linkActive}` : styles.link
+        }
+      >
+        Add Book
+      </NavLink>
+
+      <NavLink
         to="/users"
         className={({ isActive }) =>
-          isActive ? "navbar__link navbar__link--active" : "navbar__link"
+          isActive ? `${styles.link} ${styles.linkActive}` : styles.link
         }
       >
         Users
@@ -35,7 +44,7 @@ function Navbar() {
       <NavLink
         to="/borrow-requests"
         className={({ isActive }) =>
-          isActive ? "navbar__link navbar__link--active" : "navbar__link"
+          isActive ? `${styles.link} ${styles.linkActive}` : styles.link
         }
       >
         Borrow Requests
