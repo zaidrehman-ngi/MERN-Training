@@ -7,12 +7,19 @@ import SearchBox from "../components/SearchBox";
 import ResultCount from "../components/ResultCount";
 import FilterChips from "../components/FilterChips";
 import { useBookSearch } from "../hooks/useBookSearch";
+import { useDispatch, useSelector } from "react-redux";
+import { setSelectedBranch } from "../store/uiSlice";
 
 function Books() {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedFilter = searchParams.get("filter") ?? "all";
   const searchText = searchParams.get("q") ?? "";
   const navigate = useNavigate();
+  const selectedBranch = useSelector((state) => state.ui.selectedBranch);
+  const dispatch = useDispatch();
+  const available = useSelector((state) =>
+    state.books.items.filter((b) => b.onShelf > 0),
+  );
 
   const {
     results: books,
@@ -34,6 +41,26 @@ function Books() {
 
       {!loading && !error && (
         <>
+          <p>Selected branch: {selectedBranch}</p>
+
+          <button onClick={() => dispatch(setSelectedBranch("Gulshan Branch"))}>
+            Select Gulshan Branch
+          </button>
+
+          <button onClick={() => dispatch(setSelectedBranch("Clifton Branch"))}>
+            Select Clifton Branch
+          </button>
+
+          <button
+            onClick={() =>
+              dispatch(setSelectedBranch("North Nazimabad Branch"))
+            }
+          >
+            Select North Nazimabad Branch
+          </button>
+
+          <p>Available books: {available.length}</p>
+
           <FilterChips
             onFilterChange={(filter) =>
               setSearchParams({ filter, q: searchText })
