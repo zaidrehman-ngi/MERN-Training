@@ -1,3 +1,4 @@
+import { memo } from "react";
 import styles from "./BookCardModule.module.css";
 
 function BookCardModule({ book, onSelect, variant = "default" }) {
@@ -46,4 +47,4 @@ function BookCardModule({ book, onSelect, variant = "default" }) {
   );
 }
 
-export default BookCardModule;
+export default memo(BookCardModule);

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
-import { ALL_BOOKS } from "../data/books.fixture.js";
+import { useCallback, useEffect } from "react";
+// import { ALL_BOOKS } from "../data/books.fixture.js";
+import { generateBooks } from "../data/generateBooks";
 import BookCardModule from "../components/BookCard/BookCardModule";
 import SearchBox from "../components/SearchBox";
 import ResultCount from "../components/ResultCount";
@@ -27,11 +28,22 @@ function Books() {
 
   const dispatch = useDispatch();
 
+  // useEffect(() => {
+  //   if (books.length === 0) {
+  //     dispatch(booksLoaded(ALL_BOOKS));
+  //   }
+  // }, [books.length, dispatch]);
+
   useEffect(() => {
-    if (books.length === 0) {
-      dispatch(booksLoaded(ALL_BOOKS));
-    }
-  }, [books.length, dispatch]);
+    dispatch(booksLoaded(generateBooks(500)));
+  }, [dispatch]);
+
+  const handleSelect = useCallback(
+    (selectedBook) => {
+      navigate(`/books/${selectedBook.id}`);
+    },
+    [navigate],
+  );
 
   return (
     <main>
@@ -86,12 +98,7 @@ function Books() {
             {filteredBooks.map((book) => (
               <div key={book.id}>
                 <input type="checkbox" />
-                <BookCardModule
-                  book={book}
-                  onSelect={(selectedBook) =>
-                    navigate(`/books/${selectedBook.id}`)
-                  }
-                />
+                <BookCardModule book={book} onSelect={handleSelect} />
               </div>
             ))}
           </div>

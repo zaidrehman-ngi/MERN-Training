@@ -63,3 +63,67 @@ The Week 2 rule is still valid. We should not directly mutate actual state in pl
 The cache becomes useless if the input selectors return new references unnecessarily, such as creating a new array or object every time. That makes the inputs look changed even when the actual data has not changed, so the selector has to calculate the result again.
 
 The previous inline `useSelector` used `filter()` directly, which created a new array on each execution and caused the development warning. Using `createSelector` gives us a memoized selector and removes that problem.
+
+
+# Exercise 3
+
+### Task 2
+
+* **Total time for the commit:** 134.1ms (first keystroke)
+* **Slowest component:** `Books`, 42.8ms
+* **Components re-rendered:** 221 (217 `BookCardModule` + `Books` + `FilterChips` + `SearchBox` + `ResultCount`)
+* **Why did this render (BookCardModule):** Props changed: `onSelect`
+
+
+### Task 3
+
+**After wrapping `BookCardModule` with `React.memo`:**
+
+* **Total time for the commit:** 173.8ms
+* **Slowest component:** `Books`, 62.2ms
+* **Components re-rendered:** 221
+* **Why did this render (BookCardModule):** Props changed: `onSelect`
+
+**Observation:** `React.memo` did not reduce the re-renders because the `onSelect` function is recreated whenever `Books` renders, so it is treated as a changed prop.
+
+
+### Task 4
+
+**After stabilizing `onSelect` with `useCallback`:**
+
+* **Total time for the commit:** 62.6ms
+* **Slowest component:** `Books`, 59.8ms
+* **Components re-rendered:** 4 (`Books`, `SearchBox`, `FilterChips`, `ResultCount`)
+* **BookCard:** Did not re-render because `onSelect` is now the same function reference between renders.
+
+**Rule:** `React.memo` compares a component's props with their previous values. An inline handler creates a new function on every parent render, so `React.memo` sees it as a changed prop and re-renders the component. `useCallback` keeps the same function reference between renders, allowing `React.memo` to skip the re-render when the other props are also unchanged.
+
+
+### Task 5
+
+The filtering calculation was already memoized in Exercise 2 using Redux Toolkit's `createSelector`, so no additional `useMemo` was needed.
+
+`createSelector` memoizes derived data from Redux state and only recalculates when its input selectors change. `useMemo` memoizes a calculation inside a React component and is useful when the derived value is component-specific or does not belong in Redux selectors.
+
+For this case, `createSelector` is the better fit because the filtered books are derived from Redux state (`books`, `filter`, and `search`). `useMemo` would be useful for expensive calculations that are local to a component and do not need to be shared through Redux.
+
+* **Total time for the commit:** 62.6ms
+* **Slowest component:** `Books`, 59.8ms
+* **Components re-rendered:** 4 (`Books`, `SearchBox`, `FilterChips`, `ResultCount`)
+* **BookCard:** Did not re-render.
+
+
+### Task 6
+
+| Point               | Total Time | Slowest Component | Components Re-rendered |
+| ------------------- | ---------: | ----------------- | ---------------------: |
+| Baseline            |    134.1ms | `Books` — 42.8ms  |                    221 |
+| After `React.memo`  |    173.8ms | `Books` — 62.2ms  |                    221 |
+| After `useCallback` |     62.6ms | `Books` — 59.8ms  |                      4 |
+| Final state         |     62.6ms | `Books` — 59.8ms  |                      4 |
+
+**Most effective change:** `useCallback` had the biggest impact because it stabilized the `onSelect` function, allowing `React.memo` to skip the `BookCardModule` re-renders.
+
+**Would I have guessed it?** I expected `React.memo` alone to have little or no effect because `onSelect` was being recreated on every render. The profiler confirmed this and showed that stabilizing the handler was the change that made `React.memo` effective.
+
+**Wrong dependency array:** If `useCallback` had an incorrect dependency array, the callback could keep using an outdated value from an earlier render. To a user, this could appear as stale or incorrect behavior, such as an action using old data or navigating based on an outdated value. It would not necessarily look like a performance problem.
