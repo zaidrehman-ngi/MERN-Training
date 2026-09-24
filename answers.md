@@ -41,3 +41,25 @@ The selected branch belongs in Redux because it is shared application state that
 * **Reducer setup:** `createSlice` creates the slice reducer from the reducer functions, instead of requiring separate reducer files and switch statements.
 * **Immutable updates:** `createSlice` uses Immer, so we can write simple mutation-style code like `state.selectedBranch = action.payload` while Immer handles the immutable update behind the scenes.
 * **Store setup:** `configureStore` automatically combines reducers, adds default middleware, and connects Redux DevTools instead of requiring us to configure these manually.
+
+
+# Exercise 2
+
+### Task 2
+
+Redux Toolkit uses **Immer** inside its reducers. It gives the reducer a draft version of the state, so code like `state.items.push(newBook)` can be used safely.
+
+Immer tracks the changes made to the draft and produces a new immutable state. Redux then uses that new state as the current store state.
+
+The Week 2 rule is still valid. We should not directly mutate actual state in plain React or Redux code. Mutation-style code is only safe inside Redux Toolkit reducers because Immer handles the draft and creates the new immutable state.
+
+
+### Task 4
+
+`selectFilteredBooks` uses `createSelector` to derive the filtered and searched book list from three store values: the books list, filter, and search term.
+
+`createSelector` caches the result of the selector. If the input values have not changed, it returns the previously calculated result instead of running the filtering logic again.
+
+The cache becomes useless if the input selectors return new references unnecessarily, such as creating a new array or object every time. That makes the inputs look changed even when the actual data has not changed, so the selector has to calculate the result again.
+
+The previous inline `useSelector` used `filter()` directly, which created a new array on each execution and caused the development warning. Using `createSelector` gives us a memoized selector and removes that problem.

@@ -1,103 +1,100 @@
-import { useSearchParams, useNavigate } from "react-router-dom";
-// import BookCardStyled from "../components/BookCard/BookCardStyled";
-// import BookCard from "../components/BookCard/BookCard";
-// import BookCardInline from "../components/BookCard/BookCardInline";
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { ALL_BOOKS } from "../data/books.fixture.js";
 import BookCardModule from "../components/BookCard/BookCardModule";
 import SearchBox from "../components/SearchBox";
 import ResultCount from "../components/ResultCount";
 import FilterChips from "../components/FilterChips";
-import { useBookSearch } from "../hooks/useBookSearch";
 import { useDispatch, useSelector } from "react-redux";
 import { setSelectedBranch } from "../store/uiSlice";
+import {
+  booksLoaded,
+  bookAdded,
+  filterChanged,
+  selectAllBooks,
+  selectSearch,
+  searchChanged,
+  selectFilteredBooks,
+} from "../store/booksSlice";
 
 function Books() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const selectedFilter = searchParams.get("filter") ?? "all";
-  const searchText = searchParams.get("q") ?? "";
+  const searchText = useSelector(selectSearch);
   const navigate = useNavigate();
-  const selectedBranch = useSelector((state) => state.ui.selectedBranch);
-  const dispatch = useDispatch();
-  const available = useSelector((state) =>
-    state.books.items.filter((b) => b.onShelf > 0),
-  );
 
-  const {
-    results: books,
-    loading,
-    error,
-  } = useBookSearch(searchText, selectedFilter);
+  const selectedBranch = useSelector((state) => state.ui.selectedBranch);
+  const books = useSelector(selectAllBooks);
+  const filteredBooks = useSelector(selectFilteredBooks);
+
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (books.length === 0) {
+      dispatch(booksLoaded(ALL_BOOKS));
+    }
+  }, [books.length, dispatch]);
 
   return (
     <main>
       <h1>Books</h1>
 
-      {loading && <p>Loading books...</p>}
+      <p>Selected branch: {selectedBranch}</p>
 
-      {!loading && error && (
-        <p>
-          Something went wrong while loading the catalogue. Please try again.
-        </p>
-      )}
+      <button onClick={() => dispatch(setSelectedBranch("Gulshan Branch"))}>
+        Select Gulshan Branch
+      </button>
 
-      {!loading && !error && (
+      <button onClick={() => dispatch(setSelectedBranch("Clifton Branch"))}>
+        Select Clifton Branch
+      </button>
+
+      <button
+        onClick={() => dispatch(setSelectedBranch("North Nazimabad Branch"))}
+      >
+        Select North Nazimabad Branch
+      </button>
+
+      <button
+        onClick={() =>
+          dispatch(
+            bookAdded({
+              id: 101,
+              title: "Test Book",
+              onShelf: 1,
+            }),
+          )
+        }
+      >
+        Add Test Book
+      </button>
+
+      <FilterChips
+        onFilterChange={(filter) => dispatch(filterChanged(filter))}
+      />
+
+      <SearchBox
+        searchText={searchText}
+        onSearchChange={(search) => dispatch(searchChanged(search))}
+      />
+
+      {filteredBooks.length === 0 ? (
+        <p>No books found. Try changing your search or filter.</p>
+      ) : (
         <>
-          <p>Selected branch: {selectedBranch}</p>
+          <ResultCount count={filteredBooks.length} />
 
-          <button onClick={() => dispatch(setSelectedBranch("Gulshan Branch"))}>
-            Select Gulshan Branch
-          </button>
-
-          <button onClick={() => dispatch(setSelectedBranch("Clifton Branch"))}>
-            Select Clifton Branch
-          </button>
-
-          <button
-            onClick={() =>
-              dispatch(setSelectedBranch("North Nazimabad Branch"))
-            }
-          >
-            Select North Nazimabad Branch
-          </button>
-
-          <p>Available books: {available.length}</p>
-
-          <FilterChips
-            onFilterChange={(filter) =>
-              setSearchParams({ filter, q: searchText })
-            }
-          />
-
-          <SearchBox
-            searchText={searchText}
-            onSearchChange={(search) =>
-              setSearchParams({ filter: selectedFilter, q: search })
-            }
-          />
-
-          {books.length === 0 ? (
-            <p>No books found. Try changing your search or filter.</p>
-          ) : (
-            <>
-              <ResultCount count={books.length} />
-
-              <div>
-                {books.map((book) => (
-                  <div key={book.id}>
-                    <input type="checkbox" />
-                    {/* <BookCard book={book} /> */}
-                    {/* <BookCardInline book={book} /> */}
-                    <BookCardModule
-                      book={book}
-                      onSelect={(selectedBook) =>
-                        navigate(`/books/${selectedBook.id}`)
-                      }
-                    />
-                    {/* <BookCardStyled book={book} /> */}
-                  </div>
-                ))}
+          <div>
+            {filteredBooks.map((book) => (
+              <div key={book.id}>
+                <input type="checkbox" />
+                <BookCardModule
+                  book={book}
+                  onSelect={(selectedBook) =>
+                    navigate(`/books/${selectedBook.id}`)
+                  }
+                />
               </div>
-            </>
-          )}
+            ))}
+          </div>
         </>
       )}
     </main>

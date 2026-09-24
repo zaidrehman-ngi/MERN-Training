@@ -1,9 +1,12 @@
 import useForm from "../../hooks/useForm";
 import styles from "./AddBook.module.css";
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { bookAdded } from "../../store/booksSlice";
 
 function AddBook() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const initialValues = {
     title: "",
@@ -68,7 +71,18 @@ function AddBook() {
       initialValues,
       validate,
       onSubmit: (values) => {
-        console.log("Book submitted:", values);
+        dispatch(
+          bookAdded({
+            id: `bk-${Date.now()}`,
+            title: values.title,
+            author: values.author,
+            isbn: values.isbn,
+            onShelf: Number(values.copies),
+            totalCopies: Number(values.copies),
+            status: "available",
+          }),
+        );
+
         navigate("/books");
       },
     });
@@ -78,7 +92,9 @@ function AddBook() {
       <h1>Add a Book</h1>
 
       <form className={styles.form} onSubmit={handleSubmit}>
-        <label className={styles.label} htmlFor="title">Title</label>
+        <label className={styles.label} htmlFor="title">
+          Title
+        </label>
         <input
           id="title"
           type="text"
@@ -93,10 +109,14 @@ function AddBook() {
           }
         />
         {touched.title && errors.title && (
-          <p className={styles.error} id="title-error">{errors.title}</p>
+          <p className={styles.error} id="title-error">
+            {errors.title}
+          </p>
         )}
 
-        <label className={styles.label} htmlFor="author">Author</label>
+        <label className={styles.label} htmlFor="author">
+          Author
+        </label>
         <input
           id="author"
           type="text"
@@ -111,10 +131,14 @@ function AddBook() {
           }
         />
         {touched.author && errors.author && (
-          <p className={styles.error} id="author-error">{errors.author}</p>
+          <p className={styles.error} id="author-error">
+            {errors.author}
+          </p>
         )}
 
-        <label className={styles.label} htmlFor="isbn">ISBN</label>
+        <label className={styles.label} htmlFor="isbn">
+          ISBN
+        </label>
         <input
           id="isbn"
           type="text"
@@ -129,10 +153,14 @@ function AddBook() {
           }
         />
         {touched.isbn && errors.isbn && (
-          <p className={styles.error} id="isbn-error">{errors.isbn}</p>
+          <p className={styles.error} id="isbn-error">
+            {errors.isbn}
+          </p>
         )}
 
-        <label className={styles.label} htmlFor="copies">Copies</label>
+        <label className={styles.label} htmlFor="copies">
+          Copies
+        </label>
         <input
           id="copies"
           type="number"
@@ -148,10 +176,14 @@ function AddBook() {
           }
         />
         {touched.copies && errors.copies && (
-          <p className={styles.error} id="copies-error">{errors.copies}</p>
+          <p className={styles.error} id="copies-error">
+            {errors.copies}
+          </p>
         )}
 
-        <label className={styles.label} htmlFor="branch">Branch</label>
+        <label className={styles.label} htmlFor="branch">
+          Branch
+        </label>
         <select
           id="branch"
           name="branch"
@@ -170,10 +202,14 @@ function AddBook() {
           <option value="gulshan">Gulshan</option>
         </select>
         {touched.branch && errors.branch && (
-          <p className={styles.error} id="branch-error">{errors.branch}</p>
+          <p className={styles.error} id="branch-error">
+            {errors.branch}
+          </p>
         )}
 
-        <button className={styles.submit} type="submit">Add Book</button>
+        <button className={styles.submit} type="submit">
+          Add Book
+        </button>
       </form>
     </main>
   );
