@@ -127,3 +127,73 @@ For this case, `createSelector` is the better fit because the filtered books are
 **Would I have guessed it?** I expected `React.memo` alone to have little or no effect because `onSelect` was being recreated on every render. The profiler confirmed this and showed that stabilizing the handler was the change that made `React.memo` effective.
 
 **Wrong dependency array:** If `useCallback` had an incorrect dependency array, the callback could keep using an outdated value from an earlier render. To a user, this could appear as stale or incorrect behavior, such as an action using old data or navigating based on an outdated value. It would not necessarily look like a performance problem.
+
+
+# Exercise 4
+
+### Task 1
+
+After memoizing `Header`, `FilterChips`, and the Books page title:
+
+* **Total time for the commit:** 61.6ms
+* **Slowest component:** `Books`, 58.6ms
+* **Components re-rendered:** 3 (`Books`, `SearchBox`, `ResultCount`)
+
+Only 1 of the 3 memoizations survived: `FilterChips`. Its `onFilterChange` prop was stabilized with `useCallback`, so it stopped re-rendering when the parent rendered again.
+
+The `Header` memoization and the `BooksTitle` memoized component were removed because they produced no meaningful measurable improvement. The attempted deleted code was:
+
+```jsx
+const Header = React.memo(function Header() {
+	return <header>Header</header>;
+});
+```
+
+```jsx
+const BooksTitle = React.memo(function BooksTitle() {
+	return <h1>Books</h1>;
+});
+```
+
+The commit time was effectively unchanged: 61.6ms compared with 62.6ms, so the optimization did not materially improve overall performance.
+
+
+### Task 2
+
+`useMemo` remembers a calculated value so React can reuse it when its inputs have not changed.
+
+`useCallback` remembers a function so React can reuse the same function reference when its dependencies have not changed.
+
+They both avoid creating or recalculating something unnecessarily; I use `useMemo` for an expensive value and `useCallback` for a function passed to another component, especially a memoized one.
+
+**Real `useMemo` example:** `BranchProvider` in `src/context/BranchContext.jsx` memoizes its `{ branch, member }` context value. This is a project use case, although `BranchProvider` is not currently mounted in the active app tree.
+
+**Real `useCallback` example:** `Books` memoizes `handleSelect` and passes it as `onSelect` to the memoized `BookCardModule`. The stable function reference lets the book cards avoid re-rendering when their other props have not changed.
+
+
+### Task 3
+
+With 2,000 books, the first commit took **161ms**, with `Books` as the slowest component at **153.7ms**. At 500 books, the same measurements were **61.6ms** and **58.6ms**.
+
+The `BookCardModule` components still did not re-render because `React.memo` and `useCallback` are working. The main new cost is in `Books`, which has to process the much larger filtered list and create 2,000 elements on each search update, while React still has to compare the memoized cards.
+
+The technique that addresses lists of this size is **list virtualization (windowing)**. It renders only the items currently visible on screen instead of processing the entire list at once. Libraries such as `react-window` and TanStack Virtual can be used for this.
+
+Memoization can skip component re-renders, but it does not remove the work involved in processing a large list.
+
+
+### Task 4
+
+**Three things I memoised and would keep:**
+
+* **`BookCardModule` with `React.memo`** — It prevents the book cards from re-rendering when their props have not changed, which becomes important with a large list.
+* **`handleSelect` with `useCallback`** — It keeps the `onSelect` function reference stable so `React.memo` can work effectively for `BookCardModule`.
+* **`FilterChips` with `React.memo` and `handleFilterChange` with `useCallback`** — This prevents `FilterChips` from re-rendering when the parent updates for unrelated changes.
+
+**Three things I deliberately did not memoise:**
+
+* **`Header`** — It had no props and memoizing it produced no meaningful improvement. Keeping the optimization would add unnecessary code.
+* **Books page title (`<h1>Books</h1>`)** — It is a simple element with negligible rendering cost. Extracting it into a memoized component would add unnecessary component and maintenance overhead.
+* **`ResultCount`** — Its `count` prop changes when the search results change, so memoizing it would not prevent the renders that matter. It would add memoization code without providing a useful benefit.
+
+The main lesson is that memoization should be used where it prevents meaningful work, not applied automatically to every component.

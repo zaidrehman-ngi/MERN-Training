@@ -35,7 +35,7 @@ function Books() {
   // }, [books.length, dispatch]);
 
   useEffect(() => {
-    dispatch(booksLoaded(generateBooks(500)));
+    dispatch(booksLoaded(generateBooks(2000)));
   }, [dispatch]);
 
   const handleSelect = useCallback(
@@ -43,6 +43,11 @@ function Books() {
       navigate(`/books/${selectedBook.id}`);
     },
     [navigate],
+  );
+
+  const handleFilterChange = useCallback(
+    (filter) => dispatch(filterChanged(filter)),
+    [dispatch],
   );
 
   return (
@@ -80,7 +85,7 @@ function Books() {
       </button>
 
       <FilterChips
-        onFilterChange={(filter) => dispatch(filterChanged(filter))}
+        onFilterChange={handleFilterChange}
       />
 
       <SearchBox

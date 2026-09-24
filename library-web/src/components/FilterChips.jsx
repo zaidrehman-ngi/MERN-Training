@@ -1,4 +1,6 @@
-function FilterChips({ onFilterChange }) {
+import React from "react";
+
+const FilterChips = React.memo(function FilterChips({ onFilterChange }) {
   return (
     <div>
       <button onClick={() => onFilterChange("all")}>All</button>
@@ -10,6 +12,6 @@ function FilterChips({ onFilterChange }) {
       <button onClick={() => onFilterChange("overdue")}>Overdue</button>
     </div>
   );
-}
+});
 
 export default FilterChips;
