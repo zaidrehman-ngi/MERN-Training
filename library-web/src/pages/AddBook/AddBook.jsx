@@ -2,7 +2,7 @@ import useForm from "../../hooks/useForm";
 import styles from "./AddBook.module.css";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { bookAdded } from "../../store/booksSlice";
+import { createBookThunk } from "../../store/booksSlice";
 
 function AddBook() {
   const navigate = useNavigate();
@@ -66,26 +66,38 @@ function AddBook() {
     branch: validateBranch(values.branch),
   });
 
-  const { values, errors, touched, handleChange, handleBlur, handleSubmit } =
-    useForm({
-      initialValues,
-      validate,
-      onSubmit: (values) => {
-        dispatch(
-          bookAdded({
-            id: `bk-${Date.now()}`,
-            title: values.title,
-            author: values.author,
-            isbn: values.isbn,
-            onShelf: Number(values.copies),
-            totalCopies: Number(values.copies),
-            status: "available",
-          }),
-        );
+  const {
+    values,
+    errors,
+    touched,
+    handleChange,
+    handleBlur,
+    handleSubmit,
+    isSubmitting,
+    submitError,
+  } = useForm({
+    initialValues,
+    validate,
+    onSubmit: async (values) => {
+      const result = await dispatch(
+        createBookThunk({
+          title: values.title,
+          author: values.author,
+          isbn: values.isbn,
+          onShelf: Number(values.copies),
+          totalCopies: Number(values.copies),
+          status: "available",
+        }),
+      );
 
+      if (createBookThunk.fulfilled.match(result)) {
         navigate("/books");
-      },
-    });
+        return;
+      }
+
+      throw result.payload;
+    },
+  });
 
   return (
     <main className={styles.page}>
@@ -207,8 +219,10 @@ function AddBook() {
           </p>
         )}
 
-        <button className={styles.submit} type="submit">
-          Add Book
+        {submitError && <p className={styles.error}>{submitError}</p>}
+
+        <button className={styles.submit} type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Adding Book..." : "Add Book"}
         </button>
       </form>
     </main>

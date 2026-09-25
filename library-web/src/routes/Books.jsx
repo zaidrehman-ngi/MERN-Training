@@ -4,14 +4,15 @@ import BookCard from "../components/BookCard/BookCard";
 import SearchBox from "../components/SearchBox";
 import ResultCount from "../components/ResultCount";
 import FilterChips from "../components/FilterChips";
-import { listBooks } from "../api/books";
 import { useDispatch, useSelector } from "react-redux";
 import { setSelectedBranch } from "../store/uiSlice";
 import {
-  booksLoaded,
+  fetchBooks,
   bookAdded,
   filterChanged,
   selectAllBooks,
+  selectBooksError,
+  selectBooksStatus,
   selectFilter,
   selectSearch,
   searchChanged,
@@ -20,24 +21,22 @@ import {
 function Books() {
   const searchText = useSelector(selectSearch);
   const filter = useSelector(selectFilter);
+  const status = useSelector(selectBooksStatus);
+  const error = useSelector(selectBooksError);
+
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const selectedBranch = useSelector((state) => state.ui.selectedBranch);
   const books = useSelector(selectAllBooks);
 
-  const dispatch = useDispatch();
-
   useEffect(() => {
-    listBooks({
-      filter,
-      search: searchText,
-    })
-      .then((response) => {
-        dispatch(booksLoaded(response.data));
-      })
-      .catch((error) => {
-        console.error("Failed to load books:", error);
-      });
+    dispatch(
+      fetchBooks({
+        filter,
+        search: searchText,
+      }),
+    );
   }, [dispatch, filter, searchText]);
 
   const handleSelect = useCallback(
@@ -51,6 +50,15 @@ function Books() {
     (filter) => dispatch(filterChanged(filter)),
     [dispatch],
   );
+
+  const handleRetry = () => {
+    dispatch(
+      fetchBooks({
+        filter,
+        search: searchText,
+      }),
+    );
+  };
 
   return (
     <main>
@@ -93,9 +101,20 @@ function Books() {
         onSearchChange={(search) => dispatch(searchChanged(search))}
       />
 
-      {books.length === 0 ? (
+      {status === "loading" && <p>Loading books...</p>}
+
+      {status === "failed" && (
+        <div>
+          <p>{error || "Failed to load books."}</p>
+          <button onClick={handleRetry}>Retry</button>
+        </div>
+      )}
+
+      {status === "succeeded" && books.length === 0 && (
         <p>No books found. Try changing your search or filter.</p>
-      ) : (
+      )}
+
+      {status === "succeeded" && books.length > 0 && (
         <>
           <ResultCount count={books.length} />
 

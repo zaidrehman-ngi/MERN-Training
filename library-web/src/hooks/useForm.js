@@ -5,6 +5,7 @@ function useForm({ initialValues, validate, onSubmit }) {
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -16,6 +17,7 @@ function useForm({ initialValues, validate, onSubmit }) {
 
     setValues(nextValues);
     setErrors(validate(nextValues));
+    setSubmitError("");
   };
 
   const handleBlur = (e) => {
@@ -34,6 +36,7 @@ function useForm({ initialValues, validate, onSubmit }) {
 
     const validationErrors = validate(values);
     setErrors(validationErrors);
+    setSubmitError("");
 
     setTouched(
       Object.keys(values).reduce((allTouched, field) => {
@@ -54,6 +57,10 @@ function useForm({ initialValues, validate, onSubmit }) {
 
     try {
       await onSubmit(values);
+    } catch (error) {
+      setSubmitError(
+        error?.message || "Something went wrong. Please try again.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -66,6 +73,7 @@ function useForm({ initialValues, validate, onSubmit }) {
     setErrors({});
     setTouched({});
     setIsSubmitting(false);
+    setSubmitError("");
   };
 
   return {
@@ -77,6 +85,7 @@ function useForm({ initialValues, validate, onSubmit }) {
     handleSubmit,
     isValid,
     isSubmitting,
+    submitError,
     resetForm,
   };
 }

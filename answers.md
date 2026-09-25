@@ -95,3 +95,36 @@ JSON Server does not implement the Week 1 error structure or the authentication-
 **Decision:** Keep the Week 1 error response contract and implement it in the real backend later.
 
 Overall, the JSON Server API is a temporary implementation for the frontend milestone. The Week 1 specification will be used as the contract for the real backend rather than changing the specification to match JSON Server's conventions.
+
+
+# Exercise 2
+
+### Task 4
+
+Added `createBookThunk`, `updateBookThunk`, and `deleteBookThunk` using the existing API functions. Each thunk updates the Redux store after a successful request.
+
+The existing Add a Book form was also updated to handle asynchronous submission. `useForm` now tracks `isSubmitting` and `submitError`, disables the submit button while the request is in progress, and shows a user-friendly error if the API request fails.
+
+This gap did not appear last week because form submission was instant and did not involve a network request that could fail or take time to complete.
+
+
+### Task 5
+
+Reproduced the race condition by triggering multiple book requests quickly. A slower earlier request could finish after a newer request and overwrite the latest results.
+
+Fixed it using Redux Toolkit's `requestId`. The slice stores the latest request ID and only accepts a fulfilled or rejected result if its request ID matches the current one.
+
+The abandoned request is not cancelled. It can still finish in the background, but its result is ignored so stale data cannot update the store.
+
+
+### Task 6
+
+The three mechanisms handle stale requests differently:
+
+* **Effect cleanup:** stops the previous effect from updating the state after it is no longer relevant. The request itself usually continues in the background.
+* **Abort signal:** actually cancels the in-flight request when the underlying API supports cancellation, so the request does not need to continue.
+* **Ignoring the response:** lets the request finish, but checks whether it is still the latest request before updating the store. If it is stale, the response is ignored.
+
+In the current code, **ignoring the response with Redux Toolkit's `requestId` is being used**. The older request can still finish, but its result is ignored when its `requestId` no longer matches the latest request.
+
+This shows why loading is not simply a boolean: multiple requests can be in progress, and the application needs to know which request is currently relevant.
