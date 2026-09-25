@@ -1,11 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useCallback, useEffect } from "react";
-// import { ALL_BOOKS } from "../data/books.fixture.js";
-import { generateBooks } from "../data/generateBooks";
-import BookCardModule from "../components/BookCard/BookCardModule";
+import BookCard from "../components/BookCard/BookCard";
 import SearchBox from "../components/SearchBox";
 import ResultCount from "../components/ResultCount";
 import FilterChips from "../components/FilterChips";
+import { listBooks } from "../api/books";
 import { useDispatch, useSelector } from "react-redux";
 import { setSelectedBranch } from "../store/uiSlice";
 import {
@@ -13,30 +12,33 @@ import {
   bookAdded,
   filterChanged,
   selectAllBooks,
+  selectFilter,
   selectSearch,
   searchChanged,
-  selectFilteredBooks,
 } from "../store/booksSlice";
 
 function Books() {
   const searchText = useSelector(selectSearch);
+  const filter = useSelector(selectFilter);
   const navigate = useNavigate();
 
   const selectedBranch = useSelector((state) => state.ui.selectedBranch);
   const books = useSelector(selectAllBooks);
-  const filteredBooks = useSelector(selectFilteredBooks);
 
   const dispatch = useDispatch();
 
-  // useEffect(() => {
-  //   if (books.length === 0) {
-  //     dispatch(booksLoaded(ALL_BOOKS));
-  //   }
-  // }, [books.length, dispatch]);
-
   useEffect(() => {
-    dispatch(booksLoaded(generateBooks(2000)));
-  }, [dispatch]);
+    listBooks({
+      filter,
+      search: searchText,
+    })
+      .then((response) => {
+        dispatch(booksLoaded(response.data));
+      })
+      .catch((error) => {
+        console.error("Failed to load books:", error);
+      });
+  }, [dispatch, filter, searchText]);
 
   const handleSelect = useCallback(
     (selectedBook) => {
@@ -84,26 +86,24 @@ function Books() {
         Add Test Book
       </button>
 
-      <FilterChips
-        onFilterChange={handleFilterChange}
-      />
+      <FilterChips onFilterChange={handleFilterChange} />
 
       <SearchBox
         searchText={searchText}
         onSearchChange={(search) => dispatch(searchChanged(search))}
       />
 
-      {filteredBooks.length === 0 ? (
+      {books.length === 0 ? (
         <p>No books found. Try changing your search or filter.</p>
       ) : (
         <>
-          <ResultCount count={filteredBooks.length} />
+          <ResultCount count={books.length} />
 
           <div>
-            {filteredBooks.map((book) => (
+            {books.map((book) => (
               <div key={book.id}>
                 <input type="checkbox" />
-                <BookCardModule book={book} onSelect={handleSelect} />
+                <BookCard book={book} onSelect={handleSelect} />
               </div>
             ))}
           </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { loadBorrowRequests } from "../data/mockApi";
+import { listBorrowRequests } from "../api/borrowRequests";
 
 export function useBorrowRequests() {
   const [requests, setRequests] = useState([]);
@@ -11,9 +11,9 @@ export function useBorrowRequests() {
     setLoading(true);
     setError("");
 
-    loadBorrowRequests()
-      .then((requests) => {
-        setRequests(requests);
+    listBorrowRequests()
+      .then((response) => {
+        setRequests(response.data);
       })
       .catch((error) => {
         setError(error.message);

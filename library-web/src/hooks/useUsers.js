@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { loadUsers } from "../data/mockApi";
+import { listUsers } from "../api/users";
 
 export function useUsers() {
   const [users, setUsers] = useState([]);
@@ -11,9 +11,9 @@ export function useUsers() {
     setLoading(true);
     setError("");
 
-    loadUsers()
-      .then((users) => {
-        setUsers(users);
+    listUsers()
+      .then((response) => {
+        setUsers(response.data);
       })
       .catch((error) => {
         setError(error.message);

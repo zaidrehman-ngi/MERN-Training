@@ -1,4 +1,4 @@
-import { createSlice, createSelector } from "@reduxjs/toolkit";
+import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
   items: [],
@@ -56,22 +56,5 @@ export const {
 export const selectAllBooks = (state) => state.books.items;
 export const selectFilter = (state) => state.books.filter;
 export const selectSearch = (state) => state.books.search;
-
-export const selectFilteredBooks = createSelector(
-  [selectAllBooks, selectFilter, selectSearch],
-  (books, filter, search) => {
-    const term = search.trim().toLowerCase();
-
-    return books.filter((book) => {
-      const matchesFilter = filter === "all" || book.status === filter;
-
-      const haystack = `${book.title ?? ""} ${book.author ?? ""}`.toLowerCase();
-
-      const matchesSearch = !term || haystack.includes(term);
-
-      return matchesFilter && matchesSearch;
-    });
-  },
-);
 
 export default booksSlice.reducer;
