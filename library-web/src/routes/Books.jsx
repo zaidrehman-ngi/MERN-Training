@@ -5,7 +5,7 @@ import SearchBox from "../components/SearchBox";
 import ResultCount from "../components/ResultCount";
 import FilterChips from "../components/FilterChips";
 import { useDispatch, useSelector } from "react-redux";
-import { setSelectedBranch } from "../store/uiSlice";
+import useDebounce from "../hooks/useDebounce";
 import {
   fetchBooks,
   filterChanged,
@@ -16,19 +16,20 @@ import {
   selectSearch,
   searchChanged,
 } from "../store/booksSlice";
+
 function Books() {
   const searchText = useSelector(selectSearch);
+  const debouncedSearchText = useDebounce(searchText, 300);
   const filter = useSelector(selectFilter);
   const status = useSelector(selectBooksStatus);
   const error = useSelector(selectBooksError);
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const selectedBranch = useSelector((state) => state.ui.selectedBranch);
   const books = useSelector(selectAllBooks);
 
   useEffect(() => {
-    dispatch(fetchBooks({ filter, search: searchText }));
-  }, [dispatch, filter, searchText]);
+    dispatch(fetchBooks({ filter, search: debouncedSearchText }));
+  }, [dispatch, filter, debouncedSearchText]);
   const handleSelect = useCallback(
     (selectedBook) => {
       navigate(`/books/${selectedBook.id}`);
@@ -40,27 +41,12 @@ function Books() {
     [dispatch],
   );
   const handleRetry = () => {
-    dispatch(fetchBooks({ filter, search: searchText }));
+    dispatch(fetchBooks({ filter, search: debouncedSearchText }));
   };
   return (
     <main>
-      {" "}
-      <h1>Books</h1> <p>Selected branch: {selectedBranch}</p>{" "}
-      <button onClick={() => dispatch(setSelectedBranch("Gulshan Branch"))}>
-        {" "}
-        Select Gulshan Branch{" "}
-      </button>{" "}
-      <button onClick={() => dispatch(setSelectedBranch("Clifton Branch"))}>
-        {" "}
-        Select Clifton Branch{" "}
-      </button>{" "}
-      <button
-        onClick={() => dispatch(setSelectedBranch("North Nazimabad Branch"))}
-      >
-        {" "}
-        Select North Nazimabad Branch{" "}
-      </button>{" "}
-      <FilterChips onFilterChange={handleFilterChange} />{" "}
+      <h1>Books</h1>
+      <FilterChips activeFilter={filter} onFilterChange={handleFilterChange} />{" "}
       <SearchBox
         searchText={searchText}
         onSearchChange={(search) => dispatch(searchChanged(search))}
@@ -90,8 +76,6 @@ function Books() {
             {" "}
             {books.map((book) => (
               <div key={book.id}>
-                {" "}
-                <input type="checkbox" />{" "}
                 <BookCard book={book} onSelect={handleSelect} />{" "}
               </div>
             ))}{" "}

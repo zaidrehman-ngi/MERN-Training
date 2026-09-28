@@ -81,7 +81,9 @@ function BookDetail() {
     return (
       <main>
         <h1>Book Not Found</h1>
-        <p>{error.message || "This book is no longer available."}</p>
+        <p role="alert">
+          {error.message || "This book is no longer available."}
+        </p>
 
         <button onClick={() => navigate("/books")}>Back to catalogue</button>
       </main>
@@ -91,47 +93,72 @@ function BookDetail() {
   if (loadStatus === "idle" || loadStatus === "loading") {
     return (
       <main>
-        <p>Loading book...</p>
+        <p role="status">Loading book...</p>
       </main>
     );
   }
 
   return (
     <main>
-      <h1>{book.title}</h1>
-      <p>Author: {book.author ?? "Unknown author"}</p>
-      <p>Year: {book.year ?? "Unknown year"}</p>
-      <p>ISBN: {book.isbn}</p>
-      <p>
-        Copies: {book.onShelf} / {book.totalCopies}
-      </p>
-      <p>Fine per day: Rs. {book.finePerDay}</p>
-      <p>Status: {book.status}</p>
-      <button
-        type="button"
-        onClick={handleBorrow}
-        disabled={
-          borrowStatus === "pending" ||
-          borrowStatus === "succeeded" ||
-          Number(book.onShelf) < 1
-        }
-      >
-        {borrowStatus === "pending"
-          ? "Requesting..."
-          : borrowStatus === "succeeded"
-            ? "Request sent"
-            : "Borrow"}
-      </button>
-      {borrowError && <p role="alert">{borrowError.message}</p>}
-      <Link to={`/books/${book.id}/edit`}>Edit book</Link>
-      <button
-        type="button"
-        onClick={handleDelete}
-        disabled={deleteStatus === "loading" || deleteStatus === "succeeded"}
-      >
-        {deleteStatus === "loading" ? "Deleting..." : "Delete book"}
-      </button>
-      {deleteError && <p role="alert">{deleteError.message}</p>}
+      <section className="detailPanel">
+        <h1>{book.title}</h1>
+        <dl className="detailList">
+          <div>
+            <dt>Author</dt>
+            <dd>{book.author ?? "Unknown author"}</dd>
+          </div>
+          <div>
+            <dt>Year</dt>
+            <dd>{book.year ?? "Unknown year"}</dd>
+          </div>
+          <div>
+            <dt>ISBN</dt>
+            <dd>{book.isbn}</dd>
+          </div>
+          <div>
+            <dt>Copies</dt>
+            <dd>
+              {book.onShelf} / {book.totalCopies}
+            </dd>
+          </div>
+          <div>
+            <dt>Fine per day</dt>
+            <dd>Rs. {book.finePerDay}</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>{book.status}</dd>
+          </div>
+        </dl>
+        <div className="detailActions">
+          <button
+            type="button"
+            onClick={handleBorrow}
+            disabled={
+              borrowStatus === "pending" ||
+              borrowStatus === "succeeded" ||
+              Number(book.onShelf) < 1
+            }
+          >
+            {borrowStatus === "pending"
+              ? "Requesting..."
+              : borrowStatus === "succeeded"
+                ? "Request sent"
+                : "Borrow"}
+          </button>
+          <Link to={`/books/${book.id}/edit`}>Edit book</Link>
+          <button
+            className="dangerButton"
+            type="button"
+            onClick={handleDelete}
+            disabled={deleteStatus === "loading" || deleteStatus === "succeeded"}
+          >
+            {deleteStatus === "loading" ? "Deleting..." : "Delete book"}
+          </button>
+        </div>
+        {borrowError && <p role="alert">{borrowError.message}</p>}
+        {deleteError && <p role="alert">{deleteError.message}</p>}
+      </section>
     </main>
   );
 }

@@ -1,64 +1,37 @@
-/*
- * tokens.css
- * Week 4, Day 1 — Exercise 3.
- *
- * The library's design tokens. Colours, spacing, radii and type scale, as CSS
- * custom properties on :root.
- *
- * Why you are being given these rather than picking your own: Exercise 3 asks
- * you to style the same component three different ways and compare them
- * honestly. That comparison is worthless if each version also looks different,
- * because you will end up judging your own colour choices instead of the three
- * techniques. Same values, three mechanisms, one fair comparison.
- *
- * Import it once, at the top of src/main.jsx:
- *
- *     import './styles/tokens.css';
- *
- * All three approaches can read these. Inline styles read them with
- * var(--name) in a string, CSS Modules read them like any stylesheet, and
- * styled-components read them in the template literal. Part of task 5 is
- * noticing that this file is the thing all three have in common — and what
- * that tells you about how much the choice actually matters.
- *
- * Do not add hardcoded hex codes to your components. If you need a value that
- * is not here, add it here first and say why in answers.md.
- */
+/* Shared design tokens. All application colors are defined in this file. */
 
 :root {
-  /* ---- global page palette ---- */
-  --page-text: #6b6375;
-  --page-heading: #08060d;
-  --page-background: #fff;
-  --page-border: #e5e4e7;
-  --page-code-background: #f4f3ec;
-  --page-accent: #aa3bff;
-  --page-accent-background: rgba(170, 59, 255, 0.1);
-  --page-accent-border: rgba(170, 59, 255, 0.5);
-  --page-social-background: rgba(244, 243, 236, 0.5);
-  --page-shadow: rgba(0, 0, 0, 0.1) 0 10px 15px -3px,
-    rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  color-scheme: light;
 
-  /* ---- brand ---- */
-  --colour-ink: #1a1a1a;
-  --colour-body: #444444;
-  --colour-muted: #7a7a7a;
-  --colour-line: #e2e0d9;
+  /* ---- application palette ---- */
+  --colour-ink: #1c2b24;
+  --colour-body: #46584e;
+  --colour-muted: #718078;
+  --colour-line: #dce5de;
   --colour-surface: #ffffff;
-  --colour-surface-sunk: #f6f5f2;
-  --colour-accent: #0f5c4a;
-  --colour-accent-soft: #e6f0ec;
-
-  /* ---- status ---- */
-  /* These map to the four status values in books.fixture.js. The fifth,
-     RESERVED_STACK, is deliberately not here — you decided how to handle
-     unknown statuses in Week 2 and that decision still applies. */
-  --colour-available: #1a7f4b;
-  --colour-out: #9a3412;
-  --colour-overdue: #b91c1c;
+  --colour-surface-raised: #ffffff;
+  --colour-surface-sunk: #f2f6f2;
+  --colour-page: #f6f8f5;
+  --colour-accent: #176b52;
+  --colour-accent-hover: #125640;
+  --colour-accent-soft: #e4f2eb;
+  --colour-accent-contrast: #ffffff;
+  --colour-danger: #ad3f3a;
+  --colour-danger-soft: #fbefed;
+  --colour-success: #28704f;
+  --colour-success-soft: #eaf5ed;
+  --colour-warning: #8b5b17;
+  --colour-warning-soft: #fbf3e4;
+  --colour-info: #315f83;
+  --colour-info-soft: #edf4f9;
+  --colour-available: #28704f;
+  --colour-out: #8b5b17;
+  --colour-overdue: #ad3f3a;
   --colour-on-available: #ffffff;
   --colour-on-out: #ffffff;
   --colour-on-overdue: #ffffff;
+  --colour-focus: #247c60;
+  --colour-overlay: rgba(28, 43, 36, 0.08);
 
   /* ---- spacing scale ---- */
   --space-1: 4px;
@@ -77,13 +50,14 @@
   --border-width-card: 1px;
 
   /* ---- type ---- */
-  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-body: "DM Sans", "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --text-xs: 12px;
   --text-sm: 14px;
   --text-base: 16px;
   --text-lg: 20px;
   --text-xl: 26px;
+  --text-2xl: 32px;
   --leading-tight: 1.25;
   --leading-body: 1.55;
 
@@ -91,8 +65,10 @@
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 14px;
-  --shadow-card: 0 1px 2px rgba(26, 26, 26, 0.06),
-                 0 4px 12px rgba(26, 26, 26, 0.04);
+  --shadow-card: 0 1px 2px rgba(28, 43, 36, 0.05),
+    0 8px 24px rgba(28, 43, 36, 0.06);
+  --shadow-float: 0 12px 32px rgba(28, 43, 36, 0.12);
+  --transition-fast: 140ms ease;
 
   /* ---- layout ---- */
   --page-max: 1080px;
@@ -100,18 +76,3 @@
   --header-height: 56px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --page-text: #9ca3af;
-    --page-heading: #f3f4f6;
-    --page-background: #16171d;
-    --page-border: #2e303a;
-    --page-code-background: #1f2028;
-    --page-accent: #c084fc;
-    --page-accent-background: rgba(192, 132, 252, 0.15);
-    --page-accent-border: rgba(192, 132, 252, 0.5);
-    --page-social-background: rgba(47, 48, 58, 0.5);
-    --page-shadow: rgba(0, 0, 0, 0.4) 0 10px 15px -3px,
-      rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-}

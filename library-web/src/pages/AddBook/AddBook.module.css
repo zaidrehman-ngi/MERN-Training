@@ -1,29 +1,34 @@
 .page {
-  width: min(100% - var(--space-6), var(--page-max));
-  margin: var(--space-7) auto;
+  width: min(calc(100% - 48px), 720px);
+  margin: var(--space-6) auto;
   box-sizing: border-box;
-  padding: var(--space-5);
+  padding: clamp(var(--space-4), 4vw, var(--space-6));
+  border: var(--border-width-card) solid var(--colour-line);
+  border-radius: var(--radius-md);
+  background: var(--colour-surface);
   color: var(--colour-ink);
   font-family: var(--font-body);
   text-align: left;
+  box-shadow: var(--shadow-card);
 }
 
 .page h1 {
   margin: 0 0 var(--space-5);
   color: var(--colour-ink);
   font-size: var(--text-xl);
+  font-weight: 800;
   line-height: var(--leading-tight);
 }
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  max-width: var(--page-max);
+  gap: var(--space-1);
+  max-width: 560px;
 }
 
 .label {
-  margin-top: var(--space-2);
+  margin-top: var(--space-3);
   color: var(--colour-ink);
   font-size: var(--text-sm);
   font-weight: 600;
@@ -39,6 +44,7 @@
   color: var(--colour-ink);
   font: inherit;
   font-size: var(--text-sm);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .control:focus-visible {
@@ -67,8 +73,9 @@
 }
 
 .submit:hover {
-  background: var(--colour-accent-soft);
-  color: var(--colour-ink);
+  border-color: var(--colour-accent-hover);
+  background: var(--colour-accent-hover);
+  color: var(--colour-accent-contrast);
 }
 
 .submit:focus-visible {
@@ -78,8 +85,8 @@
 
 @media (max-width: 37.5rem) {
   .page {
-    width: 100%;
-    margin: var(--space-5) auto;
+    width: calc(100% - 32px);
+    margin: var(--space-4) auto;
     padding: var(--space-4);
   }
 }

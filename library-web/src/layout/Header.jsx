@@ -1,17 +1,17 @@
-// import { useEffect } from "react";
-
-// export default function Header() {
-//   useEffect(() => {
-//     console.log("Header mounted");
-
-//     return () => {
-//       console.log("Header unmounted");
-//     };
-//   }, []);
-
-//   return <header>Header</header>;
-// }
+import { Link } from "react-router-dom";
 
 export default function Header() {
-  return <header>Header</header>;
+  return (
+    <header>
+      <Link className="brand" to="/" aria-label="Karachi Central Library home">
+        <span className="brandMark" aria-hidden="true">
+          KC
+        </span>
+        <span className="brandText">
+          <strong>Karachi Central Library</strong>
+          <span>Library management</span>
+        </span>
+      </Link>
+    </header>
+  );
 }

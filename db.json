@@ -31,10 +31,10 @@
       "year": 1989,
       "isbn": "9780553283686",
       "coverUrl": "/covers/hyperion.jpg",
-      "onShelf": 1,
+      "onShelf": 2,
       "totalCopies": 4,
       "finePerDay": 20,
-      "status": "overdue"
+      "status": "available"
     },
     {
       "id": "bk-4",
@@ -197,7 +197,7 @@
       "onShelf": 0,
       "totalCopies": 3,
       "finePerDay": 20,
-      "status": "available"
+      "status": "overdue"
     },
     {
       "id": "gen-9",
