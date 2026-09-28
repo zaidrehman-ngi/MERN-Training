@@ -128,3 +128,41 @@ The three mechanisms handle stale requests differently:
 In the current code, **ignoring the response with Redux Toolkit's `requestId` is being used**. The older request can still finish, but its result is ignored when its `requestId` no longer matches the latest request.
 
 This shows why loading is not simply a boolean: multiple requests can be in progress, and the application needs to know which request is currently relevant.
+
+
+# Exercise 3
+
+### Task 1
+
+Tested the application under four different network/API conditions:
+
+* **3-second server delay:** The member sees `Loading books...`, and the books load normally after around 3 seconds.
+* **Server stopped:** The member sees a blank/crashed screen. The console shows `ERR_CONNECTION_REFUSED` and a React error because the interceptor error object is rendered directly.
+* **Axios timeout:** With the Axios timeout set to 1000ms and the server delay at 3000ms, the member sees `Loading books...` and then the screen crashes. The console shows `AxiosError: timeout of 1000ms exceeded`.
+* **Book not found:** The member sees `Book Not Found` with the message `The requested resource could not be found.` The console shows a `404 (Not Found)` response.
+
+The current error handling makes some different failure cases look similar, while the 404 case is already handled separately on the book detail page.
+
+
+### Task 2
+
+Made the failure cases different by using the information provided by the Axios response interceptor:
+
+* **Connection lost:** "We couldn't connect to the server. Please check your connection and try again." → **Retry the request.**
+* **Book not found:** "This book is no longer available." → **Back to the catalogue.**
+* **Broken server:** "The server is having a problem. Please try again later." → **Retry the request later.**
+
+The interceptor uses `error.response?.status` to identify HTTP errors such as `404` and `500`, while the absence of `error.response` identifies cases where the server could not be reached.
+
+For the tested cases, the stopped server produced `ERR_CONNECTION_REFUSED` with no response, while the missing book returned HTTP `404`. The `500` case is handled in the interceptor through the `status >= 500` condition, although JSON Server does not provide a simple way to trigger a real `500` response for this exercise.
+
+
+### Task 3
+
+Used the app for two minutes with the browser throttled to 450 ms latency and 52 KB/s upload/download. The profiler was not enabled.
+
+Three non-error UX issues stood out:
+
+1) Searching cleared all visible book cards while the request was pending, then brought the results back. This made the page jump, so I kept the previous results visible during refreshes and added an updating status message.
+2) The **Add Test Book** button accepted repeated activations and inserted duplicate IDs. I disabled the button after the test entry exists and added a duplicate-ID guard in the Redux reducer.
+3) The loading message can disappear quickly once a request completes. I left its duration tied to the actual request instead of adding a minimum spinner delay; on this local API that would make successful searches feel slower just to keep the indicator visible longer.

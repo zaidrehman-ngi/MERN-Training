@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { createBook, listBooks, removeBook, updateBook } from "../api/books";
+import { createBorrowRequest } from "../api/borrowRequests";
 
 export const fetchBooks = createAsyncThunk(
   "books/fetchBooks",
@@ -49,6 +50,24 @@ export const deleteBookThunk = createAsyncThunk(
   },
 );
 
+export const borrowBookThunk = createAsyncThunk(
+  "books/borrow",
+  async ({ request }, { rejectWithValue }) => {
+    try {
+      const response = await createBorrowRequest(request);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error);
+    }
+  },
+  {
+    condition: ({ bookId }, { getState }) => {
+      const status = getState().books.borrowStatusByBookId[bookId];
+      return status !== "pending" && status !== "succeeded";
+    },
+  },
+);
+
 const initialState = {
   items: [],
   status: "idle",
@@ -56,6 +75,8 @@ const initialState = {
   filter: "all",
   search: "",
   currentRequestId: null,
+  borrowStatusByBookId: {},
+  borrowErrorByBookId: {},
 };
 
 const booksSlice = createSlice({
@@ -65,7 +86,9 @@ const booksSlice = createSlice({
 
   reducers: {
     bookAdded: (state, action) => {
-      state.items.push(action.payload);
+      if (!state.items.some((book) => book.id === action.payload.id)) {
+        state.items.push(action.payload);
+      }
     },
 
     bookUpdated: (state, action) => {
@@ -135,6 +158,27 @@ const booksSlice = createSlice({
 
       .addCase(deleteBookThunk.fulfilled, (state, action) => {
         state.items = state.items.filter((book) => book.id !== action.payload);
+      })
+
+      .addCase(borrowBookThunk.pending, (state, action) => {
+        const { bookId } = action.meta.arg;
+        state.borrowStatusByBookId[bookId] = "pending";
+        delete state.borrowErrorByBookId[bookId];
+      })
+
+      .addCase(borrowBookThunk.fulfilled, (state, action) => {
+        const { bookId } = action.meta.arg;
+        state.borrowStatusByBookId[bookId] = "succeeded";
+      })
+
+      .addCase(borrowBookThunk.rejected, (state, action) => {
+        if (action.meta.condition) {
+          return;
+        }
+
+        const { bookId } = action.meta.arg;
+        delete state.borrowStatusByBookId[bookId];
+        state.borrowErrorByBookId[bookId] = action.payload;
       });
   },
 });
