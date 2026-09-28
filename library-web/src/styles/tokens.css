@@ -26,6 +26,19 @@
  */
 
 :root {
+  /* ---- global page palette ---- */
+  --page-text: #6b6375;
+  --page-heading: #08060d;
+  --page-background: #fff;
+  --page-border: #e5e4e7;
+  --page-code-background: #f4f3ec;
+  --page-accent: #aa3bff;
+  --page-accent-background: rgba(170, 59, 255, 0.1);
+  --page-accent-border: rgba(170, 59, 255, 0.5);
+  --page-social-background: rgba(244, 243, 236, 0.5);
+  --page-shadow: rgba(0, 0, 0, 0.1) 0 10px 15px -3px,
+    rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+
   /* ---- brand ---- */
   --colour-ink: #1a1a1a;
   --colour-body: #444444;
@@ -85,4 +98,20 @@
   --page-max: 1080px;
   --sidebar-width: 220px;
   --header-height: 56px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page-text: #9ca3af;
+    --page-heading: #f3f4f6;
+    --page-background: #16171d;
+    --page-border: #2e303a;
+    --page-code-background: #1f2028;
+    --page-accent: #c084fc;
+    --page-accent-background: rgba(192, 132, 252, 0.15);
+    --page-accent-border: rgba(192, 132, 252, 0.5);
+    --page-social-background: rgba(47, 48, 58, 0.5);
+    --page-shadow: rgba(0, 0, 0, 0.4) 0 10px 15px -3px,
+      rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+  }
 }

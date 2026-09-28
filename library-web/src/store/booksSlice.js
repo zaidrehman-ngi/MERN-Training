@@ -77,6 +77,12 @@ const initialState = {
   currentRequestId: null,
   borrowStatusByBookId: {},
   borrowErrorByBookId: {},
+  createStatus: "idle",
+  createError: null,
+  updateStatusById: {},
+  updateErrorById: {},
+  deleteStatusById: {},
+  deleteErrorById: {},
 };
 
 const booksSlice = createSlice({
@@ -103,6 +109,21 @@ const booksSlice = createSlice({
 
     bookRemoved: (state, action) => {
       state.items = state.items.filter((book) => book.id !== action.payload);
+    },
+
+    resetBookMutation: (state, action) => {
+      const { operation, id } = action.payload;
+
+      if (operation === "create") {
+        state.createStatus = "idle";
+        state.createError = null;
+      } else if (operation === "update") {
+        delete state.updateStatusById[id];
+        delete state.updateErrorById[id];
+      } else if (operation === "delete") {
+        delete state.deleteStatusById[id];
+        delete state.deleteErrorById[id];
+      }
     },
 
     filterChanged: (state, action) => {
@@ -143,10 +164,39 @@ const booksSlice = createSlice({
       })
 
       .addCase(createBookThunk.fulfilled, (state, action) => {
-        state.items.push(action.payload);
+        state.createStatus = "succeeded";
+        state.createError = null;
+        const index = state.items.findIndex(
+          (book) => book.id === action.payload.id,
+        );
+
+        if (index === -1) {
+          state.items.push(action.payload);
+        } else {
+          state.items[index] = action.payload;
+        }
+      })
+
+      .addCase(createBookThunk.pending, (state) => {
+        state.createStatus = "loading";
+        state.createError = null;
+      })
+
+      .addCase(createBookThunk.rejected, (state, action) => {
+        state.createStatus = "failed";
+        state.createError = action.payload;
+      })
+
+      .addCase(updateBookThunk.pending, (state, action) => {
+        const { id } = action.meta.arg;
+        state.updateStatusById[id] = "loading";
+        delete state.updateErrorById[id];
       })
 
       .addCase(updateBookThunk.fulfilled, (state, action) => {
+        const { id } = action.meta.arg;
+        state.updateStatusById[id] = "succeeded";
+        delete state.updateErrorById[id];
         const index = state.items.findIndex(
           (book) => book.id === action.payload.id,
         );
@@ -156,8 +206,28 @@ const booksSlice = createSlice({
         }
       })
 
+      .addCase(updateBookThunk.rejected, (state, action) => {
+        const { id } = action.meta.arg;
+        state.updateStatusById[id] = "failed";
+        state.updateErrorById[id] = action.payload;
+      })
+
+      .addCase(deleteBookThunk.pending, (state, action) => {
+        const id = action.meta.arg;
+        state.deleteStatusById[id] = "loading";
+        delete state.deleteErrorById[id];
+      })
+
       .addCase(deleteBookThunk.fulfilled, (state, action) => {
+        state.deleteStatusById[action.payload] = "succeeded";
+        delete state.deleteErrorById[action.payload];
         state.items = state.items.filter((book) => book.id !== action.payload);
+      })
+
+      .addCase(deleteBookThunk.rejected, (state, action) => {
+        const id = action.meta.arg;
+        state.deleteStatusById[id] = "failed";
+        state.deleteErrorById[id] = action.payload;
       })
 
       .addCase(borrowBookThunk.pending, (state, action) => {
@@ -187,6 +257,7 @@ export const {
   bookAdded,
   bookUpdated,
   bookRemoved,
+  resetBookMutation,
   filterChanged,
   searchChanged,
 } = booksSlice.actions;

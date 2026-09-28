@@ -166,3 +166,39 @@ Three non-error UX issues stood out:
 1) Searching cleared all visible book cards while the request was pending, then brought the results back. This made the page jump, so I kept the previous results visible during refreshes and added an updating status message.
 2) The **Add Test Book** button accepted repeated activations and inserted duplicate IDs. I disabled the button after the test entry exists and added a duplicate-ID guard in the Redux reducer.
 3) The loading message can disappear quickly once a request completes. I left its duration tied to the actual request instead of adding a minimum spinner delay; on this local API that would make successful searches feel slower just to keep the indicator visible longer.
+
+
+# Exercise 4
+
+### Task 3 — Repository Review
+
+* **BookCard:** Remains presentational and only handles displaying book data and user interaction through props.
+* **useForm:** Remains generic and has no library-specific logic or dependencies.
+* **Stable keys:** Lists use stable IDs such as `book.id`, `user.id`, and `request.id`.
+* **Routes:** All current application screens have routes, including the books, users, borrow requests, add book, edit book, and book detail screens.
+* **Colours:** Moved the active colour definitions into `tokens.css` so it is now the single source for application colours.
+* **Dead code:** Removed the old Register and SupportTicketForm exercises, unused Vite `App.css`, and the unused `styled-components` dependency. No remaining `mockApi` or manual page switcher code was found.
+
+
+### Task 4 - Demo Running Order
+
+* Open the Books catalogue and demonstrate a filter and search.
+* Open a book and copy its URL, then open the same deep link directly in a fresh browser tab.
+* Create a new test book and show that it appears in the catalogue.
+* Open the newly created book and delete it, then confirm it is removed from the catalogue.
+* Stop the JSON Server while the app is running and trigger a request to demonstrate the connection error and graceful error handling.
+
+
+## Task 5
+
+### Decisions I Would Make Differently
+
+* **Use URL state for search earlier.** We decided that search should be URL-based for sharing and browser navigation, but the final Books implementation keeps it in Redux. Changing this now would require syncing the search state with the URL and updating the related Books logic.
+
+* **Isolate JSON Server differences in the API layer earlier.** We intentionally designed a production-style API contract separately from JSON Server, but some differences still had to be handled later. Changing this now would require adjusting the API modules and their consumers.
+
+* **Add request cancellation for frequent searches.** We handled stale responses using Redux Toolkit `requestId`, which prevents old results from overwriting new ones, but the old requests still continue running. Adding cancellation now would require passing abort signals through the API layer.
+
+### Decision I Was Unsure About but Would Make the Same Way Again
+
+* **Choose CSS Modules for styling.** We compared inline styles, CSS Modules, and styled-components before choosing CSS Modules. I was unsure initially, but I would make the same choice again because it keeps styles separate and supports the project's styling requirements without adding unnecessary complexity.

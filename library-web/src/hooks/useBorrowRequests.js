@@ -3,26 +3,25 @@ import { listBorrowRequests } from "../api/borrowRequests";
 
 export function useBorrowRequests() {
   const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [status, setStatus] = useState("idle");
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
+    setStatus("loading");
     setError("");
 
     listBorrowRequests()
       .then((response) => {
         setRequests(response.data);
+        setStatus("succeeded");
       })
       .catch((error) => {
-        setError(error.message);
+        setError(error);
         setRequests([]);
-      })
-      .finally(() => {
-        setLoading(false);
+        setStatus("failed");
       });
   }, []);
 
-  return { requests, loading, error };
+  return { requests, status, error };
 }

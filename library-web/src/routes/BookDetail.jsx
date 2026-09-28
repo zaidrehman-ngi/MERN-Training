@@ -1,33 +1,53 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { getBook } from "../api/books";
-import { borrowBookThunk } from "../store/booksSlice";
+import {
+  borrowBookThunk,
+  deleteBookThunk,
+  resetBookMutation,
+} from "../store/booksSlice";
 
 function BookDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const [book, setBook] = useState(null);
-  const [error, setError] = useState(null);
+  const [bookState, setBookState] = useState(null);
+  const book = bookState?.id === id ? bookState.book : null;
+  const error = bookState?.id === id ? bookState.error : null;
+  const loadStatus = bookState?.id === id ? bookState.status : "loading";
   const borrowStatus = useSelector(
     (state) => state.books.borrowStatusByBookId[id] ?? "idle",
   );
   const borrowError = useSelector(
     (state) => state.books.borrowErrorByBookId[id],
   );
+  const deleteStatus = useSelector(
+    (state) => state.books.deleteStatusById[id] ?? "idle",
+  );
+  const deleteError = useSelector((state) => state.books.deleteErrorById[id]);
 
   useEffect(() => {
+    let active = true;
+    dispatch(resetBookMutation({ operation: "delete", id }));
+
     getBook(id)
       .then((response) => {
-        setBook(response.data);
+        if (active) {
+          setBookState({ id, book: response.data, status: "succeeded" });
+        }
       })
       .catch((error) => {
-        setError(error);
-        setBook(null);
+        if (active) {
+          setBookState({ id, error, status: "failed" });
+        }
       });
-  }, [id]);
+
+    return () => {
+      active = false;
+    };
+  }, [dispatch, id]);
 
   const handleBorrow = () => {
     const requestedAt = new Date();
@@ -49,6 +69,14 @@ function BookDetail() {
     );
   };
 
+  const handleDelete = () => {
+    dispatch(deleteBookThunk(id)).then((result) => {
+      if (deleteBookThunk.fulfilled.match(result)) {
+        navigate("/books");
+      }
+    });
+  };
+
   if (error) {
     return (
       <main>
@@ -60,7 +88,7 @@ function BookDetail() {
     );
   }
 
-  if (!book) {
+  if (loadStatus === "idle" || loadStatus === "loading") {
     return (
       <main>
         <p>Loading book...</p>
@@ -95,6 +123,15 @@ function BookDetail() {
             : "Borrow"}
       </button>
       {borrowError && <p role="alert">{borrowError.message}</p>}
+      <Link to={`/books/${book.id}/edit`}>Edit book</Link>
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={deleteStatus === "loading" || deleteStatus === "succeeded"}
+      >
+        {deleteStatus === "loading" ? "Deleting..." : "Delete book"}
+      </button>
+      {deleteError && <p role="alert">{deleteError.message}</p>}
     </main>
   );
 }

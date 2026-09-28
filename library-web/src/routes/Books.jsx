@@ -8,7 +8,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { setSelectedBranch } from "../store/uiSlice";
 import {
   fetchBooks,
-  bookAdded,
   filterChanged,
   selectAllBooks,
   selectBooksError,
@@ -26,7 +25,6 @@ function Books() {
   const dispatch = useDispatch();
   const selectedBranch = useSelector((state) => state.ui.selectedBranch);
   const books = useSelector(selectAllBooks);
-  const hasTestBook = books.some((book) => book.id === 101);
 
   useEffect(() => {
     dispatch(fetchBooks({ filter, search: searchText }));
@@ -62,20 +60,12 @@ function Books() {
         {" "}
         Select North Nazimabad Branch{" "}
       </button>{" "}
-      <button
-        disabled={hasTestBook}
-        onClick={() =>
-          dispatch(bookAdded({ id: 101, title: "Test Book", onShelf: 1 }))
-        }
-      >
-        {" "}
-        Add Test Book{" "}
-      </button>{" "}
       <FilterChips onFilterChange={handleFilterChange} />{" "}
       <SearchBox
         searchText={searchText}
         onSearchChange={(search) => dispatch(searchChanged(search))}
       />{" "}
+      {status === "idle" && <p role="status">Waiting to load books...</p>}{" "}
       {status === "loading" && (
         <p role="status">
           {books.length > 0 ? "Updating books..." : "Loading books..."}

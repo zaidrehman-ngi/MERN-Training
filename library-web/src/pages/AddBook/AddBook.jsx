@@ -1,19 +1,85 @@
 import useForm from "../../hooks/useForm";
 import styles from "./AddBook.module.css";
-import { useNavigate } from "react-router-dom";
-import { useDispatch } from "react-redux";
-import { createBookThunk } from "../../store/booksSlice";
+import { useNavigate, useParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { createBookThunk, resetBookMutation, updateBookThunk } from "../../store/booksSlice";
+import { getBook } from "../../api/books";
+import { useEffect, useState } from "react";
 
 function AddBook() {
+  const { id } = useParams();
+  const [loadedBook, setLoadedBook] = useState(null);
+  const book = id && loadedBook?.id === id ? loadedBook.book : null;
+  const loadStatus = id
+    ? loadedBook?.id === id
+      ? loadedBook.status
+      : "loading"
+    : "succeeded";
+
+  useEffect(() => {
+    if (!id) {
+      return;
+    }
+
+    let active = true;
+    getBook(id)
+      .then((response) => {
+        if (active) {
+          setLoadedBook({ id, book: response.data, status: "succeeded" });
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setLoadedBook({ id, error, status: "failed" });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  if (loadStatus === "loading") {
+    return <main className={styles.page}><p role="status">Loading book...</p></main>;
+  }
+
+  if (loadStatus === "failed") {
+    return (
+      <main className={styles.page}>
+        <p role="alert">
+          {loadedBook?.error?.message || "Unable to load this book."}
+        </p>
+      </main>
+    );
+  }
+
+  return <BookForm key={book?.id ?? "new"} book={book} />;
+}
+
+function BookForm({ book }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const mutationStatus = useSelector((state) =>
+    book ? state.books.updateStatusById[book.id] ?? "idle" : state.books.createStatus,
+  );
+  const mutationError = useSelector((state) =>
+    book ? state.books.updateErrorById[book.id] : state.books.createError,
+  );
+
+  useEffect(() => {
+    dispatch(
+      resetBookMutation({ operation: book ? "update" : "create", id: book?.id }),
+    );
+  }, [book, dispatch]);
 
   const initialValues = {
-    title: "",
-    author: "",
-    isbn: "",
-    copies: "",
-    branch: "",
+    title: book?.title ?? "",
+    author: book?.author ?? "",
+    isbn: book?.isbn ?? "",
+    copies: book?.onShelf == null ? "" : String(book.onShelf),
+    totalCopies: book?.totalCopies == null ? "" : String(book.totalCopies),
+    status: book?.status ?? "available",
+    branch: book?.branch ?? "",
   };
 
   function validateTitle(value) {
@@ -43,8 +109,26 @@ function AddBook() {
   }
 
   function validateCopies(value) {
-    if (!value || Number(value) < 1) {
-      return "Copies must be at least 1.";
+    if (value === "" || Number(value) < (book ? 0 : 1)) {
+      return book
+        ? "Available copies cannot be negative."
+        : "Copies must be at least 1.";
+    }
+
+    if (book && Number(value) > Number(book.totalCopies)) {
+      return "Available copies cannot exceed total copies.";
+    }
+
+    return "";
+  }
+
+  function validateTotalCopies(value, values) {
+    if (!book) {
+      return "";
+    }
+
+    if (value === "" || Number(value) < Number(values.copies)) {
+      return "Total copies cannot be fewer than available copies.";
     }
 
     return "";
@@ -63,7 +147,9 @@ function AddBook() {
     author: validateAuthor(values.author),
     isbn: validateIsbn(values.isbn),
     copies: validateCopies(values.copies),
-    branch: validateBranch(values.branch),
+    totalCopies: validateTotalCopies(values.totalCopies, values),
+    branch: book ? "" : validateBranch(values.branch),
+    status: "",
   });
 
   const {
@@ -73,25 +159,38 @@ function AddBook() {
     handleChange,
     handleBlur,
     handleSubmit,
-    isSubmitting,
     submitError,
   } = useForm({
     initialValues,
     validate,
     onSubmit: async (values) => {
-      const result = await dispatch(
-        createBookThunk({
+      const payload = {
+        ...(book ?? {}),
           title: values.title,
           author: values.author,
           isbn: values.isbn,
           onShelf: Number(values.copies),
-          totalCopies: Number(values.copies),
-          status: "available",
-        }),
-      );
+        ...(!book
+          ? {
+              totalCopies: Number(values.copies),
+              status: "available",
+              branch: values.branch,
+            }
+            : {
+                totalCopies: Number(values.totalCopies),
+                status: values.status,
+              }),
+      };
+      const request = book
+        ? dispatch(updateBookThunk({ id: book.id, book: payload }))
+        : dispatch(createBookThunk(payload));
+      const result = await request;
 
-      if (createBookThunk.fulfilled.match(result)) {
-        navigate("/books");
+      if (
+        (book && updateBookThunk.fulfilled.match(result)) ||
+        (!book && createBookThunk.fulfilled.match(result))
+      ) {
+        navigate(book ? `/books/${book.id}` : "/books");
         return;
       }
 
@@ -101,7 +200,7 @@ function AddBook() {
 
   return (
     <main className={styles.page}>
-      <h1>Add a Book</h1>
+      <h1>{book ? "Edit Book" : "Add a Book"}</h1>
 
       <form className={styles.form} onSubmit={handleSubmit}>
         <label className={styles.label} htmlFor="title">
@@ -177,7 +276,7 @@ function AddBook() {
           id="copies"
           type="number"
           name="copies"
-          min="1"
+          min={book ? "0" : "1"}
           value={values.copies}
           onChange={handleChange}
           onBlur={handleBlur}
@@ -193,36 +292,103 @@ function AddBook() {
           </p>
         )}
 
-        <label className={styles.label} htmlFor="branch">
-          Branch
-        </label>
-        <select
-          id="branch"
-          name="branch"
-          value={values.branch}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          aria-invalid={touched.branch && !!errors.branch}
-          className={styles.control}
-          aria-describedby={
-            touched.branch && errors.branch ? "branch-error" : undefined
-          }
-        >
-          <option value="">Select a branch</option>
-          <option value="clifton">Clifton</option>
-          <option value="defence">Defence</option>
-          <option value="gulshan">Gulshan</option>
-        </select>
-        {touched.branch && errors.branch && (
-          <p className={styles.error} id="branch-error">
-            {errors.branch}
+        {book && (
+          <>
+            <label className={styles.label} htmlFor="totalCopies">
+              Total copies
+            </label>
+            <input
+              id="totalCopies"
+              type="number"
+              name="totalCopies"
+              min={values.copies || "0"}
+              value={values.totalCopies}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              aria-invalid={touched.totalCopies && !!errors.totalCopies}
+              className={styles.control}
+              aria-describedby={
+                touched.totalCopies && errors.totalCopies
+                  ? "totalCopies-error"
+                  : undefined
+              }
+            />
+            {touched.totalCopies && errors.totalCopies && (
+              <p className={styles.error} id="totalCopies-error">
+                {errors.totalCopies}
+              </p>
+            )}
+
+            <label className={styles.label} htmlFor="status">
+              Status
+            </label>
+            <select
+              id="status"
+              name="status"
+              value={values.status}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              className={styles.control}
+            >
+              {[...new Set(["available", "out", "overdue", values.status])]
+                .filter(Boolean)
+                .map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+            </select>
+          </>
+        )}
+
+        {!book && (
+          <>
+            <label className={styles.label} htmlFor="branch">
+              Branch
+            </label>
+            <select
+              id="branch"
+              name="branch"
+              value={values.branch}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              aria-invalid={touched.branch && !!errors.branch}
+              className={styles.control}
+              aria-describedby={
+                touched.branch && errors.branch ? "branch-error" : undefined
+              }
+            >
+              <option value="">Select a branch</option>
+              <option value="clifton">Clifton</option>
+              <option value="defence">Defence</option>
+              <option value="gulshan">Gulshan</option>
+            </select>
+            {touched.branch && errors.branch && (
+              <p className={styles.error} id="branch-error">
+                {errors.branch}
+              </p>
+            )}
+          </>
+        )}
+
+        {(submitError || mutationError) && (
+          <p className={styles.error} role="alert">
+            {submitError || mutationError.message}
           </p>
         )}
 
-        {submitError && <p className={styles.error}>{submitError}</p>}
-
-        <button className={styles.submit} type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Adding Book..." : "Add Book"}
+        <button
+          className={styles.submit}
+          type="submit"
+          disabled={mutationStatus === "loading"}
+        >
+          {mutationStatus === "loading"
+            ? book
+              ? "Saving..."
+              : "Adding Book..."
+            : book
+              ? "Save Changes"
+              : "Add Book"}
         </button>
       </form>
     </main>
