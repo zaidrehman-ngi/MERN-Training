@@ -235,3 +235,109 @@ In Node.js v24.20.0, both directions worked in my tests:
 * ES Module `import` → CommonJS `.cjs` worked successfully.
 
 The original task expected an interop error, but the current Node.js version supports synchronous `require()` of compatible ES Modules, so no error occurred in this environment.
+
+
+# Exercise 4
+
+### Task 1
+
+A **Buffer** stores raw binary data as bytes. Node.js needs Buffers because files, network data, and streams contain binary data, while JavaScript strings are mainly used to represent text.
+
+The small file was read as a Buffer first, then the same bytes were represented as UTF-8, hexadecimal, and Base64.
+
+The JWT payload can also be decoded using a Buffer instead of `atob()`. `Buffer.from(parts[1], "base64url")` decodes the JWT payload bytes, and `.toString("utf8")` converts those bytes into text before parsing the JSON.
+
+**Base64url** is a URL-safe form of Base64. It replaces `+` with `-`, `/` with `_`, and removes the `=` padding. JWT uses Base64url so its encoded parts can safely be used in URLs and other contexts where those Base64 characters can cause problems.
+
+
+### Task 2
+
+**Naive approach (`readFileSync`):**
+
+| Measurement |     Result |
+| ----------- | ---------: |
+| Total fine  |  260693280 |
+| Row count   |    3949908 |
+| Wall time   | 3000.22 ms |
+| RSS memory  |  521.88 MB |
+
+The CSV was read completely into memory using `readFileSync`, then split into lines and processed to calculate the total fine and row count.
+
+
+### Task 3
+
+**Streaming approach (`createReadStream`):**
+
+| Measurement | Result |
+|---|---:|
+| Total fine | 260693280 |
+| Row count | 3949908 |
+| Wall time | 2539.28 ms |
+| RSS memory | 68.43 MB |
+
+The streaming version produced the same total fine and row count as the naive version. It uses much less memory because the CSV is processed in chunks instead of loading the entire file into memory.
+
+
+### Task 4
+
+At approximately 600 MB, the naive approach failed while the streaming approach completed successfully.
+
+**200 MB results:**
+
+| Approach  |  Wall time | RSS memory |
+| --------- | ---------: | ---------: |
+| Naive     | 3000.22 ms |  521.88 MB |
+| Streaming | 2539.28 ms |   68.43 MB |
+
+**600 MB streaming results:**
+
+| Approach  |  Wall time | RSS memory |
+| --------- | ---------: | ---------: |
+| Naive     |     Failed |     Failed |
+| Streaming | 7770.39 ms |   69.89 MB |
+
+The naive approach failed with:
+
+```text
+Error: Cannot create a string longer than 0x1fffffe8 characters
+code: 'ERR_STRING_TOO_LONG'
+```
+
+The limit reached was Node.js's maximum string length. `readFileSync(..., "utf8")` tries to load the entire 600 MB file into one JavaScript string, which exceeds that limit.
+
+The streaming approach still completed because it processes the file in chunks instead of creating one huge string.
+
+This shows that streaming is not just an optimisation for lower memory usage; it is necessary when the input can exceed the limits of the naive approach.
+
+
+### Task 5
+
+The pipeline processed the CSV through a `Transform` that parsed the rows and passed on only rows with a fine.
+
+**Result:**
+
+| Measurement    |    Result |
+| -------------- | --------: |
+| Rows with fine |   2354967 |
+| Total fine     | 777138660 |
+
+The pipeline completed successfully and produced the expected total fine.
+
+The pipeline was also interrupted successfully using `Ctrl+C`.
+
+When the input file was missing, it was handled cleanly with:
+
+```text
+Input file not found: ./catalogue.csv
+```
+
+`pipeline()` provides centralized error propagation across the whole stream chain. If one stream fails, the pipeline rejects and the failure can be handled in one `catch` block. With a chain of `.pipe()` calls, errors from individual streams are not automatically handled end-to-end, so error listeners and cleanup may need to be managed separately.
+
+
+### Task 6
+
+`stream.write()` returns `false` when the internal buffer is full. Without checking it, the producer could keep writing faster than the file stream can handle, causing data to build up in memory and potentially causing an out-of-memory error.
+
+This mechanism is called **backpressure**. It solves the **fast producer / slow writer** problem.
+
+The `pipeline()` in Task 5 handles backpressure automatically between the connected streams, so the upstream stream does not keep pushing data when the downstream stream cannot keep up.
