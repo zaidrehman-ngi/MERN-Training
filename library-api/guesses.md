@@ -23,3 +23,14 @@
 8. `9 nextTick in read`
 9. `7 timeout in read`
 10. `8 immediate in read`
+
+
+## Exercise 3 - Task 3
+
+**Guessed result:**
+
+* Top-level `console.log()` will appear: **1 time**
+* The three files will receive: **three separate copies**
+
+**Reason:**
+I think Node will run the required module once, but each file will get its own copy of the exported object.

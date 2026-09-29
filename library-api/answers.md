@@ -173,3 +173,65 @@ Close Callbacks
 ```
 
 This explains why recursive `nextTick()` can starve the event loop and why `setImmediate()` runs in the Check phase.
+
+
+# Exercise 3
+
+### Task 2
+
+**`__dirname` difference:**
+
+In CommonJS (`.cjs`), `__dirname` is available directly:
+
+```js
+console.log(__dirname);
+```
+
+In ES Modules (`.mjs`), `__dirname` is not available directly. The standard replacement is:
+
+```js
+import { fileURLToPath } from "url";
+import path from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+```
+
+**Top-level `await`:**
+
+Top-level `await` works in ES Modules (`.mjs`) but not in CommonJS (`.cjs`). ES Modules support top-level `await` because the module system can wait for asynchronous module evaluation, while CommonJS does not support it.
+
+
+### Task 3
+
+**Result:**
+
+* The top-level `console.log()` appeared **1 time**.
+* All three files received the **same object reference**, not separate copies.
+* The `count` changed from `1` to `2` to `3`, proving that each file was using the same object.
+
+This behaviour is called **CommonJS module caching**. Node loads a required module once and caches its exported value for later `require()` calls.
+
+**Useful for:** Sharing a single module instance or state across different files and avoiding repeated module initialization.
+
+**Possible bug:** If one file mutates the cached exported object, other files can unexpectedly see the changed state.
+
+
+### Task 4
+
+With `"type": "module"` in `package.json`, the `.cjs` CommonJS file still ran successfully because the `.cjs` extension explicitly marks the file as CommonJS.
+
+**Module system rules:**
+
+* `.mjs` → always treated as an ES Module.
+* `.cjs` → always treated as CommonJS.
+* `.js` → follows the nearest `package.json` `"type"` field. With `"type": "module"`, it is treated as an ES Module; with `"type": "commonjs"`, it is treated as CommonJS.
+
+**Interop:**
+
+In Node.js v24.20.0, both directions worked in my tests:
+
+* CommonJS `require()` → ESM `.mjs` worked successfully.
+* ES Module `import` → CommonJS `.cjs` worked successfully.
+
+The original task expected an interop error, but the current Node.js version supports synchronous `require()` of compatible ES Modules, so no error occurred in this environment.
