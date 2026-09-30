@@ -1,36 +1,26 @@
-## Exercise 1 — Task 2
+# Exercise 1
 
-### Guessed Output Order
+### Task 4 — Guess
 
-1. After readFileSync
-2. After readFile
-3. End of file
-4. Inside promise
-5. Inside readFile callback
+Given these routes in this order:
 
+```js
+router.get("/:id", ...);
+router.get("/new", ...);
+```
 
-## Exercise 2 — Task 1
+For:
 
-### Guessed Output Order
+```text
+GET /api/v1/books/new
+```
 
-1. `1 start`
-2. `10 end`
-3. `5 nextTick`
-4. `4 promise`
-5. `2 timeout`
-6. `3 immediate`
-7. `6 read done`
-8. `9 nextTick in read`
-9. `7 timeout in read`
-10. `8 immediate in read`
+I predict that Express will match the `/:id` route first because `new` can be treated as the value of `:id`.
 
+Therefore:
 
-## Exercise 3 - Task 3
-
-**Guessed result:**
-
-* Top-level `console.log()` will appear: **1 time**
-* The three files will receive: **three separate copies**
-
-**Reason:**
-I think Node will run the required module once, but each file will get its own copy of the exported object.
+* Matched route: `/:id`
+* `req.params.id`: `"new"`
+* The `/new` route will not be reached.
+* The request will therefore be handled by `getBookById`, which will search for a book with `id === "new"`.
+* Since there is no such book, I expect a **404 Book not found** response.
