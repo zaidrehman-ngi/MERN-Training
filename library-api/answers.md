@@ -124,3 +124,71 @@ A response has three main parts:
 One example of getting it wrong today was using `res.send("Dune")`. The response looked fine on screen, but Express returned `Content-Type: text/html` instead of JSON. The data looked correct to a human, but the response metadata was wrong for an API.
 
 This shows how an API can look correct to a human while giving the wrong information to the machine consuming it.
+
+
+# Exercise 3
+
+### Task 1
+
+Installed `cookie-parser` and added it as middleware so the application can read cookies through `req.cookies`.
+
+Updated the login controller to set the JWT as an `accessToken` cookie. Added a temporary `/test-cookie` route to read the cookie back using `req.cookies.accessToken`.
+
+Tested the flow in Postman:
+
+* `POST /api/v1/auth/login` successfully returned a `Set-Cookie` header containing the `accessToken`.
+* `GET /api/v1/auth/test-cookie` successfully read the same cookie and returned the access token.
+* Also confirmed the cookie was available in the terminal through `req.cookies`.
+
+
+### Task 2
+
+Updated the `accessToken` cookie with the following flags:
+
+* `httpOnly: true` — prevents client-side JavaScript from directly accessing the cookie, reducing the risk of token theft through XSS.
+* `sameSite: "strict"` — prevents the cookie from being sent with cross-site requests, reducing the risk of CSRF.
+* `maxAge: 60 * 60 * 1000` — makes the cookie expire after one hour.
+
+Verified the raw `Set-Cookie` header in Postman. It contained:
+
+* `Max-Age=3600`
+* `HttpOnly`
+* `SameSite=Strict`
+
+The fourth flag is `Secure`. It makes the browser send the cookie only over HTTPS, but it could not be meaningfully tested in the current localhost setup because the API is running over HTTP.
+
+The JWT storage decision was revisited separately in `decisions.md` after testing the cookie in practice.
+
+
+### Task 3
+
+Added a custom `X-Request-Id` response header and verified that it was returned by the API.
+
+Also added a custom `X-Client-Id` request header in Postman and read it from the incoming request using `req.get()`.
+
+A frontend running on a different origin cannot normally read custom response headers because of the browser's CORS restrictions. The `Access-Control-Expose-Headers` response header allows specific custom response headers to be exposed to frontend JavaScript.
+
+
+### Task 4
+
+Tested redirects using both `301` and `302`.
+
+* **301:** `/catalogue` redirected to `/books`. After changing the target to `/users`, the browser still redirected to `/books` because it had cached the permanent redirect. The new server code did not run for the redirect.
+* **302:** `/catalogue-302` redirected to `/books`. After changing the target to `/users`, the browser followed the new `/users` target because the redirect was temporary and was not permanently cached.
+
+**Practical rule:** Use `301` when a resource has permanently moved and `302` when the redirect is temporary.
+
+To undo a `301` that had already been shipped to 400 members, the cached redirect would need to be dealt with on affected clients, since changing the server-side target alone may not take effect immediately.
+
+The two method-preserving redirect codes are `307` and `308`. `307` is the temporary version and `308` is the permanent version; they matter when redirecting requests such as `POST`, `PUT`, or `PATCH` where the HTTP method and request body need to be preserved.
+
+
+### Task 5
+
+Built a redirect loop where `/a` redirects to `/b` and `/b` redirects back to `/a`.
+
+When visiting `/a` in Chrome, the browser followed the redirect loop and made **20 requests**. The requests before the final one returned `302`, and the 20th request failed with `ERR_TOO_MANY_REDIRECTS`.
+
+A naive Node.js Axios client also followed the redirects automatically. It eventually stopped with `ERR_FR_TOO_MANY_REDIRECTS: Maximum number of redirects exceeded`. The Axios configuration showed a default `maxRedirects` value of `21`.
+
+To protect the client from redirect loops, I would set a lower `maxRedirects` limit so the client stops following redirects after a small number of attempts.

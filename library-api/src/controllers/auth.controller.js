@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 
 const login = (req, res) => {
   const { users } = req.app.locals.db;
+
   const { email, password } = req.body;
 
   const user = users.find(
@@ -24,6 +25,12 @@ const login = (req, res) => {
     "library-secret",
     { expiresIn: "1h" },
   );
+
+  res.cookie("accessToken", accessToken, {
+    httpOnly: true,
+    sameSite: "strict",
+    maxAge: 60 * 60 * 1000,
+  });
 
   res.status(200).json({
     accessToken,

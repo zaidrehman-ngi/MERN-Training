@@ -2096,6 +2096,15 @@
       "role": "user",
       "branch": "Gulshan Branch",
       "joined": "2025-06-15"
+    },
+    {
+      "id": "m-test",
+      "name": "Test User",
+      "email": "test@lib.pk",
+      "password": "test123",
+      "role": "user",
+      "branch": "Clifton Branch",
+      "joined": "2026-09-30"
     }
   ],
   "borrowRequests": [
