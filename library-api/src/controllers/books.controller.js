@@ -295,7 +295,7 @@ const createBook = (req, res) => {
 
   books.push(newBook);
 
-  res.status(201).json({
+  res.status(201).location(`/api/v1/books/${newBook.id}`).json({
     data: newBook,
   });
 };

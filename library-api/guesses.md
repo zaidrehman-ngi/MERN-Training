@@ -24,3 +24,10 @@ Therefore:
 * The `/new` route will not be reached.
 * The request will therefore be handled by `getBookById`, which will search for a book with `id === "new"`.
 * Since there is no such book, I expect a **404 Book not found** response.
+
+
+# Exercise 2
+
+### Task 1
+
+I predict that `req.body` will be `undefined` because Express does not parse the incoming JSON body automatically without body-parsing middleware. The JSON data arrives through the request as a stream, but it will not be available as a JavaScript object in `req.body` yet.
