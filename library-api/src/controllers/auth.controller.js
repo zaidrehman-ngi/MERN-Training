@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 const login = (req, res) => {
   const { users } = req.app.locals.db;
 
-  const { email, password } = req.body;
+  const { email, password } = req.body || {};
 
   const user = users.find(
     (user) => user.email === email && user.password === password,

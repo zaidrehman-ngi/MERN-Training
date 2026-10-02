@@ -43,7 +43,8 @@ const getBorrowRequestById = (req, res) => {
 const createBorrowRequest = (req, res) => {
   const { borrowRequests } = req.app.locals.db;
 
-  const { userId, bookId, status, requestedAt, dueDate, finePerDay } = req.body;
+  const { userId, bookId, status, requestedAt, dueDate, finePerDay } =
+    req.body || {};
 
   const details = [];
 
@@ -144,7 +145,7 @@ const updateBorrowRequest = (req, res) => {
     });
   }
 
-  const { status, finePerDay } = req.body;
+  const { status, finePerDay } = req.body || {};
 
   if (status !== undefined) {
     const allowedStatuses = ["pending", "approved", "rejected"];

@@ -25,7 +25,7 @@ const getUserById = (req, res) => {
 const createUser = (req, res) => {
   const { users } = req.app.locals.db;
 
-  const { name, email, role, branch, joined } = req.body;
+  const { name, email, role, branch, joined } = req.body || {};
 
   const details = [];
 
@@ -131,7 +131,7 @@ const updateUser = (req, res) => {
     });
   }
 
-  const { role, email } = req.body;
+  const { role, email } = req.body || {};
 
   if (role !== undefined) {
     const allowedRoles = ["user", "librarian", "admin"];

@@ -192,3 +192,60 @@ When visiting `/a` in Chrome, the browser followed the redirect loop and made **
 A naive Node.js Axios client also followed the redirects automatically. It eventually stopped with `ERR_FR_TOO_MANY_REDIRECTS: Maximum number of redirects exceeded`. The Axios configuration showed a default `maxRedirects` value of `21`.
 
 To protect the client from redirect loops, I would set a lower `maxRedirects` limit so the client stops following redirects after a small number of attempts.
+
+
+# Exercise 4
+
+### Task 1
+
+Split the Express application from the server startup by keeping the app and middleware in `app.js` and moving `app.listen()` into `server.js`. The seed data is loaded once when the application starts and stored in `app.locals.db`, instead of being loaded for each request. Added nodemon and updated the `npm run dev` script to start `server.js`.
+
+This separation is useful for testing because `app.js` can be imported directly into tests without opening a network port.
+
+
+### Task 2
+
+Updated the Week 1 Postman environment to point to the local server at `http://localhost:3000` and ran the complete collection against the Express API before making any changes.
+
+The initial test run had:
+
+* **Total tests:** 37
+* **Passed:** 18
+* **Failed:** 19
+
+
+### Task 3
+
+Classified the initial 19 failures into the following piles:
+
+**Server Wrong**
+
+* `POST /api/v1/books` — missing request body caused the controller to crash.
+* `PATCH /api/v1/books/:id` — missing request body caused the controller to crash.
+* `POST /api/v1/users` — missing request body caused the controller to crash.
+* `PATCH /api/v1/users/:id` — missing request body caused the controller to crash.
+* `POST /api/v1/auth/login` — missing request body caused the controller to crash.
+* `POST /api/v1/borrow-requests` — missing request body caused the controller to crash.
+* `PATCH /api/v1/borrow-requests/:id` — missing request body caused the controller to crash.
+
+**Collection Wrong**
+
+* Book, user, and borrow-request requests used numeric IDs such as `12` and `1`, while the actual API uses IDs such as `bk-1`, `m-1000`, and `br-100`.
+* `POST /api/v1/books` had no request body and later had an incorrect response assertion for the nested `data.id`.
+* `GET /api/v1/users/:id` had an assertion expecting the numeric ID `1` instead of the actual string ID `m-1000`.
+* `POST /api/v1/users` had no request body.
+* `POST /api/v1/borrow-requests` had no request body.
+* The login request had no credentials in its request body.
+
+**Spec Wrong**
+
+* No genuine specification mismatch was identified from these failures.
+
+After fixing the server and collection issues, I restarted the server to reload the seed data and ran the complete collection again. The final run passed **37/37 tests with 0 failures**.
+
+
+### Task 5
+
+If I were writing the Week 1 specification today, I would define the response shapes, status codes, and validation rules more clearly and consistently from the start.
+I got the API versioning, resource-based routes, and error response structure right, even though I was not fully sure about them at the time.
+I am most concerned about keeping the API dependent on in-memory data and how the current update/delete behaviour will translate when a real database is introduced next week.

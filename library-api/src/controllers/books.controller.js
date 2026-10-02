@@ -147,7 +147,7 @@ const createBook = (req, res) => {
     totalCopies,
     finePerDay,
     status,
-  } = req.body;
+  } = req.body || {};
 
   const details = [];
 
@@ -323,7 +323,7 @@ const updateBook = (req, res) => {
     totalCopies,
     finePerDay,
     status,
-  } = req.body;
+  } = req.body || {};
 
   if (year !== undefined && (!Number.isInteger(year) || year < 0)) {
     return res.status(422).json({
