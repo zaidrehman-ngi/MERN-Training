@@ -13,3 +13,10 @@ I expect no Express error because the request is simply stuck and no error is th
 
 **How I would recognise this in a real codebase:**
 I would notice that the request hangs without a response or error, then check the middleware chain and look for a middleware that does not call `next()` or send a response.
+
+
+# Exercise 2
+
+### Task 3
+
+**Prediction:** The unauthenticated request will reach `approveHandler` because the route is registered before `requireAuth`. The authentication middleware will not run for that route, so the request will be approved without a token.

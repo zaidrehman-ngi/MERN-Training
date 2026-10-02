@@ -7,18 +7,15 @@ import {
   updateBook,
   deleteBook,
 } from "../controllers/books.controller.js";
+import requireAuth from "../middleware/requireAuth.js";
+import requireRole from "../middleware/requireRole.js";
 
 const router = express.Router();
 
-// router.use((req, res, next) => {
-//   console.log("BOOKS ROUTER:", req.method, req.path);
-//   next();
-// });
-
 router.get("/", getBooks);
-router.post("/", createBook);
+router.post("/", requireAuth, requireRole("librarian", "admin"), createBook);
 router.get("/:id", getBookById);
-router.patch("/:id", updateBook);
-router.delete("/:id", deleteBook);
+router.patch("/:id", requireAuth, requireRole("librarian", "admin"), updateBook);
+router.delete("/:id", requireAuth, requireRole("admin"), deleteBook);
 
 export default router;

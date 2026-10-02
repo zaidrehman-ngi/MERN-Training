@@ -1,23 +1,24 @@
 import express from "express";
 import { login, logout, refreshToken } from "../controllers/auth.controller.js";
+import requireAuth from "../middleware/requireAuth.js";
+import requireRole from "../middleware/requireRole.js";
 
 const router = express.Router();
 
 router.post("/login", login);
 
-router.get("/test-cookie", (req, res) => {
-  console.log(req.cookies);
+router.post(
+  "/logout",
+  requireAuth,
+  requireRole("user", "librarian", "admin", "super admin"),
+  logout,
+);
 
-  console.log(req.get("X-Client-Id"));
-
-  res.set("X-Request-Id", "req-12345");
-
-  res.json({
-    accessToken: req.cookies.accessToken,
-  });
-});
-
-router.post("/logout", logout);
-router.post("/refresh", refreshToken);
+router.post(
+  "/refresh",
+  requireAuth,
+  requireRole("user", "librarian", "admin", "super admin"),
+  refreshToken,
+);
 
 export default router;

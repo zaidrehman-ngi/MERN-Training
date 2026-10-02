@@ -1,8 +1,11 @@
 workspace:
   id: e21d1620-7ce4-42e0-85af-85439a2d8d3b
+
+# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
+
 cloudResources:
   collections:
-    ../postman/collections/Karachi Central Library API: 58028095-ca8fbf07-ce3e-44f6-bbb1-4bdd56c3e395
+    ../postman/collections/Karachi Central Library API: be75a428-d4ab-4e32-a4bb-36eefee8a87a
   environments:
     ../postman/environments/library-local.environment.yaml: 58028095-3b0e91cc-cdbf-4bd7-9a28-d473e99dfcb9
   globals:
