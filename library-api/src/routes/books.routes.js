@@ -15,6 +15,7 @@ const router = express.Router();
 router.get("/", getBooks);
 router.post("/", requireAuth, requireRole("librarian", "admin"), createBook);
 router.get("/:id", getBookById);
+// router.put("/:id", updateBook);
 router.patch("/:id", requireAuth, requireRole("librarian", "admin"), updateBook);
 router.delete("/:id", requireAuth, requireRole("admin"), deleteBook);
 

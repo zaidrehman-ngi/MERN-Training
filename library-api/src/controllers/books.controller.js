@@ -1,4 +1,5 @@
 const getBooks = (req, res) => {
+  // console.log("BOOKS HANDLER RAN");
   const { books } = req.app.locals.db;
 
   let result = [...books];

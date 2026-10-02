@@ -10,11 +10,40 @@ import requestLog from "./middleware/requestLog.js";
 import requestId from "./middleware/requestId.js";
 import errorHandler from "./middleware/errorHandler.js";
 import requireAuth from "./middleware/requireAuth.js";
+import morgan from "morgan";
+import fs from "fs";
+import helmet from "helmet";
+import cors from "cors";
+
+const accessLogStream = fs.createWriteStream("./logs/access.log", {
+  flags: "a",
+});
 
 const app = express();
 
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  }),
+);
+
+// app.use(
+//   cors({
+//     origin: "*",
+//     credentials: true,
+//   }),
+// );
+
 app.use(requestLog);
+
+// app.use(morgan("dev"));
+app.use(morgan("combined"));
+app.use(morgan("combined", { stream: accessLogStream }));
+
+app.use(helmet());
 // app.use(requestId);
+
 app.use(express.json());
 app.use(cookieParser());
 

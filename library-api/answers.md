@@ -106,3 +106,89 @@ The client received the expected `401` response, but the middleware continued ex
 The error handler then tried to send a `500` response after the `401` response had already been sent, causing `ERR_HTTP_HEADERS_SENT`.
 
 This is more dangerous than having no auth because the request is refused but the middleware still continues executing. Restored the `return` after testing.
+
+
+# Exercise 3
+
+### Task 1
+
+Added Morgan for request logging and compared the `dev` and `combined` formats. The `dev` format is shorter and easier to read during development, while `combined` includes additional details such as the client IP, timestamp, HTTP version, referrer, response size, and user-agent. These extra fields are useful for production monitoring, debugging, security investigation, and log analysis.
+
+Configured Morgan with a writable stream so the combined logs are written to `logs/access.log` while also being shown in the terminal.
+
+
+### Task 2
+
+Recorded the response headers before and after adding Helmet. Before Helmet, the response mainly contained standard headers such as `ETag`, `Keep-Alive`, and `X-Powered-By`. After adding Helmet, several security-related headers were added, including CSP, HSTS, `X-Content-Type-Options`, and `X-Frame-Options`.
+
+Three examples:
+
+* `X-Content-Type-Options: nosniff` — makes MIME-sniffing attacks harder.
+* `X-Frame-Options: SAMEORIGIN` — makes clickjacking harder.
+* `Strict-Transport-Security` — helps prevent HTTP downgrade or SSL-stripping attacks by enforcing HTTPS.
+
+The `Content-Security-Policy` header can break frontend images or scripts loaded from other origins. If external assets are needed, their origins must be explicitly allowed in directives such as `img-src` or `script-src`.
+
+
+### Task 3
+
+Added a `console.log` inside the books handler and triggered the request from the frontend running on port 5173.
+
+The browser showed a CORS error because the API response did not contain an `Access-Control-Allow-Origin` header. However, the API terminal showed that the request reached the server and the handler ran:
+
+```text
+BOOKS HANDLER RAN
+GET /api/v1/books HTTP/1.1" 304
+```
+
+The same endpoint was then tested with `curl`:
+
+```bash
+curl http://localhost:3000/api/v1/books
+```
+
+`curl` received the JSON response successfully. This confirmed that the API and route were working, and that the browser was the part blocking access to the response.
+
+**Conclusion:** CORS is enforced by the browser to control which frontend origins can read API responses; it does not protect the API server from receiving the request.
+
+
+### Task 4
+
+Installed the `cors` middleware and configured it with the specific frontend origin:
+
+```js
+cors({
+  origin: "http://localhost:5173",
+})
+```
+
+After adding the middleware, the browser no longer reported a CORS error for requests from the frontend.
+
+Using `origin: "*"` would allow any website to read responses from the API. This is convenient for public APIs, but it gives up origin-level access control. Since the API will carry login-related data and tokens next week, allowing every origin would make it possible for any website to be permitted to read API responses, increasing the risk of exposing sensitive data.
+
+
+### Task 5
+
+Changed the frontend update request to use `PUT` with a JSON body and the custom `X-Test` header. The browser sent two requests instead of one:
+
+```text
+OPTIONS /api/v1/books/bk-2
+PUT /api/v1/books/bk-2
+```
+
+The first request is an `OPTIONS` preflight request. The browser uses it to ask the server whether the frontend origin is allowed to make the requested `PUT` request and use the requested headers. The server responds with the appropriate CORS headers, and the browser then sends the actual `PUT` request.
+
+CORS-safelisted requests can avoid the preflight round trip, such as simple `GET` requests and certain `POST` requests using safelisted content types such as `text/plain`, `application/x-www-form-urlencoded`, or `multipart/form-data`. Requests using methods such as `PUT`, custom headers, or `application/json` trigger a preflight.
+
+
+### Task 6
+
+Set `credentials: true` in the CORS configuration and `withCredentials: true` in the Axios client while keeping `origin: "*"`.
+
+The browser blocked the request because credentialed CORS requests cannot use the wildcard `*` as the allowed origin:
+
+```text
+The value of the 'Access-Control-Allow-Origin' header in the response must not be the wildcard '*' when the request's credentials mode is 'include'.
+```
+
+When credentials such as cookies are allowed, the server must specify the exact allowed origin instead of allowing every origin. This connects to the previous cookie decision because the JWT is stored in an `httpOnly` cookie, so cross-origin requests that need to send the cookie require an explicit allowed origin.
