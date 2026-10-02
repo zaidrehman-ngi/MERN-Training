@@ -4,3 +4,4 @@ node_modules/
 !/postman/library-api.postman_collection.json
 !/postman/library-api.postman_environment.json
 /.postman/
+.env

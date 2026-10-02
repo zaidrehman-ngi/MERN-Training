@@ -1,33 +1,15 @@
 # Exercise 1
 
-### Task 4 — Guess
+### Task 2
 
-Given these routes in this order:
+**What gets logged:**
+A and B will be logged. C and D will not run because B does not call `next()`.
 
-```js
-router.get("/:id", ...);
-router.get("/new", ...);
-```
+**What the client receives:**
+The request will keep waiting and eventually time out because no middleware sends a response.
 
-For:
+**What appears in the error output:**
+I expect no Express error because the request is simply stuck and no error is thrown.
 
-```text
-GET /api/v1/books/new
-```
-
-I predict that Express will match the `/:id` route first because `new` can be treated as the value of `:id`.
-
-Therefore:
-
-* Matched route: `/:id`
-* `req.params.id`: `"new"`
-* The `/new` route will not be reached.
-* The request will therefore be handled by `getBookById`, which will search for a book with `id === "new"`.
-* Since there is no such book, I expect a **404 Book not found** response.
-
-
-# Exercise 2
-
-### Task 1
-
-I predict that `req.body` will be `undefined` because Express does not parse the incoming JSON body automatically without body-parsing middleware. The JSON data arrives through the request as a stream, but it will not be available as a JavaScript object in `req.body` yet.
+**How I would recognise this in a real codebase:**
+I would notice that the request hangs without a response or error, then check the middleware chain and look for a middleware that does not call `next()` or send a response.

@@ -5,13 +5,54 @@ import borrowRequestsRouter from "./routes/borrowRequests.routes.js";
 import authRouter from "./routes/auth.routes.js";
 import db from "../db.json" with { type: "json" };
 import cookieParser from "cookie-parser";
+import requestLog from "./middleware/requestLog.js";
+import requestId from "./middleware/requestId.js";
+import errorHandler from "./middleware/errorHandler.js";
 
 const app = express();
 
+app.use(requestLog);
+// app.use(requestId);
 app.use(express.json());
 app.use(cookieParser());
 
 app.locals.db = db;
+
+// app.use((req, res, next) => {
+//   console.log("A");
+//   next();
+// });
+
+// app.use((req, res, next) => {
+//   console.log("B");
+//   next();
+// });
+
+// app.use((req, res, next) => {
+//   console.log("C");
+//   next();
+// });
+
+// app.get("/middleware-test", (req, res) => {
+//   console.log("D");
+//   res.json({
+//     message: "Middleware test passed",
+//   });
+// });
+
+// app.use("/api/v1", (req, res, next) => {
+//   console.log("API-V1:", req.method, req.path);
+//   next();
+// });
+
+// app.get("/", (req, res, next) => {
+//   console.log("SINGLE ROUTE:", req.method, req.path);
+//   next();
+// }, (req, res) => {
+//   res.status(200).json({
+//     message: "Library API is running",
+//   });
+// });
 
 app.get("/", (req, res) => {
   res.status(200).json({
@@ -19,34 +60,21 @@ app.get("/", (req, res) => {
   });
 });
 
-// app.get("/catalogue", (req, res) => {
-//   res.redirect(301, "/books");
+
+// app.get("/error-next", (req, res, next) => {
+//   next(new Error("Deliberate next error"));
 // });
 
-app.get("/catalogue", (req, res) => {
-  res.redirect(301, "/users");
-});
-
-// app.get("/catalogue-302", (req, res) => {
-//   res.redirect(302, "/books");
+// app.get("/error-async", async (req, res) => {
+//   throw new Error("Deliberate async error");
 // });
-
-app.get("/catalogue-302", (req, res) => {
-  res.redirect(302, "/users");
-});
-
-app.get("/a", (req, res) => {
-  res.redirect(302, "/b");
-});
-
-app.get("/b", (req, res) => {
-  res.redirect(302, "/a");
-});
 
 app.use("/api/v1/books", booksRouter);
 app.use("/api/v1/users", usersRouter);
 app.use("/api/v1/borrow-requests", borrowRequestsRouter);
 app.use("/api/v1/auth", authRouter);
+
+app.use(errorHandler);
 
 app.use((req, res) => {
   res.status(404).json({
