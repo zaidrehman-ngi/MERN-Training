@@ -12,6 +12,7 @@ import errorHandler from "./middleware/errorHandler.js";
 import requireAuth from "./middleware/requireAuth.js";
 import morgan from "morgan";
 import fs from "fs";
+import path from "path";
 import helmet from "helmet";
 import cors from "cors";
 
@@ -21,6 +22,19 @@ const accessLogStream = fs.createWriteStream("./logs/access.log", {
 
 const app = express();
 
+// Security headers must be added early so they apply to responses from the rest of the app.
+app.use(helmet());
+
+// app.use(requestId);
+
+// Logging should run early so requests to all following middleware and routes are recorded.
+app.use(requestLog);
+
+// app.use(morgan("dev"));
+app.use(morgan("combined"));
+app.use(morgan("combined", { stream: accessLogStream }));
+
+// CORS must run before routes so the required CORS headers are added to API responses.
 app.use(
   cors({
     origin: "http://localhost:5173",
@@ -35,19 +49,47 @@ app.use(
 //   }),
 // );
 
-app.use(requestLog);
-
-// app.use(morgan("dev"));
-app.use(morgan("combined"));
-app.use(morgan("combined", { stream: accessLogStream }));
-
-app.use(helmet());
-// app.use(requestId);
-
+// Body parsing must run before routes that need to read JSON request bodies.
 app.use(express.json());
+
+// Cookie parsing must run before routes or middleware that need to read cookies.
 app.use(cookieParser());
 
 app.locals.db = db;
+
+// Static files are served before API routes so requests for uploads are handled directly.
+app.use(
+  "/uploads",
+  (req, res, next) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+  },
+  express.static("uploads", {
+    maxAge: "1h",
+  }),
+);
+
+app.get("/files/:filename", (req, res) => {
+  const uploadsPath = path.resolve("uploads");
+  const requestedPath = path.resolve(uploadsPath, req.params.filename);
+
+  if (
+    requestedPath !== uploadsPath &&
+    !requestedPath.startsWith(`${uploadsPath}${path.sep}`)
+  ) {
+    return res.status(404).json({
+      error: "NOT_FOUND",
+      message: "File not found.",
+      details: [],
+    });
+  }
+
+  const stream = fs.createReadStream(requestedPath);
+
+  res.setHeader("Content-Type", "image/jpeg");
+
+  stream.pipe(res);
+});
 
 // app.use((req, res, next) => {
 //   console.log("A");
@@ -106,13 +148,13 @@ app.get("/", (req, res) => {
 //   });
 // });
 
+// API routes come after the common middleware they depend on.
 app.use("/api/v1/books", booksRouter);
 app.use("/api/v1/users", usersRouter);
 app.use("/api/v1/borrow-requests", borrowRequestsRouter);
 app.use("/api/v1/auth", authRouter);
 
-app.use(errorHandler);
-
+// 404 must come after the routes so it only handles requests that matched nothing.
 app.use((req, res) => {
   res.status(404).json({
     error: "NOT_FOUND",
@@ -120,5 +162,8 @@ app.use((req, res) => {
     details: [],
   });
 });
+
+// Error handling must come last so errors from middleware and routes reach it.
+app.use(errorHandler);
 
 export default app;

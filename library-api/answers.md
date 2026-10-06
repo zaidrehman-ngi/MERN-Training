@@ -192,3 +192,83 @@ The value of the 'Access-Control-Allow-Origin' header in the response must not b
 ```
 
 When credentials such as cookies are allowed, the server must specify the exact allowed origin instead of allowing every origin. This connects to the previous cookie decision because the JWT is stored in an `httpOnly` cookie, so cross-origin requests that need to send the cookie require an explicit allowed origin.
+
+
+# Exercise 4
+
+### Task 2
+
+Added a handwritten `/files/:filename` route using `path.join()` and `fs.createReadStream()`, then piped the stream to the response.
+
+After setting the response `Content-Type` to `image/jpeg`, the route successfully served the image in the browser.
+
+
+### Task 3
+
+Tested the three paths against both the hand-written `/files/:filename` route and the `express.static` `/uploads` route using `curl --path-as-is`.
+
+#### Hand-written route
+
+| Path               | Result                                  |
+| ------------------ | --------------------------------------- |
+| `/files/dune.jpg`  | `200 OK` — image served successfully    |
+| `/files/../.env`   | `404 Not Found`                         |
+| `/files/..%2f.env` | `200 OK` — `.env` contents were exposed |
+
+The encoded path traversal was able to reach the hand-written route. After URL decoding, `path.join()` normalized the path outside the `uploads` directory, allowing `fs.createReadStream()` to read the `.env` file.
+
+#### `express.static` route
+
+| Path                 | Result                               |
+| -------------------- | ------------------------------------ |
+| `/uploads/dune.jpg`  | `200 OK` — image served successfully |
+| `/uploads/../.env`   | `404 Not Found`                      |
+| `/uploads/..%2f.env` | `404 Not Found`                      |
+
+The `express.static` route prevented both traversal attempts from serving the `.env` file.
+
+**Conclusion:** The hand-written file-serving route is vulnerable to encoded path traversal, while `express.static` safely restricts file access to the configured `uploads` directory.
+
+
+### Task 4
+
+Fixed the handwritten `/files/:filename` route by resolving the `uploads` directory and requested file to absolute paths, then checking that the requested path remains inside the `uploads` directory before creating the file stream.
+
+Tested all three requests with `curl --path-as-is`:
+
+| Path               | Result                                     |
+| ------------------ | ------------------------------------------ |
+| `/files/dune.jpg`  | `200 OK` — image still served successfully |
+| `/files/../.env`   | `404 Not Found`                            |
+| `/files/..%2f.env` | `404 Not Found` — `File not found.`        |
+
+The fix prevents path traversal while still allowing valid files inside the `uploads` directory to be served.
+
+
+### Task 5
+
+Added `maxAge: "1h"` to the `express.static` middleware. The response now includes `Cache-Control: public, max-age=3600`, and the browser showed `304 Not Modified` with `ETag` and `If-None-Match`.
+
+If a cover changes, a member with a cached copy could continue seeing the old version for up to 1 hour. For files that can change, I would use versioned filenames or adjust the cache duration. This is the same stale-cache issue we saw with yesterday's `301` redirect.
+
+
+### Task 6
+
+Assembled the middleware stack in `app.js` in the following order:
+
+* **Security headers (`helmet`)** — placed early so security headers are applied to responses from the rest of the application.
+* **Logging (`requestLog` and Morgan)** — placed early so requests to the following middleware and routes are recorded.
+* **CORS** — placed before routes so API responses include the required CORS headers.
+* **Body parsing (`express.json`)** — placed before routes that need to read `req.body`.
+* **Cookie parsing (`cookieParser`)** — placed before authentication middleware and routes that need to read cookies.
+* **Static files** — placed before API routes so upload requests can be handled directly.
+* **API routes** — handle the application's actual API requests.
+* **404 handler** — placed after the routes so it only handles requests that did not match any route.
+* **Error handler** — placed last so errors from middleware and routes can reach it.
+
+Tested the middleware order by moving two pieces:
+
+* Moving `express.json()` after the routes caused a POST request to fail validation because the JSON request body was not parsed.
+* Moving the 404 middleware before the routes caused valid API requests such as `GET /api/v1/books` to return `404 Route not found`.
+
+This confirmed that middleware order affects whether requests are parsed, handled, or stopped. Middleware such as `helmet`, CORS, and `express.json()` must come before the routes they affect, while the 404 and error handlers must come after the routes.

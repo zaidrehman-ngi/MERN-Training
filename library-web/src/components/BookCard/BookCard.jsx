@@ -4,8 +4,13 @@ import styles from "./BookCard.module.css";
 function BookCard({ book, onSelect, variant = "default" }) {
   const author = book.author ?? "Unknown author";
   const year = book.year ?? "Unknown year";
-  const coverUrl = book.coverUrl ?? "/covers/placeholder.jpg";
   const title = book.title ?? "Untitled book";
+
+  const API_ORIGIN = import.meta.env.VITE_API_URL.replace("/api/v1", "");
+
+  const coverUrl = book.coverUrl
+    ? new URL(book.coverUrl, API_ORIGIN).href
+    : "/covers/placeholder.jpg";
 
   const status = ["available", "out", "overdue"].includes(book.status)
     ? book.status

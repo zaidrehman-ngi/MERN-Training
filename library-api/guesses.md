@@ -30,3 +30,12 @@ I would notice that the request hangs without a response or error, then check th
 * **Does the route handler run?** Yes, I think the route handler runs and the server processes the request.
 * **Does the database change if it is a POST?** Yes, I think a POST request can still change the database because the server receives and processes it.
 * **What exactly fails?** I think the browser blocks the frontend from accessing the response because the API does not allow the frontend's origin through CORS.
+
+
+# Exercise 4
+
+### Task 3
+
+* `/files/dune.jpg` → I think this will return the image successfully.
+* `/files/../.env` → I think this may return the `.env` file contents.
+* `/files/..%2f.env` → I think this may also return the `.env` file contents.
