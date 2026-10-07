@@ -1,4 +1,3 @@
-import "dotenv/config";
 import express from "express";
 import booksRouter from "./routes/books.routes.js";
 import usersRouter from "./routes/users.routes.js";
@@ -17,10 +16,13 @@ import cors from "cors";
 import validate from "./middleware/validate.js";
 import { filenameSchema } from "./schemas/files.schema.js";
 import { notFound } from "./errors/ApiError.js";
+import config from "./config/config.js";
+import logger from "./config/logger.js";
+import apiRateLimiter from "./middleware/apiRateLimiter.js";
 
-const accessLogStream = fs.createWriteStream("./logs/access.log", {
-  flags: "a",
-});
+const accessLogStream = logger.isEnabled("info")
+  ? fs.createWriteStream("./logs/access.log", { flags: "a" })
+  : null;
 
 const app = express();
 
@@ -32,14 +34,15 @@ app.use(requestId);
 // Logging should run early so requests to all following middleware and routes are recorded.
 app.use(requestLog);
 
-// app.use(morgan("dev"));
-app.use(morgan("combined"));
-app.use(morgan("combined", { stream: accessLogStream }));
+if (logger.isEnabled("info")) {
+  app.use(morgan(config.nodeEnv === "production" ? "combined" : "dev"));
+  app.use(morgan("combined", { stream: accessLogStream }));
+}
 
 // CORS must run before routes so the required CORS headers are added to API responses.
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: config.corsOrigin,
     credentials: true,
   }),
 );
@@ -52,6 +55,8 @@ app.use(cookieParser());
 
 app.locals.db = db;
 
+app.use("/api/v1", apiRateLimiter);
+
 // Static files are served before API routes so requests for uploads are handled directly.
 app.use(
   "/uploads",
@@ -59,7 +64,7 @@ app.use(
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     next();
   },
-  express.static("uploads", {
+  express.static(config.uploadsPath, {
     maxAge: "1h",
   }),
 );
@@ -68,12 +73,11 @@ app.get(
   "/files/:filename",
   validate(filenameSchema, "params"),
   (req, res, next) => {
-    const uploadsPath = path.resolve("uploads");
-    const requestedPath = path.resolve(uploadsPath, req.params.filename);
+    const requestedPath = path.resolve(config.uploadsPath, req.params.filename);
 
     if (
-      requestedPath !== uploadsPath &&
-      !requestedPath.startsWith(`${uploadsPath}${path.sep}`)
+      requestedPath !== config.uploadsPath &&
+      !requestedPath.startsWith(`${config.uploadsPath}${path.sep}`)
     ) {
       throw notFound("File not found.");
     }

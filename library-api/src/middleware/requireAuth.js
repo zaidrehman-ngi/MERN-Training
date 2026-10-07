@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { unauthorized } from "../errors/ApiError.js";
+import config from "../config/config.js";
 
 const requireAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -18,7 +19,7 @@ const requireAuth = (req, res, next) => {
 
   const token = authHeader.split(" ")[1];
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, payload) => {
+  jwt.verify(token, config.jwtSecret, (err, payload) => {
     if (err) {
       const message =
         err.name === "TokenExpiredError"

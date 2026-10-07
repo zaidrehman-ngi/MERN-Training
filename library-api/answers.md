@@ -69,3 +69,65 @@ A **programmer error** is a bug or server configuration mistake that needs inves
 | Null dereference | Programmer | Generic `500` response. | Log the error with its stack and request ID, then fix and test the code. |
 | Database is down | Operational dependency failure | `503 Service Unavailable` with a safe retry message. | Log and alert, restore the database, and retry only where safe. |
 | Request for a deleted book | Operational | `404 Not Found` saying the book is unavailable. | Return not found; do not expose internal details. |
+
+# Exercise 3
+
+### Task 1
+
+The API reads its port, JWT secret and expiry, CORS origin, uploads directory,
+rate-limit window and maximum, and log level from environment variables.
+`.env` is ignored by Git; `.env.example` contains placeholders only.
+
+Node also supports `--env-file` natively. I tested it with `.env.example`;
+dotenv is still useful because it loads settings consistently across Node
+versions and start commands.
+
+### Task 2
+
+`src/config/config.js` is the only project file that reads environment
+variables. This keeps configuration consistent and lets the app validate it
+once at startup. It also makes two things easier: running the same code with
+different settings in development, testing, and production, and testing
+startup with controlled configuration values.
+
+### Task 3
+
+At startup, Zod checks every required setting and reports invalid or missing
+values by environment variable name. The server exits before listening if
+configuration is invalid. This catches a bad deployment when it starts, so
+the developer or operator sees it before a user encounters it on a request.
+
+### Task 4
+
+`NODE_ENV` is set in `.env` for local development and in the deployment
+environment for production. Development errors include the error message in
+the response and log the stack; production errors return a generic message
+and log no stack. Morgan uses its concise `dev` format locally and `combined`
+in production. Neither environment sends a stack trace to the client.
+
+### Task 5
+
+**Belong in code**
+
+1. API routes and controller behavior.
+2. Zod validation rules.
+3. Authorization rules, such as which roles can manage books.
+
+**Belong in environment variables**
+
+4. `PORT` and `NODE_ENV`.
+5. `CORS_ORIGIN`.
+6. `UPLOADS_PATH`.
+7. `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX`.
+8. `LOG_LEVEL`.
+9. `JWT_EXPIRES_IN`.
+
+**Belong in neither**
+
+10. The JWT signing secret and persistent user, book, and borrow-request data.
+    The secret belongs in a deployment secret manager; the records belong in
+    a database, not in code or environment variables. In Week 8, use the
+    deployment platform's secret store for the JWT secret and database
+    credentials, and a managed persistent database for application data.
+    The local `.env` is only a staging post for development, not the place to
+    keep production secrets.

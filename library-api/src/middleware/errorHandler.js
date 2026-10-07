@@ -1,10 +1,13 @@
 import { inspect } from "node:util";
 import { ApiError } from "../errors/ApiError.js";
+import config from "../config/config.js";
+import logger from "../config/logger.js";
 
 const errorHandler = (err, req, res, next) => {
   const isErrorObject = err !== null && typeof err === "object";
   const isMalformedJson = isErrorObject && err.type === "entity.parse.failed";
   const isExpected = err instanceof ApiError || isMalformedJson;
+  const isDevelopment = config.nodeEnv === "development";
   const statusCode = isMalformedJson
     ? 400
     : err instanceof ApiError && Number.isInteger(err.statusCode)
@@ -24,17 +27,27 @@ const errorHandler = (err, req, res, next) => {
       }
     : {
         error: "INTERNAL_SERVER_ERROR",
-        message: "An unexpected error occurred.",
+        message:
+          isDevelopment && err instanceof Error
+            ? err.message
+            : isDevelopment && typeof err === "string"
+              ? err
+              : "An unexpected error occurred.",
         details: [],
       };
 
-  const logDetails = inspect(err, { depth: 5 });
+  const logDetails =
+    config.nodeEnv === "development"
+      ? inspect(err, { depth: 5 })
+      : err instanceof Error
+        ? `${err.name}: ${err.message}`
+        : inspect(err, { depth: 5 });
   if (isExpected) {
-    console.warn(
+    logger.warn(
       `${req.requestId} ${req.method} ${req.originalUrl}: ${statusCode} ${response.error} ${logDetails}`,
     );
   } else {
-    console.error(
+    logger.error(
       `${req.requestId} ${req.method} ${req.originalUrl}: ${statusCode} ${response.error}`,
       logDetails,
     );
