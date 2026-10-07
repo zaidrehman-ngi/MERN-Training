@@ -1,3 +1,5 @@
+import { badRequest } from "../errors/ApiError.js";
+
 const sources = new Set(["body", "query", "params"]);
 
 const validate = (schema, source) => {
@@ -11,14 +13,14 @@ const validate = (schema, source) => {
     const result = schema.safeParse(req[source]);
 
     if (!result.success) {
-      return res.status(400).json({
-        error: "VALIDATION_ERROR",
-        message: "Some fields have invalid values.",
-        details: result.error.issues.map((issue) => ({
+      throw badRequest(
+        "Some fields have invalid values.",
+        result.error.issues.map((issue) => ({
           field: issue.path.length > 0 ? issue.path.join(".") : source,
           message: issue.message,
         })),
-      });
+        "VALIDATION_ERROR",
+      );
     }
 
     if (source === "query") {

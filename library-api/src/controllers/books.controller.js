@@ -1,3 +1,5 @@
+import { conflict, notFound } from "../errors/ApiError.js";
+
 const getBooks = (req, res) => {
   const { books } = req.app.locals.db;
 
@@ -53,11 +55,7 @@ const getBookById = (req, res) => {
   const book = books.find((book) => book.id === req.params.id);
 
   if (!book) {
-    return res.status(404).json({
-      error: "NOT_FOUND",
-      message: "Book not found.",
-      details: [],
-    });
+    throw notFound("Book not found.");
   }
 
   res.status(200).json(book);
@@ -81,16 +79,12 @@ const createBook = (req, res) => {
   const existingBook = books.find((book) => book.isbn === isbn);
 
   if (existingBook) {
-    return res.status(409).json({
-      error: "CONFLICT",
-      message: "A book with this ISBN already exists.",
-      details: [
-        {
-          field: "isbn",
-          message: "ISBN must be unique.",
-        },
-      ],
-    });
+    throw conflict("A book with this ISBN already exists.", [
+      {
+        field: "isbn",
+        message: "ISBN must be unique.",
+      },
+    ]);
   }
 
   const newBook = {
@@ -182,11 +176,7 @@ const updateBook = (req, res) => {
   const index = books.findIndex((book) => book.id === req.params.id);
 
   if (index === -1) {
-    return res.status(404).json({
-      error: "NOT_FOUND",
-      message: "Book not found.",
-      details: [],
-    });
+    throw notFound("Book not found.");
   }
 
   const {
@@ -207,16 +197,12 @@ const updateBook = (req, res) => {
     );
 
     if (duplicate) {
-      return res.status(409).json({
-        error: "CONFLICT",
-        message: "A book with this ISBN already exists.",
-        details: [
-          {
-            field: "isbn",
-            message: "ISBN must be unique.",
-          },
-        ],
-      });
+      throw conflict("A book with this ISBN already exists.", [
+        {
+          field: "isbn",
+          message: "ISBN must be unique.",
+        },
+      ]);
     }
   }
 
@@ -244,11 +230,7 @@ const deleteBook = (req, res) => {
   const index = books.findIndex((book) => book.id === req.params.id);
 
   if (index === -1) {
-    return res.status(404).json({
-      error: "NOT_FOUND",
-      message: "Book not found.",
-      details: [],
-    });
+    throw notFound("Book not found.");
   }
 
   books.splice(index, 1);

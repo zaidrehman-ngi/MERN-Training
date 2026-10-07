@@ -1,14 +1,11 @@
 import jwt from "jsonwebtoken";
+import { unauthorized } from "../errors/ApiError.js";
 
 const requireAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({
-      error: "UNAUTHORIZED",
-      message: "Authentication required.",
-      details: [],
-    });
+    return next(unauthorized());
   }
 
   // if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -17,30 +14,23 @@ const requireAuth = (req, res, next) => {
   //     message: "Authentication required.",
   //     details: [],
   //   });
-  // }
+  //   }
 
   const token = authHeader.split(" ")[1];
 
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+  jwt.verify(token, process.env.JWT_SECRET, (err, payload) => {
+    if (err) {
+      const message =
+        err.name === "TokenExpiredError"
+          ? "Token has expired."
+          : "Invalid token.";
+      next(unauthorized(message));
+      return;
+    }
 
     req.user = payload;
     next();
-  } catch (err) {
-    if (err.name === "TokenExpiredError") {
-      return res.status(401).json({
-        error: "UNAUTHORIZED",
-        message: "Token has expired.",
-        details: [],
-      });
-    }
-
-    return res.status(401).json({
-      error: "UNAUTHORIZED",
-      message: "Invalid token.",
-      details: [],
-    });
-  }
+  });
 };
 
 export default requireAuth;

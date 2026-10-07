@@ -1,3 +1,5 @@
+import { notFound } from "../errors/ApiError.js";
+
 const getBorrowRequests = (req, res) => {
   const { borrowRequests } = req.app.locals.db;
 
@@ -30,11 +32,7 @@ const getBorrowRequestById = (req, res) => {
   );
 
   if (!borrowRequest) {
-    return res.status(404).json({
-      error: "NOT_FOUND",
-      message: "Borrow request not found.",
-      details: [],
-    });
+    throw notFound("Borrow request not found.");
   }
 
   res.status(200).json(borrowRequest);
@@ -70,11 +68,7 @@ const updateBorrowRequest = (req, res) => {
   );
 
   if (index === -1) {
-    return res.status(404).json({
-      error: "NOT_FOUND",
-      message: "Borrow request not found.",
-      details: [],
-    });
+    throw notFound("Borrow request not found.");
   }
 
   borrowRequests[index] = {
@@ -96,11 +90,7 @@ const returnBorrowedBook = (req, res) => {
   );
 
   if (index === -1) {
-    return res.status(404).json({
-      error: "NOT_FOUND",
-      message: "Borrow request not found.",
-      details: [],
-    });
+    throw notFound("Borrow request not found.");
   }
 
   borrowRequests[index].status = "returned";

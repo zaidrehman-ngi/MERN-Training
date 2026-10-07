@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { verifyPassword } from "../utils/password.js";
+import { unauthorized } from "../errors/ApiError.js";
 
 const login = async (req, res) => {
   const { users } = req.app.locals.db;
@@ -11,11 +12,7 @@ const login = async (req, res) => {
     user && (await verifyPassword(password, user.password));
 
   if (!passwordMatches) {
-    return res.status(401).json({
-      error: "INVALID_CREDENTIALS",
-      message: "Email or password is incorrect.",
-      details: [],
-    });
+    throw unauthorized("Email or password is incorrect.", "INVALID_CREDENTIALS");
   }
 
   const accessToken = jwt.sign(

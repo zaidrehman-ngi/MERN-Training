@@ -9,7 +9,6 @@ import cookieParser from "cookie-parser";
 import requestLog from "./middleware/requestLog.js";
 import requestId from "./middleware/requestId.js";
 import errorHandler from "./middleware/errorHandler.js";
-import requireAuth from "./middleware/requireAuth.js";
 import morgan from "morgan";
 import fs from "fs";
 import path from "path";
@@ -17,6 +16,7 @@ import helmet from "helmet";
 import cors from "cors";
 import validate from "./middleware/validate.js";
 import { filenameSchema } from "./schemas/files.schema.js";
+import { notFound } from "./errors/ApiError.js";
 
 const accessLogStream = fs.createWriteStream("./logs/access.log", {
   flags: "a",
@@ -27,7 +27,7 @@ const app = express();
 // Security headers must be added early so they apply to responses from the rest of the app.
 app.use(helmet());
 
-// app.use(requestId);
+app.use(requestId);
 
 // Logging should run early so requests to all following middleware and routes are recorded.
 app.use(requestLog);
@@ -64,27 +64,35 @@ app.use(
   }),
 );
 
-app.get("/files/:filename", validate(filenameSchema, "params"), (req, res) => {
-  const uploadsPath = path.resolve("uploads");
-  const requestedPath = path.resolve(uploadsPath, req.params.filename);
+app.get(
+  "/files/:filename",
+  validate(filenameSchema, "params"),
+  (req, res, next) => {
+    const uploadsPath = path.resolve("uploads");
+    const requestedPath = path.resolve(uploadsPath, req.params.filename);
 
-  if (
-    requestedPath !== uploadsPath &&
-    !requestedPath.startsWith(`${uploadsPath}${path.sep}`)
-  ) {
-    return res.status(404).json({
-      error: "NOT_FOUND",
-      message: "File not found.",
-      details: [],
+    if (
+      requestedPath !== uploadsPath &&
+      !requestedPath.startsWith(`${uploadsPath}${path.sep}`)
+    ) {
+      throw notFound("File not found.");
+    }
+
+    const stream = fs.createReadStream(requestedPath);
+
+    res.setHeader("Content-Type", "image/jpeg");
+
+    stream.on("error", (error) => {
+      if (error.code === "ENOENT") {
+        next(notFound("File not found."));
+        return;
+      }
+
+      next(error);
     });
-  }
-
-  const stream = fs.createReadStream(requestedPath);
-
-  res.setHeader("Content-Type", "image/jpeg");
-
-  stream.pipe(res);
-});
+    stream.pipe(res);
+  },
+);
 
 app.get("/", (req, res) => {
   res.status(200).json({
@@ -98,13 +106,24 @@ app.use("/api/v1/users", usersRouter);
 app.use("/api/v1/borrow-requests", borrowRequestsRouter);
 app.use("/api/v1/auth", authRouter);
 
+// Task 4 verification: this was enabled temporarily to test thrown strings.
+// app.get("/exercise-error-string", () => {
+//   throw "a plain string";
+// });
+//
+// app.get("/b", async () => {
+//   throw new Error("boom");
+// });
+//
+// const somethingAsync = () => Promise.reject(new Error("async rejection"));
+// app.get("/c", (req, res) => {
+//   somethingAsync();
+//   res.json({ ok: true });
+// });
+
 // 404 must come after the routes so it only handles requests that matched nothing.
-app.use((req, res) => {
-  res.status(404).json({
-    error: "NOT_FOUND",
-    message: "Route not found.",
-    details: [],
-  });
+app.use((req) => {
+  throw notFound("Route not found.");
 });
 
 // Error handling must come last so errors from middleware and routes reach it.

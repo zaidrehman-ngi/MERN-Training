@@ -1,4 +1,5 @@
 import { hashPassword } from "../utils/password.js";
+import { conflict, notFound } from "../errors/ApiError.js";
 
 const toPublicUser = ({ password, ...user }) => user;
 
@@ -16,11 +17,7 @@ const getUserById = (req, res) => {
   const user = users.find((user) => user.id === req.params.id);
 
   if (!user) {
-    return res.status(404).json({
-      error: "NOT_FOUND",
-      message: "User not found.",
-      details: [],
-    });
+    throw notFound("User not found.");
   }
 
   res.status(200).json(toPublicUser(user));
@@ -34,16 +31,12 @@ const createUser = async (req, res) => {
   const existingUser = users.find((user) => user.email === email);
 
   if (existingUser) {
-    return res.status(409).json({
-      error: "CONFLICT",
-      message: "A user with this email already exists.",
-      details: [
-        {
-          field: "email",
-          message: "Email must be unique.",
-        },
-      ],
-    });
+    throw conflict("A user with this email already exists.", [
+      {
+        field: "email",
+        message: "Email must be unique.",
+      },
+    ]);
   }
 
   const newUser = {
@@ -69,11 +62,7 @@ const updateUser = async (req, res) => {
   const index = users.findIndex((user) => user.id === req.params.id);
 
   if (index === -1) {
-    return res.status(404).json({
-      error: "NOT_FOUND",
-      message: "User not found.",
-      details: [],
-    });
+    throw notFound("User not found.");
   }
 
   const { email } = req.body;
@@ -84,16 +73,12 @@ const updateUser = async (req, res) => {
     );
 
     if (duplicate) {
-      return res.status(409).json({
-        error: "CONFLICT",
-        message: "A user with this email already exists.",
-        details: [
-          {
-            field: "email",
-            message: "Email must be unique.",
-          },
-        ],
-      });
+      throw conflict("A user with this email already exists.", [
+        {
+          field: "email",
+          message: "Email must be unique.",
+        },
+      ]);
     }
   }
 
@@ -120,11 +105,7 @@ const deleteUser = (req, res) => {
   const index = users.findIndex((user) => user.id === req.params.id);
 
   if (index === -1) {
-    return res.status(404).json({
-      error: "NOT_FOUND",
-      message: "User not found.",
-      details: [],
-    });
+    throw notFound("User not found.");
   }
 
   users.splice(index, 1);
