@@ -39,6 +39,10 @@ const configSchema = z.object({
   UPLOADS_PATH: z.string().trim().min(1),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive(),
   RATE_LIMIT_MAX: z.coerce.number().int().positive(),
+  LOGIN_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive(),
+  LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive(),
+  SEARCH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive(),
+  SEARCH_RATE_LIMIT_MAX: z.coerce.number().int().positive(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "silent"]),
 });
 

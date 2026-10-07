@@ -26,20 +26,24 @@ const accessLogStream = logger.isEnabled("info")
 
 const app = express();
 
-// Security headers must be added early so they apply to responses from the rest of the app.
+// 1. Security headers apply to responses from all later middleware and routes.
 app.use(helmet());
 
+// 2. Request IDs are available to request logs and centralized error logs.
 app.use(requestId);
 
-// Logging should run early so requests to all following middleware and routes are recorded.
+// 3. Request completion logs include status and duration for every later layer.
 app.use(requestLog);
 
+// 4. Morgan logs requests in the environment-appropriate format.
 if (logger.isEnabled("info")) {
+  // 4a. Write concise development logs or production combined logs to stdout.
   app.use(morgan(config.nodeEnv === "production" ? "combined" : "dev"));
+  // 4b. Keep a combined access-log file for later inspection.
   app.use(morgan("combined", { stream: accessLogStream }));
 }
 
-// CORS must run before routes so the required CORS headers are added to API responses.
+// 5. CORS handles preflight requests and adds CORS headers before later middleware.
 app.use(
   cors({
     origin: config.corsOrigin,
@@ -47,17 +51,18 @@ app.use(
   }),
 );
 
-// Body parsing must run before routes that need to read JSON request bodies.
+// 6. Parse JSON bodies before rate limiting and routes that need request data.
 app.use(express.json());
 
-// Cookie parsing must run before routes or middleware that need to read cookies.
+// 7. Parse cookies before routes and middleware that inspect them.
 app.use(cookieParser());
 
 app.locals.db = db;
 
+// 8. Apply the general API limit after body parsing; route-specific limits run in their routers.
 app.use("/api/v1", apiRateLimiter);
 
-// Static files are served before API routes so requests for uploads are handled directly.
+// 9. Serve uploaded static files before the remaining application routes.
 app.use(
   "/uploads",
   (req, res, next) => {
@@ -69,6 +74,7 @@ app.use(
   }),
 );
 
+// 10. Validate and serve individual file requests.
 app.get(
   "/files/:filename",
   validate(filenameSchema, "params"),
@@ -98,19 +104,24 @@ app.get(
   },
 );
 
+// 11. Register the API root route.
 app.get("/", (req, res) => {
   res.status(200).json({
     message: "Library API is running",
   });
 });
 
-// API routes come after the common middleware they depend on.
+// 12. Register feature routes after all shared middleware.
+// 12a. Book catalogue and search routes.
 app.use("/api/v1/books", booksRouter);
+// 12b. User routes.
 app.use("/api/v1/users", usersRouter);
+// 12c. Borrow-request routes.
 app.use("/api/v1/borrow-requests", borrowRequestsRouter);
+// 12d. Authentication routes.
 app.use("/api/v1/auth", authRouter);
 
-// Task 4 verification: this was enabled temporarily to test thrown strings.
+   
 // app.get("/exercise-error-string", () => {
 //   throw "a plain string";
 // });
@@ -125,12 +136,12 @@ app.use("/api/v1/auth", authRouter);
 //   res.json({ ok: true });
 // });
 
-// 404 must come after the routes so it only handles requests that matched nothing.
+// 13. Return not found only after all routes have had a chance to match.
 app.use((req) => {
   throw notFound("Route not found.");
 });
 
-// Error handling must come last so errors from middleware and routes reach it.
+// 14. Handle errors last so failures from all prior middleware and routes arrive here.
 app.use(errorHandler);
 
 export default app;

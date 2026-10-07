@@ -20,6 +20,10 @@ const result = configSchema.safeParse({
   UPLOADS_PATH: process.env.UPLOADS_PATH,
   RATE_LIMIT_WINDOW_MS: process.env.RATE_LIMIT_WINDOW_MS,
   RATE_LIMIT_MAX: process.env.RATE_LIMIT_MAX,
+  LOGIN_RATE_LIMIT_WINDOW_MS: process.env.LOGIN_RATE_LIMIT_WINDOW_MS,
+  LOGIN_RATE_LIMIT_MAX: process.env.LOGIN_RATE_LIMIT_MAX,
+  SEARCH_RATE_LIMIT_WINDOW_MS: process.env.SEARCH_RATE_LIMIT_WINDOW_MS,
+  SEARCH_RATE_LIMIT_MAX: process.env.SEARCH_RATE_LIMIT_MAX,
   LOG_LEVEL: process.env.LOG_LEVEL,
 });
 
@@ -45,6 +49,10 @@ const config = Object.freeze({
   uploadsPath: path.resolve(process.cwd(), values.UPLOADS_PATH),
   rateLimitWindowMs: values.RATE_LIMIT_WINDOW_MS,
   rateLimitMax: values.RATE_LIMIT_MAX,
+  loginRateLimitWindowMs: values.LOGIN_RATE_LIMIT_WINDOW_MS,
+  loginRateLimitMax: values.LOGIN_RATE_LIMIT_MAX,
+  searchRateLimitWindowMs: values.SEARCH_RATE_LIMIT_WINDOW_MS,
+  searchRateLimitMax: values.SEARCH_RATE_LIMIT_MAX,
   logLevel: values.LOG_LEVEL,
 });
 

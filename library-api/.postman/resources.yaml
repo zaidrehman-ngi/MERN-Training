@@ -5,7 +5,7 @@ workspace:
 
 cloudResources:
   collections:
-    ../postman/collections/Karachi Central Library API: be75a428-d4ab-4e32-a4bb-36eefee8a87a
+    ../postman/collections/Karachi Central Library API: f9de1c92-5ab8-4010-b948-cc8286daa9b7
   environments:
     ../postman/environments/library-local.environment.yaml: 58028095-3b0e91cc-cdbf-4bd7-9a28-d473e99dfcb9
   globals:

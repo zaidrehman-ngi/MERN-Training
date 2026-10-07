@@ -131,3 +131,28 @@ in production. Neither environment sends a stack trace to the client.
     credentials, and a managed persistent database for application data.
     The local `.env` is only a staging post for development, not the place to
     keep production secrets.
+
+# Exercise 4
+
+### Task 1
+
+Login allows five failed attempts per email and IP every 15 minutes; book
+search allows 60 requests per minute; other API routes allow 100 per 15
+minutes. Each blocked request returns `429` with `Retry-After`. Password reset
+is not implemented yet, so its planned limit will be added with that endpoint.
+
+Login follows the Week 1 shared-Wi-Fi decision by keying on both email and IP.
+Search is public, so it falls back to IP alone; people sharing Wi-Fi share
+that limit. This differs from the Week 1 `user/IP` plan.
+
+The limits are stored in memory per process. A multi-instance deployment will
+need a shared store.
+
+### Task 2
+
+I tested the general rate limiter both before and after JSON parsing. Before
+the parser, rejected requests avoid JSON parsing work. After it, their bodies
+are parsed first, using extra CPU and memory. The final order puts body
+parsing before the general limiter as requested; the login limiter also needs
+parsed body data to key attempts by email. The middleware order and comments
+are in `src/app.js`.

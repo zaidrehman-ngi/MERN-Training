@@ -13,9 +13,9 @@ import {
 } from "../controllers/books.controller.js";
 
 import requireAuth from "../middleware/requireAuth.js";
-
 import requireRole from "../middleware/requireRole.js";
 import validate from "../middleware/validate.js";
+import bookSearchRateLimiter from "../middleware/bookSearchRateLimiter.js";
 import {
   bookIdSchema,
   booksQuerySchema,
@@ -25,7 +25,12 @@ import {
 
 const router = express.Router();
 
-router.get("/", validate(booksQuerySchema, "query"), getBooks);
+router.get(
+  "/",
+  bookSearchRateLimiter,
+  validate(booksQuerySchema, "query"),
+  getBooks,
+);
 
 router.post(
   "/",

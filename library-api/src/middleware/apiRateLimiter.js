@@ -1,4 +1,4 @@
-import { rateLimit } from "express-rate-limit";
+import { ipKeyGenerator, rateLimit } from "express-rate-limit";
 import config from "../config/config.js";
 import { ApiError } from "../errors/ApiError.js";
 
@@ -7,6 +7,7 @@ const apiRateLimiter = rateLimit({
   limit: config.rateLimitMax,
   standardHeaders: "draft-8",
   legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
   handler: (req, res, next) => {
     next(
       new ApiError("Too many requests. Please try again later.", 429, {
@@ -14,6 +15,9 @@ const apiRateLimiter = rateLimit({
       }),
     );
   },
+  skip: (req) =>
+    (req.method === "POST" && req.path === "/auth/login") ||
+    (req.method === "GET" && req.path === "/books"),
 });
 
 export default apiRateLimiter;
