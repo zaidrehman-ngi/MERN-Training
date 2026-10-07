@@ -1,8 +1,12 @@
+import { hashPassword } from "../utils/password.js";
+
+const toPublicUser = ({ password, ...user }) => user;
+
 const getUsers = (req, res) => {
   const { users } = req.app.locals.db;
 
   res.status(200).json({
-    data: users,
+    data: users.map(toPublicUser),
   });
 };
 
@@ -19,73 +23,13 @@ const getUserById = (req, res) => {
     });
   }
 
-  res.status(200).json(user);
+  res.status(200).json(toPublicUser(user));
 };
 
-const createUser = (req, res) => {
+const createUser = async (req, res) => {
   const { users } = req.app.locals.db;
 
-  const { name, email, role, branch, joined } = req.body || {};
-
-  const details = [];
-
-  if (!name) {
-    details.push({
-      field: "name",
-      message: "Name is required.",
-    });
-  }
-
-  if (!email) {
-    details.push({
-      field: "email",
-      message: "Email is required.",
-    });
-  }
-
-  if (!role) {
-    details.push({
-      field: "role",
-      message: "Role is required.",
-    });
-  }
-
-  if (!branch) {
-    details.push({
-      field: "branch",
-      message: "Branch is required.",
-    });
-  }
-
-  if (!joined) {
-    details.push({
-      field: "joined",
-      message: "Joined date is required.",
-    });
-  }
-
-  if (details.length > 0) {
-    return res.status(400).json({
-      error: "VALIDATION_ERROR",
-      message: "Some fields are missing.",
-      details,
-    });
-  }
-
-  const allowedRoles = ["user", "librarian", "admin"];
-
-  if (!allowedRoles.includes(role)) {
-    return res.status(422).json({
-      error: "VALIDATION_ERROR",
-      message: "Invalid role.",
-      details: [
-        {
-          field: "role",
-          message: "Role must be user, librarian, or admin.",
-        },
-      ],
-    });
-  }
+  const { name, email, password, branch, joined } = req.body;
 
   const existingUser = users.find((user) => user.email === email);
 
@@ -106,7 +50,8 @@ const createUser = (req, res) => {
     id: `m-${1000 + users.length}`,
     name,
     email,
-    role,
+    password: await hashPassword(password),
+    role: "user",
     branch,
     joined,
   };
@@ -114,11 +59,11 @@ const createUser = (req, res) => {
   users.push(newUser);
 
   res.status(201).json({
-    data: newUser,
+    data: toPublicUser(newUser),
   });
 };
 
-const updateUser = (req, res) => {
+const updateUser = async (req, res) => {
   const { users } = req.app.locals.db;
 
   const index = users.findIndex((user) => user.id === req.params.id);
@@ -131,24 +76,7 @@ const updateUser = (req, res) => {
     });
   }
 
-  const { role, email } = req.body || {};
-
-  if (role !== undefined) {
-    const allowedRoles = ["user", "librarian", "admin"];
-
-    if (!allowedRoles.includes(role)) {
-      return res.status(422).json({
-        error: "VALIDATION_ERROR",
-        message: "Invalid role.",
-        details: [
-          {
-            field: "role",
-            message: "Role must be user, librarian, or admin.",
-          },
-        ],
-      });
-    }
-  }
+  const { email } = req.body;
 
   if (email !== undefined) {
     const duplicate = users.find(
@@ -169,14 +97,20 @@ const updateUser = (req, res) => {
     }
   }
 
-  users[index] = {
+  const updatedUser = {
     ...users[index],
     ...req.body,
     id: users[index].id,
   };
 
+  if (req.body.password !== undefined) {
+    updatedUser.password = await hashPassword(req.body.password);
+  }
+
+  users[index] = updatedUser;
+
   res.status(200).json({
-    data: users[index],
+    data: toPublicUser(users[index]),
   });
 };
 

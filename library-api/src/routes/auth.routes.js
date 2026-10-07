@@ -2,10 +2,12 @@ import express from "express";
 import { login, logout, refreshToken } from "../controllers/auth.controller.js";
 import requireAuth from "../middleware/requireAuth.js";
 import requireRole from "../middleware/requireRole.js";
+import validate from "../middleware/validate.js";
+import { loginSchema } from "../schemas/auth.schema.js";
 
 const router = express.Router();
 
-router.post("/login", login);
+router.post("/login", validate(loginSchema, "body"), login);
 
 router.post(
   "/logout",

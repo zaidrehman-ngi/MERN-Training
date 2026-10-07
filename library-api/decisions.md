@@ -1,7 +1,14 @@
-# Exercise 4
+## Exercise 1
 
-### Task 4
+### Task 5: Validation and sanitisation
 
-I would hand-roll file serving when the application needs custom behavior that `express.static` does not provide, such as checking database-based permissions before serving a private file or generating/streaming a file dynamically.
+The API validates the shape and constraints of a book title, but it does not
+sanitize the title as HTML. A value such as `<script>alert(1)</script>` is a
+valid string and may be stored and returned unchanged. It becomes dangerous
+when a browser interprets it as markup or executable script.
 
-When hand-rolling file serving, I would need to correctly handle path resolution and traversal protection, authorization, content types, streaming, and file/error handling. The extra control comes with more security and implementation responsibility.
+For the capstone, the React frontend is responsible for safely presenting
+untrusted text. Book titles are rendered as React text children, so React
+escapes the string instead of interpreting it as HTML. Do not bypass this
+protection for untrusted values with `dangerouslySetInnerHTML` or direct DOM
+HTML insertion; if rich HTML is ever required, sanitize it before rendering.

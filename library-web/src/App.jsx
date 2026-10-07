@@ -7,6 +7,8 @@ import BorrowRequests from "./routes/BorrowRequests";
 import NotFound from "./routes/NotFound";
 import AddBook from "./pages/AddBook/AddBook";
 import BookDetail from "./routes/BookDetail";
+import Register from "./pages/Register/Register";
+import Login from "./pages/Login/Login";
 
 function App() {
   return (
@@ -25,6 +27,8 @@ function App() {
         <Route path="/borrow-requests" element={<BorrowRequests />} />
       </Route>
 
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

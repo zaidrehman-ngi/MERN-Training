@@ -15,6 +15,8 @@ import fs from "fs";
 import path from "path";
 import helmet from "helmet";
 import cors from "cors";
+import validate from "./middleware/validate.js";
+import { filenameSchema } from "./schemas/files.schema.js";
 
 const accessLogStream = fs.createWriteStream("./logs/access.log", {
   flags: "a",
@@ -42,13 +44,6 @@ app.use(
   }),
 );
 
-// app.use(
-//   cors({
-//     origin: "*",
-//     credentials: true,
-//   }),
-// );
-
 // Body parsing must run before routes that need to read JSON request bodies.
 app.use(express.json());
 
@@ -69,7 +64,7 @@ app.use(
   }),
 );
 
-app.get("/files/:filename", (req, res) => {
+app.get("/files/:filename", validate(filenameSchema, "params"), (req, res) => {
   const uploadsPath = path.resolve("uploads");
   const requestedPath = path.resolve(uploadsPath, req.params.filename);
 
@@ -91,62 +86,11 @@ app.get("/files/:filename", (req, res) => {
   stream.pipe(res);
 });
 
-// app.use((req, res, next) => {
-//   console.log("A");
-//   next();
-// });
-
-// app.use((req, res, next) => {
-//   console.log("B");
-//   next();
-// });
-
-// app.use((req, res, next) => {
-//   console.log("C");
-//   next();
-// });
-
-// app.get("/middleware-test", (req, res) => {
-//   console.log("D");
-//   res.json({
-//     message: "Middleware test passed",
-//   });
-// });
-
-// app.use("/api/v1", (req, res, next) => {
-//   console.log("API-V1:", req.method, req.path);
-//   next();
-// });
-
-// app.get("/", (req, res, next) => {
-//   console.log("SINGLE ROUTE:", req.method, req.path);
-//   next();
-// }, (req, res) => {
-//   res.status(200).json({
-//     message: "Library API is running",
-//   });
-// });
-
 app.get("/", (req, res) => {
   res.status(200).json({
     message: "Library API is running",
   });
 });
-
-// app.get("/error-next", (req, res, next) => {
-//   next(new Error("Deliberate next error"));
-// });
-
-// app.get("/error-async", async (req, res) => {
-//   throw new Error("Deliberate async error");
-// });
-
-// app.get("/auth-test", requireAuth, (req, res) => {
-//   res.json({
-//     message: "Authenticated",
-//     user: req.user,
-//   });
-// });
 
 // API routes come after the common middleware they depend on.
 app.use("/api/v1/books", booksRouter);
