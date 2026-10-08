@@ -7,5 +7,5 @@ registerProcessErrorHandlers();
 const { default: app } = await import("./app.js");
 
 app.listen(config.port, () => {
-  logger.info(`Server running on http://localhost:${config.port}`);
+  logger.info(`Server listening on port ${config.port}`);
 });

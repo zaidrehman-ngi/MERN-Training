@@ -1,110 +1,16 @@
-import { conflict, notFound } from "../errors/ApiError.js";
-
-const getBooks = (req, res) => {
-  const { books } = req.app.locals.db;
-
-  let result = [...books];
-
-  const { author, title, available, sort, order, page, limit } = req.query;
-
-  // Filters
-  if (author) {
-    result = result.filter((book) => book.author === author);
-  }
-
-  if (title) {
-    result = result.filter((book) => book.title === title);
-  }
-
-  if (available !== undefined) {
-    result = result.filter((book) =>
-      available === "true" ? book.onShelf > 0 : book.onShelf === 0,
-    );
-  }
-
-  // Sorting
-  if (sort) {
-    result.sort((a, b) => {
-      if (a[sort] < b[sort]) {
-        return order === "asc" ? -1 : 1;
-      }
-
-      if (a[sort] > b[sort]) {
-        return order === "asc" ? 1 : -1;
-      }
-
-      return 0;
-    });
-  }
-
-  // Pagination
-  const pageNumber = page;
-  const limitNumber = limit;
-
-  const start = (pageNumber - 1) * limitNumber;
-  const paginatedResult = result.slice(start, start + limitNumber);
-
-  res.status(200).json({
-    data: paginatedResult,
-  });
+const getBooks = async (req, res) => {
+  const books = await req.app.locals.services.books.list(req.query);
+  res.status(200).json({ data: books });
 };
 
-const getBookById = (req, res) => {
-  const { books } = req.app.locals.db;
-
-  const book = books.find((book) => book.id === req.params.id);
-
-  if (!book) {
-    throw notFound("Book not found.");
-  }
-
+const getBookById = async (req, res) => {
+  const book = await req.app.locals.services.books.getById(req.params.id);
   res.status(200).json(book);
 };
 
-const createBook = (req, res) => {
-  const { books } = req.app.locals.db;
-
-  const {
-    title,
-    author,
-    isbn,
-    year,
-    coverUrl,
-    onShelf,
-    totalCopies,
-    finePerDay,
-    status,
-  } = req.body;
-
-  const existingBook = books.find((book) => book.isbn === isbn);
-
-  if (existingBook) {
-    throw conflict("A book with this ISBN already exists.", [
-      {
-        field: "isbn",
-        message: "ISBN must be unique.",
-      },
-    ]);
-  }
-
-  const newBook = {
-    id: `bk-${books.length + 1}`,
-    title,
-    author,
-    year,
-    isbn,
-    coverUrl,
-    onShelf,
-    totalCopies,
-    finePerDay,
-    status,
-  };
-
-  books.push(newBook);
-
-  res.status(201).location(`/api/v1/books/${newBook.id}`).json({
-    data: newBook,
-  });
+const createBook = async (req, res) => {
+  const book = await req.app.locals.services.books.create(req.body);
+  res.status(201).location(`/api/v1/books/${book.id}`).json({ data: book });
 };
 
 // Task 2 - saves the original request body
@@ -170,71 +76,16 @@ const createBook = (req, res) => {
 //   });
 // };
 
-const updateBook = (req, res) => {
-  const { books } = req.app.locals.db;
-
-  const index = books.findIndex((book) => book.id === req.params.id);
-
-  if (index === -1) {
-    throw notFound("Book not found.");
-  }
-
-  const {
-    title,
-    author,
-    isbn,
-    year,
-    coverUrl,
-    onShelf,
-    totalCopies,
-    finePerDay,
-    status,
-  } = req.body;
-
-  if (isbn !== undefined) {
-    const duplicate = books.find(
-      (book) => book.isbn === isbn && book.id !== req.params.id,
-    );
-
-    if (duplicate) {
-      throw conflict("A book with this ISBN already exists.", [
-        {
-          field: "isbn",
-          message: "ISBN must be unique.",
-        },
-      ]);
-    }
-  }
-
-  books[index] = {
-    ...books[index],
-    ...(title !== undefined && { title }),
-    ...(author !== undefined && { author }),
-    ...(isbn !== undefined && { isbn }),
-    ...(year !== undefined && { year }),
-    ...(coverUrl !== undefined && { coverUrl }),
-    ...(onShelf !== undefined && { onShelf }),
-    ...(totalCopies !== undefined && { totalCopies }),
-    ...(finePerDay !== undefined && { finePerDay }),
-    ...(status !== undefined && { status }),
-  };
-
-  res.status(200).json({
-    data: books[index],
-  });
+const updateBook = async (req, res) => {
+  const book = await req.app.locals.services.books.update(
+    req.params.id,
+    req.body,
+  );
+  res.status(200).json({ data: book });
 };
 
-const deleteBook = (req, res) => {
-  const { books } = req.app.locals.db;
-
-  const index = books.findIndex((book) => book.id === req.params.id);
-
-  if (index === -1) {
-    throw notFound("Book not found.");
-  }
-
-  books.splice(index, 1);
-
+const deleteBook = async (req, res) => {
+  await req.app.locals.services.books.delete(req.params.id);
   res.status(204).send();
 };
 

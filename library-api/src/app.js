@@ -19,12 +19,16 @@ import { notFound } from "./errors/ApiError.js";
 import config from "./config/config.js";
 import logger from "./config/logger.js";
 import apiRateLimiter from "./middleware/apiRateLimiter.js";
+import createRepositories from "./repositories/createRepositories.js";
+import createServices from "./services/createServices.js";
 
 const accessLogStream = logger.isEnabled("info")
-  ? fs.createWriteStream("./logs/access.log", { flags: "a" })
+  ? fs.createWriteStream(config.accessLogPath, { flags: "a" })
   : null;
 
 const app = express();
+const repositories = createRepositories(db);
+app.locals.services = createServices(repositories);
 
 // 1. Security headers apply to responses from all later middleware and routes.
 app.use(helmet());
@@ -56,8 +60,6 @@ app.use(express.json());
 
 // 7. Parse cookies before routes and middleware that inspect them.
 app.use(cookieParser());
-
-app.locals.db = db;
 
 // 8. Apply the general API limit after body parsing; route-specific limits run in their routers.
 app.use("/api/v1", apiRateLimiter);

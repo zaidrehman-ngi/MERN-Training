@@ -264,7 +264,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n  \"name\": \"Test User\",\r\n  \"email\": \"newuser@lib.pk\",\r\n  \"role\": \"user\",\r\n  \"branch\": \"Clifton Branch\",\r\n  \"joined\": \"2026-10-01\"\r\n}",
+              "raw": "{\r\n  \"name\": \"Test User\",\r\n  \"email\": \"newuser@lib.pk\",\r\n  \"password\": \"PostmanTestPassword123!\",\r\n  \"role\": \"user\",\r\n  \"branch\": \"Clifton Branch\",\r\n  \"joined\": \"2026-10-01\"\r\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -612,6 +612,153 @@
               "raw": "{{baseUrl}}/api/v1/borrow-requests/br-100/return",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "borrow-requests", "br-100", "return"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Exercise 4 Task 3 - Error Cases",
+      "item": [
+        {
+          "name": "Validation Failure - Standard Error Shape",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {\r\n    pm.response.to.have.status(400);\r\n});\r\n\r\npm.test(\"Validation error uses the standard error shape\", function () {\r\n    const body = pm.response.json();\r\n    pm.expect(body).to.have.all.keys(\"error\", \"message\", \"details\");\r\n    pm.expect(body.error).to.eql(\"VALIDATION_ERROR\");\r\n    pm.expect(body.message).to.be.a(\"string\").and.not.empty;\r\n    pm.expect(body.details).to.be.an(\"array\");\r\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Protected Request - No Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401\", function () {\r\n    pm.response.to.have.status(401);\r\n});\r\n\r\npm.test(\"Unauthorized error uses the standard error shape\", function () {\r\n    const body = pm.response.json();\r\n    pm.expect(body).to.have.all.keys(\"error\", \"message\", \"details\");\r\n    pm.expect(body.error).to.eql(\"UNAUTHORIZED\");\r\n    pm.expect(body.message).to.be.a(\"string\").and.not.empty;\r\n    pm.expect(body.details).to.be.an(\"array\");\r\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Protected Request - Wrong Role",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 403\", function () {\r\n    pm.response.to.have.status(403);\r\n});\r\n\r\npm.test(\"Forbidden error uses the standard error shape\", function () {\r\n    const body = pm.response.json();\r\n    pm.expect(body).to.have.all.keys(\"error\", \"message\", \"details\");\r\n    pm.expect(body.error).to.eql(\"FORBIDDEN\");\r\n    pm.expect(body.message).to.be.a(\"string\").and.not.empty;\r\n    pm.expect(body.details).to.be.an(\"array\");\r\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login - Rate Limited",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const loginUrl = `${pm.environment.get(\"baseUrl\")}/api/v1/auth/login`;\r\nconst payload = JSON.stringify({ email: \"postman-rate-limit@lib.pk\", password: \"WrongPassword123!\" });\r\nfor (let attempt = 0; attempt < 5; attempt += 1) {\r\n    await new Promise((resolve, reject) => {\r\n        pm.sendRequest({\r\n            url: loginUrl,\r\n            method: \"POST\",\r\n            header: { \"Content-Type\": \"application/json\" },\r\n            body: { mode: \"raw\", raw: payload }\r\n        }, (error) => error ? reject(error) : resolve());\r\n    });\r\n}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 429\", function () {\r\n    pm.response.to.have.status(429);\r\n});\r\n\r\npm.test(\"Rate-limit error uses the standard error shape\", function () {\r\n    const body = pm.response.json();\r\n    pm.expect(body).to.have.all.keys(\"error\", \"message\", \"details\");\r\n    pm.expect(body.error).to.eql(\"RATE_LIMIT_EXCEEDED\");\r\n    pm.expect(body.message).to.be.a(\"string\").and.not.empty;\r\n    pm.expect(body.details).to.be.an(\"array\");\r\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"email\": \"postman-rate-limit@lib.pk\",\r\n  \"password\": \"WrongPassword123!\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
             }
           },
           "response": []

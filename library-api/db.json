@@ -2105,6 +2105,15 @@
       "role": "user",
       "branch": "Clifton Branch",
       "joined": "2026-09-30"
+    },
+    {
+      "id": "m-admin-test",
+      "name": "Postman Test Admin",
+      "email": "admin-test@lib.pk",
+      "password": "$2b$12$4UlWWwiq4v5LcFRNS4QjluTp56s4.ahaQ9.mJd75DwqKTjFel3OUG",
+      "role": "admin",
+      "branch": "Clifton Branch",
+      "joined": "2026-10-08"
     }
   ],
   "borrowRequests": [

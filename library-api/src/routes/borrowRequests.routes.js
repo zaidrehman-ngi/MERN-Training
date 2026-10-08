@@ -28,6 +28,7 @@ router.post(
   "/:id/approve",
   requireAuth,
   requireRole("librarian"),
+  validate(borrowRequestIdSchema, "params"),
   approveHandler,
 );
 

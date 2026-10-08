@@ -1,38 +1,31 @@
 import jwt from "jsonwebtoken";
-import { verifyPassword } from "../utils/password.js";
-import { unauthorized } from "../errors/ApiError.js";
 import config from "../config/config.js";
 
-const login = async (req, res) => {
-  const { users } = req.app.locals.db;
-
-  const { email, password } = req.body || {};
-
-  const user = users.find((user) => user.email === email);
-  const passwordMatches =
-    user && (await verifyPassword(password, user.password));
-
-  if (!passwordMatches) {
-    throw unauthorized(
-      "Email or password is incorrect.",
-      "INVALID_CREDENTIALS",
-    );
-  }
-
-  const accessToken = jwt.sign(
+const createAccessToken = (user) =>
+  jwt.sign(
     {
       sub: user.id,
       email: user.email,
+      role: user.role,
     },
     config.jwtSecret,
     { expiresIn: config.jwtExpiresIn },
   );
 
+const setAccessTokenCookie = (res, accessToken) => {
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
     sameSite: "strict",
     maxAge: config.jwtExpiresInMs,
   });
+};
+
+const login = async (req, res) => {
+  const { email, password } = req.body || {};
+  const user = await req.app.locals.services.auth.authenticate(email, password);
+
+  const accessToken = createAccessToken(user);
+  setAccessTokenCookie(res, accessToken);
 
   res.status(200).json({
     accessToken,
@@ -52,8 +45,16 @@ const logout = (req, res) => {
 };
 
 const refreshToken = (req, res) => {
+  const accessToken = createAccessToken({
+    id: req.user.sub,
+    email: req.user.email,
+    role: req.user.role,
+  });
+
+  setAccessTokenCookie(res, accessToken);
+
   res.status(200).json({
-    accessToken: "refreshed-token",
+    accessToken,
   });
 };
 

@@ -156,3 +156,37 @@ are parsed first, using extra CPU and memory. The final order puts body
 parsing before the general limiter as requested; the login limiter also needs
 parsed body data to key attempts by email. The middleware order and comments
 are in `src/app.js`.
+
+### Task 4
+
+- Every route that reads body, query, or path parameters has a Zod schema. The
+  borrow-request approval route was missing validation for `:id`; it now uses
+  the existing ID schema.
+- There is one centralized Express error handler. The 404 middleware throws
+  into it rather than sending a separate error response.
+- `process.env` is read only in `src/config/config.js`.
+- No `try/catch` remains. The `try/finally` in process-fatal logging is
+  intentional: it exits even if writing the fatal log fails.
+- The access-log path is now configurable with `ACCESS_LOG_PATH`, defaulting
+  to `logs/access.log`. The startup log no longer assumes the host is localhost.
+- Login and refresh now use the same configured JWT settings; refresh no
+  longer returns a hardcoded placeholder token. Refresh currently reissues an
+  access token from the authenticated access token; it is not a separate
+  refresh-token rotation flow.
+
+### Task 5
+
+Before this change, data access was mixed into these controllers:
+
+- `books.controller.js` read, filtered, created, updated, and deleted books.
+- `users.controller.js` read, created, updated, and deleted users, including
+  duplicate-email checks.
+- `borrowRequests.controller.js` read, filtered, created, updated, and returned
+  borrow requests.
+- `auth.controller.js` looked up users by email during login.
+
+I moved data access into repositories and business operations into services
+tonight. Controllers now call services; repositories are the only layer that
+works with the in-memory arrays. On Monday, the repository implementations can
+be changed to use PostgreSQL while the controllers keep their request and
+response responsibilities.
