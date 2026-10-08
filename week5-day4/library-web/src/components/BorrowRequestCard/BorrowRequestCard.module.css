@@ -1,0 +1,39 @@
+.card {
+  min-width: 0;
+  padding: var(--space-4);
+  border: var(--border-width-card) solid var(--colour-line);
+  border-radius: var(--radius-md);
+  background: var(--colour-surface-raised);
+  box-shadow: var(--shadow-card);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.card:hover {
+  border-color: var(--colour-accent);
+  box-shadow: var(--shadow-float);
+  transform: translateY(-2px);
+}
+
+.bookTitle {
+  margin: 0 0 var(--space-2);
+  color: var(--colour-ink);
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+
+.detail,
+.status {
+  margin: var(--space-1) 0;
+  color: var(--colour-body);
+  font-size: var(--text-sm);
+}
+
+.status {
+  font-weight: 600;
+  display: inline-flex;
+  width: fit-content;
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  background: var(--colour-info-soft);
+  color: var(--colour-info);
+}
