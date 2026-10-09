@@ -8,12 +8,7 @@ import { loginSchema } from "../schemas/auth.schema.js";
 
 const router = express.Router();
 
-router.post(
-  "/login",
-  loginRateLimiter,
-  validate(loginSchema, "body"),
-  login,
-);
+router.post("/login", loginRateLimiter, validate(loginSchema, "body"), login);
 
 router.post(
   "/logout",

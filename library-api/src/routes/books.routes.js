@@ -1,17 +1,11 @@
 import express from "express";
-
 import {
   getBooks,
   getBookById,
   createBook,
-  // testRawBody,
-  // testValidatedBody,
-  // testBooksQuery,
-  // testBookId,
   updateBook,
   deleteBook,
 } from "../controllers/books.controller.js";
-
 import requireAuth from "../middleware/requireAuth.js";
 import requireRole from "../middleware/requireRole.js";
 import validate from "../middleware/validate.js";
@@ -39,14 +33,6 @@ router.post(
   validate(createBookSchema, "body"),
   createBook,
 );
-
-// router.post("/test-raw", testRawBody);
-
-// router.post("/test-validated", testValidatedBody);
-
-// router.get("/test-query", testBooksQuery);
-
-// router.get("/test-id/:id", testBookId);
 
 router.get("/:id", validate(bookIdSchema, "params"), getBookById);
 
