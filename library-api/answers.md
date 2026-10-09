@@ -371,3 +371,32 @@ The tables prevent many of these problems from being repeated, but they do
 not repair incorrect source data automatically. The conflicting emails,
 author spellings, branch phone, and missing ISBN need checking before the
 spreadsheet is loaded.
+
+
+# Exercise 3 — Choosing what makes a row unique
+
+## Task 2
+
+For this library system, I would use UUIDs for generated IDs.
+
+- **Auto-incrementing integers:** They are short and easy to read in a URL,
+  such as `/books/4471`. The cost is that two branches working separately
+  could both create book `4471`, so their records could conflict when the
+  databases are merged. The number also gives a rough idea of how many
+  records exist, and someone could try nearby IDs. The API still needs
+  permission checks; an ID is not a security check.
+- **UUIDs:** Separate branches can generate IDs independently, so ID
+  conflicts are very unlikely when their databases are merged. A UUID in a
+  URL is also much harder to guess than a sequence number. The cost is that
+  URLs are longer and less readable, and UUIDs take more space than integers.
+- **Natural values such as ISBN:** They can be meaningful to staff and avoid
+  a separate generated value when present. But some library items have no
+  ISBN, and an ISBN can change for a new edition or format, so it cannot be
+  the key for every book record.
+
+I would use UUIDs as the primary keys for `Members`, `Authors`, `Books`,
+`Genres`, `Branches`, `BookCopies`, `BorrowRequests`, and `FinePayments`.
+Their foreign-key columns would also use UUIDs. `BookAuthors` and
+`BookGenres` would use the pair of UUID foreign keys as a composite primary
+key, since each row represents a link between two records. ISBN would remain
+an optional unique value on `Books`, not a primary key.
