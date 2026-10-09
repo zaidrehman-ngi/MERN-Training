@@ -5,3 +5,4 @@ node_modules/
 !/postman/library-api.postman_environment.json
 /.postman/
 .env
+library-spreadsheet.csv
