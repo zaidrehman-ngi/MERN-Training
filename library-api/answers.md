@@ -400,3 +400,153 @@ Their foreign-key columns would also use UUIDs. `BookAuthors` and
 `BookGenres` would use the pair of UUID foreign keys as a composite primary
 key, since each row represents a link between two records. ISBN would remain
 an optional unique value on `Books`, not a primary key.
+
+## Task 3
+
+I am using PostgreSQL for this exercise. I created the `members`, `books`,
+and `branches` tables in the `karachi_library` database and checked that all
+three appear in DBeaver. Their UUID primary keys are generated
+automatically. These tables do not have foreign keys directly between them:
+the relationship between books and branches belongs in `BookCopies`, and
+borrowing records will refer to members and copies in `BorrowRequests`.
+
+## Task 4
+
+I added the constraints while creating the tables in PostgreSQL. The saved
+SQL is in [`db/schema.sql`](./db/schema.sql). The `members` table has a
+`NOT NULL` constraint on `name`, a `UNIQUE` constraint on `email`, and a
+generated UUID `DEFAULT` for `member_id`. `book_copies.copy_number` has a
+`CHECK` constraint requiring a positive number. `borrow_requests.member_id`
+is a foreign key to `members`.
+
+For this design, each physical copy is recorded separately in `book_copies`;
+the database does not store a total copy count on `books`. The positive
+`copy_number` check prevents an invalid negative copy number, while the total
+number of copies is counted from the rows.
+
+I tested the constraints in DBeaver using inserts that PostgreSQL rejected:
+
+```sql
+-- NOT NULL
+INSERT INTO members (name, email)
+VALUES (NULL, 'constraint-null-test@example.com');
+```
+
+PostgreSQL reported:
+
+```text
+SQL Error [23502]: ERROR: null value in column "name" of relation "members" violates not-null constraint
+Detail: Failing row contains (24e9c38f-bfe9-4d1b-a25b-9b2553c9a0aa, null, constraint-null-test@example.com, null, null).
+```
+
+```sql
+-- UNIQUE
+INSERT INTO members (name, email)
+VALUES ('Duplicate Email Test', 'constraint-member@example.com');
+```
+
+PostgreSQL reported:
+
+```text
+SQL Error [23505]: ERROR: duplicate key value violates unique constraint "members_email_key"
+Detail: Key (email)=(constraint-member@example.com) already exists.
+```
+
+```sql
+-- CHECK
+INSERT INTO book_copies (book_id, branch_id, copy_number)
+VALUES (
+    '22222222-2222-4222-8222-222222222222',
+    '33333333-3333-4333-8333-333333333333',
+    -1
+);
+```
+
+PostgreSQL reported:
+
+```text
+SQL Error [23514]: ERROR: new row for relation "book_copies" violates check constraint "book_copies_copy_number_check"
+Detail: Failing row contains (296c68f0-31ac-4359-a4fa-0d5df4be95a6, 22222222-2222-4222-8222-222222222222, 33333333-3333-4333-8333-333333333333, -1).
+```
+
+```sql
+-- FOREIGN KEY
+INSERT INTO borrow_requests (member_id, copy_id, borrowed_on, due_on)
+VALUES (
+    '99999999-9999-4999-8999-999999999999',
+    '44444444-4444-4444-8444-444444444444',
+    CURRENT_DATE,
+    CURRENT_DATE + 7
+);
+```
+
+PostgreSQL reported:
+
+```text
+SQL Error [23503]: ERROR: insert or update on table "borrow_requests" violates foreign key constraint "borrow_requests_member_id_fkey"
+Detail: Key (member_id)=(99999999-9999-4999-8999-999999999999) is not present in table "members".
+```
+
+The `DEFAULT` is different: it supplies a value rather than rejecting an
+insert. I omitted `member_id` and inserted a member:
+
+```sql
+INSERT INTO members (name, email)
+VALUES ('Default Test Member', 'constraint-default@example.com');
+
+SELECT member_id, name
+FROM members
+WHERE email = 'constraint-default@example.com';
+```
+
+The insert succeeded. DBeaver showed `Default Test Member` with generated
+`member_id` `1260498e-8c6d-4aaa-89b1-eea4cf409af5`, proving the default works.
+
+## Task 5
+
+| Value | Type | Reason |
+|---|---|---|
+| Book title | `TEXT` | Titles can have different lengths. |
+| Member email | `TEXT` | Email addresses are text, not numbers. |
+| Number of copies | `INTEGER` | Copies are counted in whole numbers. In this design, each copy is a row in `book_copies`, so we count rows instead of storing a total on `books`. |
+| Fine rate | `NUMERIC(6,2)` | Exact decimal arithmetic avoids floating-point rounding for money. |
+| Borrowed date | `DATE` | It is a calendar date; no time of day is needed. |
+| Record-created timestamp | `TIMESTAMPTZ` | It stores an instant and displays it in the session time zone. |
+| Loan status | `TEXT` with a `CHECK` constraint | It stores a word and the check can limit it to valid statuses. |
+
+I tried `SELECT 0.1 + 0.2;` in PostgreSQL and got `0.3`. PostgreSQL treats
+these untyped decimal literals as exact `NUMERIC` values. I then tried
+`SELECT 0.1::double precision + 0.2::double precision;` and got
+`0.30000000000000004`. This small rounding difference is why a fine rate
+should not use a floating-point type.
+
+The time-zone query showed that the PostgreSQL session time zone is
+`Asia/Karachi`. The current timestamp was displayed with a `+0500` offset,
+and both `CURRENT_DATE` and the Karachi local date were `2026-10-12`.
+PostgreSQL's `DATE` stores only a calendar date, with no time or time zone.
+When PostgreSQL calculates `CURRENT_DATE`, it uses the session time zone;
+`TIMESTAMPTZ` stores an instant and is displayed using that same session time
+zone.
+
+For these choices, a loan's daily fine rate should use `NUMERIC(6,2)`,
+each physical copy number should use `INTEGER`, borrowing/due/return dates
+should use `DATE`, a loan status can use `TEXT` with a check, and a
+record-created timestamp should use `TIMESTAMPTZ`.
+
+## Task 6
+
+I chose a `TEXT` status column with a `CHECK` constraint for `borrow_requests`.
+The allowed loan statuses are `out`, `overdue`, and `returned`; “on shelf”
+describes a copy that is not currently borrowed, not a loan status. A new
+loan defaults to `out`.
+
+- A database `ENUM` would also restrict the values, but adding another status
+  later requires changing the enum type.
+- A lookup table with a foreign key is useful if statuses need extra details
+  or need to be managed as data, but it adds a table and a join for this small
+  fixed set.
+
+If the library adds a fifth status next year, I would update the allowed
+values in the `CHECK` constraint with a database migration and update the
+application code to recognize the new status. The saved
+[`db/schema.sql`](./db/schema.sql) now uses the text-and-check approach.
