@@ -550,3 +550,77 @@ If the library adds a fifth status next year, I would update the allowed
 values in the `CHECK` constraint with a database migration and update the
 application code to recognize the new status. The saved
 [`db/schema.sql`](./db/schema.sql) now uses the text-and-check approach.
+
+# Exercise 4 — One book, many copies, many members
+
+## Task 1
+
+I added `branch_id` to `members` as a required foreign key to `branches` and
+assigned the existing test members to the test branch in PostgreSQL. The
+foreign key goes in `members`, the “many” table: each member belongs to one
+branch, while a branch can be referenced by many members.
+
+## Task 2
+
+I chose a separate `book_copies` row for every physical copy instead of
+keeping a total count on `books`. A count would not show which branch a copy
+is at, which specific copy a member borrowed, or the difference between a
+copy that is available, missing, or withdrawn. With separate rows, each copy
+has its own branch, copy number, inventory status, acquisition year and
+method, and condition notes. A copy donated in 1998 can therefore be recorded
+as a donation with its own condition notes, and a missing copy remains in the
+database with its status set to `missing`.
+
+The `borrow_requests.copy_id` foreign key identifies the particular copy
+borrowed. The saved [`db/schema.sql`](./db/schema.sql) includes the copy
+details and the status choices. I ran the `ALTER TABLE` in PostgreSQL and
+DBeaver reported no error.
+
+## Task 3
+
+A foreign key in `books` could point to only one genre for each book, so it
+could not represent a book with several genres. A foreign key in `genres`
+could point to only one book for each genre, so it could not represent a
+genre shared by many books. Putting multiple IDs in one column would also
+prevent each relationship from being stored and checked as a separate value.
+
+I created `book_genres` with `book_id` and `genre_id`, and `book_authors`
+with `book_id` and `author_id`. In both tables, the two foreign keys together
+are the primary key. This means the same book-genre or book-author pair
+cannot appear twice. A separate ID column is not needed because the pair
+already identifies each relationship.
+
+The same junction-table design is needed for authors because a book can have
+multiple authors and an author can write multiple books. The spreadsheet's
+one-author-per-book layout cannot represent that relationship correctly. I
+created all four tables in PostgreSQL, and DBeaver reported no errors.
+
+## Task 4
+
+`borrow_requests` connects one member to one physical copy, but unlike
+`book_genres`, the connection has information of its own: when it was
+borrowed, when it is due, whether it was returned, its status, and the fine
+for that loan. `book_genres` only records that a book belongs to a genre; it
+has no separate facts about that link. A relationship table that also stores
+its own attributes is called an **associative entity** (or an associative
+table).
+
+## Task 5
+
+The schema is in [`db/schema.sql`](./db/schema.sql). Compared with Exercise 2
+Task 6, the design now includes a required branch for each member, separate
+rows and condition/inventory details for copies, multiple authors per book,
+and separate assessed fines and fine payments. The live database has also
+been updated with the loan branch, fine fields, and `fine_payments` table.
+
+The ERD matches the main relationships in the design. Creating it made the
+links explicit: `borrow_requests` refers to one member and one copy, and the
+two book junction tables connect books to multiple authors and genres.
+
+## Task 6
+
+I added [`db/seed.sql`](./db/seed.sql) and ran it successfully in PostgreSQL.
+It demonstrates a book with two authors, a book with no author, a member
+with no loans, five copies of Dune across two branches (including one marked
+missing), an overdue loan, and a fine payment. The donated copy from 1998
+also has condition notes. No schema change was needed.
