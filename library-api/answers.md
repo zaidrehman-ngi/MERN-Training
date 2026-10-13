@@ -687,3 +687,34 @@ unpaid-fine tracking. On erasure, clear or replace `name`, `email`, and
 `is_active = FALSE`. Keep `joined_on` only if it is still needed for
 statistics and cannot identify the person on its own. The branch assignment
 should also be removed or generalized if it could identify the member.
+
+# Exercise 6 — Why is this query slow
+
+## Task 1
+
+I used PostgreSQL `generate_series` to insert 400,000 synthetic loan rows.
+The `borrow_requests` table now contains 400,002 rows, including the two
+earlier test/seed loans.
+
+## Task 2
+
+The overdue report returned one loan; DBeaver reported a fetch time of
+0.046 seconds. `EXPLAIN` showed a `Parallel Seq Scan` on `borrow_requests`,
+so PostgreSQL scans the loan table and applies the overdue filter. The plan
+estimates `rows=1` for the scan output; the table contains 400,002 rows to
+scan, not just one.
+
+## Task 3
+
+I added a partial index on `due_on` for loans where `returned_on IS NULL`.
+The report still returned one row.
+
+| Measurement | Before index | After index |
+|---|---:|---:|
+| DBeaver fetch time | 0.046 seconds | 0.006 seconds |
+| Plan for `borrow_requests` | Parallel sequential scan | Index scan using `borrow_requests_overdue_due_on_idx` |
+| Estimated matching rows | 1 | 1 |
+
+An index is a separate, ordered structure that stores indexed values with
+references to the matching table rows, so PostgreSQL can look up candidates
+without checking every row. The exact timings can vary between runs.

@@ -70,6 +70,10 @@ CREATE TABLE borrow_requests (
         CHECK (status IN ('out', 'overdue', 'returned'))
 );
 
+CREATE INDEX borrow_requests_overdue_due_on_idx
+    ON borrow_requests (due_on)
+    WHERE returned_on IS NULL;
+
 CREATE TABLE fine_payments (
     payment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     loan_id UUID NOT NULL REFERENCES borrow_requests(loan_id),
