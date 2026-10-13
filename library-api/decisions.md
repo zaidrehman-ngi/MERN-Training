@@ -39,3 +39,29 @@ The general rule I am taking away is: use a generated key for the database's
 stable internal identity, and keep a natural key as a unique constraint when
 it is available and useful. A real-world value can look like a perfect key
 but still be missing or change over time.
+
+# Exercise 5
+
+## Task 3
+
+- **Branch → members: `RESTRICT`** — Do not remove a branch while it still
+  has members assigned to it.
+- **Member → borrow requests: `RESTRICT`** — Keep a member's loan history and
+  unpaid fine records; close the account without deleting the member row.
+- **Book → copies: `RESTRICT`** — Do not delete a book while its physical
+  copies still need to be tracked.
+- **Copy → borrow requests: `RESTRICT`** — Preserve loan history for a copy,
+  including overdue or unreturned loans.
+- **Book → genre links: `CASCADE`** — If a book is removed, its rows in the
+  junction table have no meaning and can be removed with it.
+
+## Task 5
+
+I will use both approaches depending on the table: members are soft-deleted
+with an `is_active` flag so loan history remains; physical copies are kept
+and marked by inventory status; reference and history records are not
+cascaded away. Junction rows can be hard-deleted when their relationship is
+removed. Active member emails stay unique with a partial unique index, so a
+closed member's email can be reused. Queries for current members must filter
+on `is_active`; soft deletion does not erase personal data, so an actual
+erasure request still needs a separate process.

@@ -18,3 +18,16 @@
 
 I expect an ISBN to be useful as a unique catalogue value, but I am not sure
 it should be the primary key for the library's book record.
+
+# Exercise 5 — What happens when you delete a member
+
+## Task 2: Predictions before testing
+
+- `ON DELETE CASCADE`: I expect deleting the member to delete that member's
+  three loan rows as well.
+- `ON DELETE RESTRICT`: I expect the database to refuse to delete the member
+  while any of the three loan rows refer to them.
+- `ON DELETE SET NULL`: I expect the database to keep the three loan rows but
+  clear their `member_id` values.
+- `ON DELETE NO ACTION`: I expect the database to refuse to delete the member
+  while the loan rows refer to them, much like `RESTRICT`.

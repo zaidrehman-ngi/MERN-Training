@@ -8,11 +8,17 @@ CREATE TABLE branches (
 CREATE TABLE members (
     member_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
-    email TEXT UNIQUE,
+    email TEXT,
     phone TEXT,
     joined_on DATE,
     branch_id UUID NOT NULL REFERENCES branches(branch_id)
+        ON DELETE RESTRICT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
+
+CREATE UNIQUE INDEX members_active_email_unique
+    ON members (email)
+    WHERE is_active = TRUE;
 
 CREATE TABLE books (
     book_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -32,7 +38,8 @@ CREATE TABLE genres (
 
 CREATE TABLE book_copies (
     copy_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    book_id UUID NOT NULL REFERENCES books(book_id),
+    book_id UUID NOT NULL REFERENCES books(book_id)
+        ON DELETE RESTRICT,
     branch_id UUID NOT NULL REFERENCES branches(branch_id),
     copy_number INTEGER NOT NULL CHECK (copy_number > 0),
     acquisition_year INTEGER,
@@ -46,8 +53,10 @@ CREATE TABLE book_copies (
 
 CREATE TABLE borrow_requests (
     loan_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    member_id UUID NOT NULL REFERENCES members(member_id),
-    copy_id UUID NOT NULL REFERENCES book_copies(copy_id),
+    member_id UUID NOT NULL REFERENCES members(member_id)
+        ON DELETE RESTRICT,
+    copy_id UUID NOT NULL REFERENCES book_copies(copy_id)
+        ON DELETE RESTRICT,
     branch_id UUID NOT NULL REFERENCES branches(branch_id),
     borrowed_on DATE NOT NULL DEFAULT CURRENT_DATE,
     due_on DATE NOT NULL,
@@ -69,7 +78,8 @@ CREATE TABLE fine_payments (
 );
 
 CREATE TABLE book_genres (
-    book_id UUID NOT NULL REFERENCES books(book_id),
+    book_id UUID NOT NULL REFERENCES books(book_id)
+        ON DELETE CASCADE,
     genre_id UUID NOT NULL REFERENCES genres(genre_id),
     PRIMARY KEY (book_id, genre_id)
 );

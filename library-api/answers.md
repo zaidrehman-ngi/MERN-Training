@@ -624,3 +624,66 @@ It demonstrates a book with two authors, a book with no author, a member
 with no loans, five copies of Dune across two branches (including one marked
 missing), an overdue loan, and a fine payment. The donated copy from 1998
 also has condition notes. No schema change was needed.
+
+# Exercise 5 — What happens when you delete a member
+
+## Task 1
+
+Deleting a member who has a loan failed with PostgreSQL error `23503`: the
+`borrow_requests_member_id_fkey` constraint rejected the deletion because
+the loan still refers to that member. The member was not deleted.
+
+Deleting a branch that has a member also failed with PostgreSQL error
+`23503`: the `members_branch_id_fkey` constraint rejected the deletion
+because the member still refers to that branch. The branch was not deleted.
+
+## Task 2
+
+I predicted the four delete actions in [`guesses.md`](./guesses.md), then
+tested each on temporary tables with three loans for the member:
+
+- `CASCADE`: the member deletion succeeded and all three loan rows were
+  deleted.
+- `RESTRICT`: PostgreSQL rejected the deletion with error `23001` because
+  loan rows still referenced the member.
+- `SET NULL`: the member deletion succeeded; all three loan rows remained
+  with `member_id` set to `NULL`.
+- `NO ACTION`: PostgreSQL rejected the deletion with error `23503` because
+  loan rows still referenced the member.
+
+`RESTRICT` and `NO ACTION` both block a deletion while references remain.
+The difference is that `NO ACTION` can be deferred until the end of a
+transaction when its foreign-key constraint is declared deferrable;
+`RESTRICT` checks immediately and cannot be deferred.
+
+## Task 4
+
+Without `ON UPDATE CASCADE`, changing a branch primary key from `1` to `2`
+failed with PostgreSQL error `23503` because three members still referenced
+branch `1`. With `ON UPDATE CASCADE` on a separate test relationship, the
+same key change succeeded and all three members' `branch_id` values changed
+to `2`.
+
+This problem is uncommon when primary keys are generated IDs: they are
+internal identifiers and normally never need to change. A natural key, such
+as a branch name or other real-world value, is more likely to change and
+cause this kind of update to be needed.
+
+## Task 5
+
+Members are soft-deleted by setting `is_active` to `FALSE`, which preserves
+their loan history. This means member queries must filter active rows, email
+uniqueness applies only to active members, and personal data remains until a
+separate erasure process removes it. I tested reusing an inactive member's
+email: the new active member was inserted successfully; rerunning the same
+insert was rejected as a duplicate.
+
+## Task 6
+
+Use **pseudonymization**: replace identifying member details with neutral
+values while retaining the member ID and loan records for statistics and
+unpaid-fine tracking. On erasure, clear or replace `name`, `email`, and
+`phone`; retain `member_id` for the foreign-key links and keep
+`is_active = FALSE`. Keep `joined_on` only if it is still needed for
+statistics and cannot identify the person on its own. The branch assignment
+should also be removed or generalized if it could identify the member.
