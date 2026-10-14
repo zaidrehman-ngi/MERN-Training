@@ -718,3 +718,90 @@ The report still returned one row.
 An index is a separate, ordered structure that stores indexed values with
 references to the matching table rows, so PostgreSQL can look up candidates
 without checking every row. The exact timings can vary between runs.
+
+## Task 4
+
+For `WHERE status = 'overdue' ORDER BY due_on`, PostgreSQL used
+`borrow_requests_status_due_on_idx`; the plan estimated cost `0.42..6.19`
+and `rows=1`. When that index was temporarily removed, it used
+`borrow_requests_due_on_status_idx`; the plan estimated cost
+`0.42..4360.45` and `rows=1`. The first index is much cheaper for this query
+because PostgreSQL can first narrow to the requested status, then read those
+rows in due-date order.
+
+**PUT THE COLUMNS YOU FILTER ON FIRST, THEN THE COLUMNS YOU SORT OR RANGE
+OVER.** Column order matters in a composite index: the leading column
+determines which rows the index can narrow down efficiently.
+
+## Task 5
+
+| Measurement | Before three additional indexes | After three additional indexes |
+|---|---:|---:|
+| 50,000-row insert time | 2.509 seconds | 2.401 seconds |
+
+The measured times were very close; this run did not show a slowdown, and
+small timing differences can come from normal system and cache variation.
+The additional indexes were `borrow_requests_member_id_idx`,
+`borrow_requests_copy_id_idx`, and `borrow_requests_branch_id_idx`.
+
+**The database pays the index-maintenance cost on inserts, updates, and
+deletes; on a write-heavy table, extra indexes can slow writes and consume
+storage, so keep only indexes that justify those costs.**
+
+## Task 6
+
+### Indexes kept
+
+`schema.sql` documents the query served by every index, including indexes
+created automatically for primary-key and unique constraints. The capstone
+index set is:
+
+| Table | Indexed columns | Query served |
+|---|---|---|
+| `branches` | Primary key `branch_id` | Fetch a branch by ID. |
+| `members` | Primary key `member_id` | Fetch a member by ID. |
+| `members` | Unique partial index on `email` where `is_active = TRUE` | Find an active member by email and enforce unique active emails while allowing reuse after soft deletion. |
+| `books` | Primary key `book_id` | Fetch a book by ID. |
+| `books` | Unique `isbn` | Find a book by ISBN and prevent duplicate ISBNs. |
+| `authors` | Primary key `author_id` | Fetch an author by ID. |
+| `genres` | Primary key `genre_id` | Fetch a genre by ID. |
+| `book_copies` | Primary key `copy_id` | Fetch a physical copy by ID. |
+| `book_copies` | Unique `(book_id, branch_id, copy_number)` | Find/identify a numbered copy of a book at a branch and prevent duplicate copy numbers there. |
+| `borrow_requests` | Primary key `loan_id` | Fetch a loan by ID. |
+| `borrow_requests` | Partial `due_on` where `returned_on IS NULL` | Find unreturned past-due loans for the overdue report, ordered by due date. |
+| `borrow_requests` | Composite `(status, due_on)` | Find loans of a given status ordered by due date. |
+| `borrow_requests` | `member_id` | List a member's loans and check references when a member is deleted or its key changes. |
+| `borrow_requests` | `copy_id` | Find a copy's loan records and check references when a copy is deleted or its key changes. |
+| `borrow_requests` | `branch_id` | List loans for a branch and check references when a branch is deleted or its key changes. |
+| `fine_payments` | Primary key `payment_id` | Fetch a fine payment by ID. |
+| `fine_payments` | `loan_id` | List payments for a loan and check references when a loan is deleted or its key changes. |
+| `book_genres` | Composite primary key `(book_id, genre_id)` | List a book's genres and prevent duplicate book/genre links. |
+| `book_authors` | Composite primary key `(book_id, author_id)` | List a book's authors and prevent duplicate book/author links. |
+
+### Indexes deliberately left out
+
+I removed `(due_on, status)`: Task 4 showed it was substantially more
+expensive than `(status, due_on)` for the tested status-filtered,
+due-date-ordered query. It also adds index maintenance without serving a
+distinct query in the current workload. I did not add reverse-order indexes
+on `book_authors(author_id, book_id)` or `book_genres(genre_id, book_id)`;
+the current capstone workload lists authors and genres starting from a book,
+which the primary-key indexes already support. Add reverse indexes only if
+searching books by author or genre becomes a measured, important query.
+
+I also left out standalone indexes on low-cardinality fields such as
+`borrow_requests.status` and `book_copies.inventory_status`: no demonstrated
+query benefits enough from those alone to justify their write and storage
+costs. The composite status/due-date index serves the tested status-and-sort
+query instead.
+
+### First table likely to become a bottleneck
+
+`borrow_requests` is the table most likely to cause the first performance
+problem: every borrowing and return adds or updates a row, and loans grow
+continuously while reports and histories repeatedly query them. I would
+first measure the slow query with `EXPLAIN (ANALYZE, BUFFERS)`, then add or
+adjust an index for its actual filter, join, and ordering pattern. If the
+table eventually becomes very large and time-based reports dominate, I would
+evaluate partitioning by `borrowed_on` or `due_on`, but only after measuring
+the operational and query costs.

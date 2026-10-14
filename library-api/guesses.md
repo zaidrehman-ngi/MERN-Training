@@ -31,3 +31,12 @@ it should be the primary key for the library's book record.
   clear their `member_id` values.
 - `ON DELETE NO ACTION`: I expect the database to refuse to delete the member
   while the loan rows refer to them, much like `RESTRICT`.
+
+## Task 4: Prediction before testing
+
+I do not expect `(status, due_on)` and `(due_on, status)` to perform
+identically. For a query that filters to one status and orders by due date, I
+predict `(status, due_on)` will work better: the index can find that status
+first and then read those matching loans in due-date order. With
+`(due_on, status)`, the database may have to scan entries for many due dates
+before it can filter by status.
