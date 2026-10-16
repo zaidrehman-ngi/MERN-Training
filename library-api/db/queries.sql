@@ -155,3 +155,140 @@ WHERE label = 'updated without a filter';
 -- Remove the temporary table and commit the test book/copy CRUD transaction.
 DROP TABLE task4_update_test;
 COMMIT;
+
+-- Exercise 2, Task 1: obvious inner-join stock report; one row per loan.
+SELECT b.title, loan.borrowed_on
+FROM books AS b
+JOIN book_copies AS bc ON bc.book_id = b.book_id
+JOIN borrow_requests AS loan ON loan.copy_id = bc.copy_id;
+
+-- Count rows produced by the inner join.
+SELECT COUNT(*) AS joined_row_count
+FROM books AS b
+JOIN book_copies AS bc ON bc.book_id = b.book_id
+JOIN borrow_requests AS loan ON loan.copy_id = bc.copy_id;
+
+-- Count all catalogue rows for comparison.
+SELECT COUNT(*) AS book_row_count
+FROM books;
+
+-- Exercise 2, Task 2: predict and count rows using INNER JOIN.
+SELECT COUNT(*) AS inner_join_rows
+FROM books AS b
+JOIN book_copies AS bc ON bc.book_id = b.book_id
+JOIN borrow_requests AS loan ON loan.copy_id = bc.copy_id;
+
+-- Exercise 2, Task 2: count rows using LEFT JOIN, retaining every book.
+SELECT COUNT(*) AS left_join_rows
+FROM books AS b
+LEFT JOIN book_copies AS bc ON bc.book_id = b.book_id
+LEFT JOIN borrow_requests AS loan ON loan.copy_id = bc.copy_id;
+
+-- Exercise 2, Task 2: count rows using RIGHT JOIN, retaining every loan.
+SELECT COUNT(*) AS right_join_rows
+FROM books AS b
+JOIN book_copies AS bc ON bc.book_id = b.book_id
+RIGHT JOIN borrow_requests AS loan ON loan.copy_id = bc.copy_id;
+
+-- Corrected stock report: retain every book and show a clear label if it has no loans.
+SELECT
+    b.title,
+    CASE
+        WHEN loan.loan_id IS NULL THEN 'Never borrowed'
+        ELSE loan.borrowed_on::TEXT
+    END AS borrow_date
+FROM books AS b
+LEFT JOIN book_copies AS bc ON bc.book_id = b.book_id
+LEFT JOIN borrow_requests AS loan ON loan.copy_id = bc.copy_id
+ORDER BY b.title, loan.borrowed_on;
+
+-- Exercise 2, Task 3: overdue notices with member, book, branch, and days overdue.
+SELECT
+    m.name AS member_name,
+    m.email AS member_email,
+    bk.title AS book_title,
+    br.name AS branch_name,
+    loan.due_on,
+    CURRENT_DATE - loan.due_on AS days_overdue
+FROM borrow_requests AS loan
+JOIN members AS m ON m.member_id = loan.member_id
+JOIN book_copies AS cp ON cp.copy_id = loan.copy_id
+JOIN books AS bk ON bk.book_id = cp.book_id
+JOIN branches AS br ON br.branch_id = loan.branch_id
+WHERE loan.returned_on IS NULL
+  AND loan.due_on < CURRENT_DATE
+ORDER BY loan.due_on ASC, loan.loan_id;
+
+-- Exercise 2, Task 4: every genre assigned to Dune, through book_genres.
+SELECT g.name AS genre_name
+FROM books AS b
+JOIN book_genres AS bg ON bg.book_id = b.book_id
+JOIN genres AS g ON g.genre_id = bg.genre_id
+WHERE b.title = 'Dune'
+ORDER BY g.name;
+
+-- Exercise 2, Task 4: every book assigned to the Science Fiction genre.
+SELECT b.title
+FROM genres AS g
+JOIN book_genres AS bg ON bg.genre_id = g.genre_id
+JOIN books AS b ON b.book_id = bg.book_id
+WHERE g.name = 'Science Fiction'
+ORDER BY b.title;
+
+-- Deliberately incorrect: one joined genre row cannot have both names at once.
+SELECT b.title
+FROM books AS b
+JOIN book_genres AS bg ON bg.book_id = b.book_id
+JOIN genres AS g ON g.genre_id = bg.genre_id
+WHERE g.name = 'Science Fiction'
+  AND g.name = 'Classics';
+
+-- Books linked to both genres: group the separate genre rows for each book.
+SELECT b.title
+FROM books AS b
+JOIN book_genres AS bg ON bg.book_id = b.book_id
+JOIN genres AS g ON g.genre_id = bg.genre_id
+WHERE g.name IN ('Science Fiction', 'Classics')
+GROUP BY b.book_id, b.title
+HAVING COUNT(DISTINCT g.name) = 2
+ORDER BY b.title;
+
+-- Temporary positive test: Local History exists, unlike Classics.
+-- Add a second genre link to Dune inside a transaction, run the same pattern,
+-- then roll back so the seeded book-genre data is unchanged.
+BEGIN;
+
+INSERT INTO book_genres (book_id, genre_id)
+SELECT b.book_id, g.genre_id
+FROM books AS b
+CROSS JOIN genres AS g
+WHERE b.title = 'Dune'
+  AND g.name = 'Local History'
+ON CONFLICT DO NOTHING;
+
+SELECT b.title
+FROM books AS b
+JOIN book_genres AS bg ON bg.book_id = b.book_id
+JOIN genres AS g ON g.genre_id = bg.genre_id
+WHERE g.name IN ('Science Fiction', 'Local History')
+GROUP BY b.book_id, b.title
+HAVING COUNT(DISTINCT g.name) = 2
+ORDER BY b.title;
+
+ROLLBACK;
+
+-- Exercise 2, Task 5: distinct pairs of books with in-collection copies at the same branch.
+SELECT DISTINCT
+    br.name AS branch_name,
+    b1.title AS first_book,
+    b2.title AS second_book
+FROM book_copies AS cp1
+JOIN book_copies AS cp2
+  ON cp2.branch_id = cp1.branch_id
+ AND cp2.book_id > cp1.book_id
+JOIN books AS b1 ON b1.book_id = cp1.book_id
+JOIN books AS b2 ON b2.book_id = cp2.book_id
+JOIN branches AS br ON br.branch_id = cp1.branch_id
+WHERE cp1.inventory_status = 'in_collection'
+  AND cp2.inventory_status = 'in_collection'
+ORDER BY br.name, b1.title, b2.title;

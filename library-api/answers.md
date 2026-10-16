@@ -172,3 +172,168 @@ in Node. With a database-backed API, the frontend can send the filter,
 search, sort, and page settings and render just the page returned by this
 query. It won't need to load and keep the full catalogue in memory just to
 show one page.
+
+# Exercise 2 — The join that lost half the rows
+
+## Task 1: The obvious join
+
+I joined books to copies and then to loans, selecting each book title with
+its loan date. In my current database, that inner join returned **400,002
+rows**, while `books` contains **4 rows**.
+
+Those counts differ for two separate reasons:
+
+- A book can have many loans, so it appears once for each matching loan.
+  That is why the join result has many more rows than the books table.
+- An inner join drops books that have no matching loan. “Untitled donation,
+  box 14” has no loan rows, so it is absent from the joined result even
+  though it is present in `books`.
+
+The synthetic loans are heavily concentrated on the seeded copies: Dune
+has 266,668 joined loan rows, “Constraint Test Book” has 66,667, and
+“Stories from Karachi” has 66,667. “Untitled donation, box 14” has none.
+The exercise describes around sixty missing titles, but this local database
+has only four books, so these are the counts I actually observed.
+
+## Task 2: INNER, LEFT, and RIGHT JOIN
+
+Before running the queries, I guessed **400,002** rows for the INNER JOIN,
+**400,003** for the LEFT JOIN, and **400,002** for the RIGHT JOIN. The
+actual counts were:
+
+| Join | Predicted | Actual |
+|---|---:|---:|
+| INNER JOIN (matching book-copy-loan rows) | 400,002 | 400,002 |
+| LEFT JOIN (keep every book) | 400,003 | 400,004 |
+| RIGHT JOIN (keep every loan) | 400,002 | 400,002 |
+
+The INNER JOIN has one row per matching loan; books/copies without a loan
+are left out. The LEFT JOIN keeps every book, but it also produces a
+NULL-extended row for each copy with no loan. In this data there is one
+such Dune copy, plus one row for “Untitled donation, box 14”, which has no
+copies at all. That makes two extra rows, so the LEFT JOIN result is
+400,004. The RIGHT JOIN keeps all loans; each loan has a matching copy and
+book, so its count remains 400,002.
+
+The corrected stock report starts from `books` and uses LEFT JOINs through
+copies to loans. For a row with no matching loan, the loan ID and
+`borrowed_on` are `NULL`. I would show a friendly label such as “Never
+borrowed” instead of leaving the date cell blank. The query in
+`db/queries.sql` does this with `CASE`.
+
+## Task 3: The overdue notice
+
+I joined `borrow_requests` to members, copies, books, and branches to get
+the details for each overdue notice. I filtered for loans that have not
+been returned and whose due date has passed. The query returned one row:
+Aisha Khan, “Stories from Karachi,” Clifton Branch, due August 15, 2026,
+62 days overdue (using the database date when I ran it).
+
+I aliased every table in the final query: `loan`, `m`, `cp`, `bk`, and
+`br`. The aliases make it easier to see which table each selected column
+and join condition belongs to.
+
+## Task 4: Many-to-many genres
+
+Both lookups go through `book_genres`: to list a book's genres, I join
+from `books` through the junction table to `genres`; to list books in a
+genre, I start at `genres` and join through `book_genres` to `books`.
+The first query returned Science Fiction for Dune, and the second returned
+Dune for Science Fiction.
+
+My first attempt to find books in both Science Fiction and Classics put
+`g.name = 'Science Fiction' AND g.name = 'Classics'` on the same joined
+genre row. That can never be true: one row's `g.name` cannot equal both
+strings. This resembles the NULL mistake in that the condition is being
+applied at the wrong level: the two requirements need to be satisfied by
+separate related rows for the same book, rather than by one row.
+
+The corrected query filters for either genre, groups those genre rows by
+book, and keeps groups with two distinct matching genre names. There is no
+`Classics` row in my `genres` table, so the requested Science Fiction +
+Classics query correctly returns nothing with the current data.
+
+To check that the query pattern can return a match, I used the existing
+Local History genre instead. I temporarily linked Dune to both Science
+Fiction and Local History inside a transaction; the query returned Dune
+with two matching genres. I rolled the transaction back and verified that
+the temporary link was gone, so the database is unchanged. The positive
+test and rollback are included in `db/queries.sql`.
+
+## Task 5: A table joined to itself
+
+In this schema, a book's branch is determined by its physical copies, so I
+self-joined `book_copies` to find pairs of different books with
+in-collection copies at the same branch. The query returned Dune and
+“Stories from Karachi” at Clifton Branch. I used an ID comparison between
+the two copy rows so each pair appears only once, and excluded copies marked
+missing or withdrawn.
+
+I would use a self-join when I need to compare rows in the same table—for
+example, to find two books sharing a branch or two members who joined in
+the same month.
+
+## Task 6: The four joins
+
+My notation: `A` is the table on the left, `B` is the table on the right.
+`[x]` means the row is kept, `[ ]` means it is dropped, and `NULL` means
+the row is kept but the other side's columns come back empty.
+
+**INNER JOIN**: only rows that match on both sides.
+
+```
+A only    match    B only
+ [ ]       [x]       [ ]
+```
+
+Question: "Which loans are overdue, and who has them?" An overdue notice
+only makes sense for a loan that has a member and a book, so the overdue
+notice query from Task 3 joins `borrow_requests`, `members`, `book_copies`,
+`books` and `branches` with inner joins.
+
+**LEFT JOIN**: every row from A, plus B where there is a match.
+
+```
+A only    match    B only
+ [x]       [x]       [ ]
+ B = NULL
+```
+
+Question: "List every book with how many times it has been borrowed,
+including books nobody has borrowed." This is the fixed stock report from
+Task 2: `books LEFT JOIN book_copies LEFT JOIN borrow_requests`. Never-
+borrowed books still show up, with `NULL` in the loan columns.
+
+**RIGHT JOIN**: every row from B, plus A where there is a match.
+
+```
+A only    match    B only
+ [ ]       [x]       [x]
+                   A = NULL
+```
+
+Question: "Show every genre with its books, including genres that have no
+books yet." Written as `books ... RIGHT JOIN genres`. It is the same as a
+LEFT JOIN with the tables swapped, so in practice I would write
+`genres LEFT JOIN book_genres LEFT JOIN books` instead, because it reads
+in the order I think about it.
+
+**FULL OUTER JOIN**: every row from both sides, matched where possible.
+
+```
+A only    match    B only
+ [x]       [x]       [x]
+ B = NULL          A = NULL
+```
+
+Question: "Which titles are at Clifton, which are at another branch, and
+which are at both?" I would get the titles for each branch and full outer
+join them on `book_id`. If one side is `NULL`, that branch doesn't have
+the title.
+
+**Rule: when you want "all the X, with their Y if they have one", use a
+LEFT JOIN and put X on the left: `FROM X LEFT JOIN Y`.**
+
+One thing to watch: a condition on Y has to go in the `ON` clause. If I put
+it in `WHERE`, the rows where Y is `NULL` fail the condition and get
+dropped, so the LEFT JOIN quietly behaves like an INNER JOIN again.
