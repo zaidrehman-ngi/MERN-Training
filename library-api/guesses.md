@@ -31,3 +31,18 @@ loans, and only one unmatched book/copy row. After running the queries, the
 actual counts were **400,002 INNER**, **400,004 LEFT**, and **400,002
 RIGHT**. My LEFT JOIN estimate was short by one because I overlooked that
 Dune has a copy with no loan as well as the book with no copies.
+
+# Exercise 3 — Count, group, having
+
+## Task 3: WHERE or HAVING
+
+I think this needs `HAVING`. The total outstanding fines for a branch is a
+`SUM`, and that total only exists after the rows have been grouped by
+branch. `WHERE` looks at one row at a time before grouping, so it can't
+check a total.
+
+If I use `WHERE SUM(...) > 10000` instead, I expect Postgres to give an
+error saying aggregate functions are not allowed in `WHERE`.
+
+After running it, both guesses were right: `HAVING` worked, and the `WHERE`
+version failed with "aggregate functions are not allowed in WHERE".

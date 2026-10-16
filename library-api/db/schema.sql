@@ -121,6 +121,11 @@ CREATE TABLE book_genres (
     PRIMARY KEY (book_id, genre_id)
 );
 
+-- Serves "every book in this genre": the primary key starts with book_id,
+-- so it cannot be used to look up by genre_id.
+CREATE INDEX book_genres_genre_id_idx
+    ON book_genres (genre_id);
+
 CREATE TABLE book_authors (
     book_id UUID NOT NULL REFERENCES books(book_id),
     author_id UUID NOT NULL REFERENCES authors(author_id),

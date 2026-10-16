@@ -313,10 +313,7 @@ A only    match    B only
 ```
 
 Question: "Show every genre with its books, including genres that have no
-books yet." Written as `books ... RIGHT JOIN genres`. It is the same as a
-LEFT JOIN with the tables swapped, so in practice I would write
-`genres LEFT JOIN book_genres LEFT JOIN books` instead, because it reads
-in the order I think about it.
+books yet." Written as `books ... RIGHT JOIN genres`.
 
 **FULL OUTER JOIN**: every row from both sides, matched where possible.
 
@@ -334,6 +331,136 @@ the title.
 **Rule: when you want "all the X, with their Y if they have one", use a
 LEFT JOIN and put X on the left: `FROM X LEFT JOIN Y`.**
 
-One thing to watch: a condition on Y has to go in the `ON` clause. If I put
-it in `WHERE`, the rows where Y is `NULL` fail the condition and get
-dropped, so the LEFT JOIN quietly behaves like an INNER JOIN again.
+
+# Exercise 3 — Count, group, having
+
+## Task 1: Five aggregates
+
+| Question | Result |
+|---|---|
+| Total books | 4 |
+| Total fines outstanding | 75.00 |
+| Average loan length | 10 days |
+| Oldest year | 1998 |
+| Busiest single day | 2026-08-01 (401 loans) |
+
+Fines outstanding is the total of `fine_assessed` on loans minus the total
+of `fine_payments`. Only one loan has a fine (100.00) and 25.00 of it has
+been paid, so 75.00 is still owed.
+
+The average loan length only counts returned loans, because a loan that is
+still out has no `returned_on` yet.
+
+The schema doesn't have a publication year, so like in Exercise 1 I used
+`acquisition_year` on `book_copies`. 1998 is the oldest copy acquired, not
+the oldest book published.
+
+## Task 2: Grouping
+
+**Fines per branch:** Clifton Branch is the only one with fines: 100.00
+assessed, 25.00 paid, 75.00 still owed. The other branches show 0.
+
+**Loans per member:** Aisha Khan has 80,001 loans, four other members have
+80,000 each, and "Delete Test Member" has 1.
+
+**Books per genre:** Local History has 1 book and Science Fiction has 1.
+
+**Loans per month:** 35 months, from December 2023 to September 2026,
+mostly around 12,000 loans a month.
+
+**The ungrouped column:** I added `loan.borrowed_on` to a query grouped
+only by branch name. Postgres refused to run it:
+
+```
+ERROR: column "loan.borrowed_on" must appear in the GROUP BY clause
+or be used in an aggregate function
+```
+
+That makes sense: one branch has thousands of loans with different dates,
+so there isn't one `borrowed_on` to show for the group. Postgres won't guess.
+
+MySQL is different. With `ONLY_FULL_GROUP_BY` turned off (the old default,
+and still common in older setups) it runs the query and just picks a value
+from somewhere in the group. You don't know which row it came from, so I
+wouldn't trust that result. Postgres's error is the safer behaviour: if it
+runs, the value is actually correct for the group.
+
+**Rule: every column in the SELECT has to be either in the GROUP BY or
+inside an aggregate like COUNT, SUM or MAX.**
+
+## Task 3: WHERE or HAVING
+
+My guess (in `guesses.md`) was `HAVING`, and that the `WHERE` version would
+give an error about aggregates. Both were right.
+
+I ran the wrong one first, with `WHERE SUM(...) > 10000`. Postgres stopped
+straight away:
+
+```
+ERROR: aggregate functions are not allowed in WHERE
+```
+
+Then I moved the same condition into `HAVING` after the `GROUP BY`. It ran
+fine but returned no rows, because the only branch with fines is Clifton and
+it owes 75.00, nowhere near 10,000.
+
+**WHERE filters individual rows before they are grouped, and HAVING filters
+the groups after GROUP BY has worked out the totals.**
+
+## Task 4: Members with more than three overdue books
+
+This query uses everything from this exercise. It joins members to their
+loans (and to payments), filters with `WHERE` to loans that are not returned
+and past their due date, groups by member, counts the overdue books and sums
+what's owed, keeps only members with more than three using `HAVING`, and
+sorts the worst first.
+
+For "total they owe" I used the same idea as Tasks 1 and 3: the fine on each
+overdue loan minus anything already paid towards it. "Worst first" sorts by
+the number of overdue books, then by the amount owed.
+
+With `> 3` the query returned no rows. My data only has one overdue loan
+(Aisha Khan's copy of "Stories from Karachi"), so nobody has more than three.
+
+## Task 5: Trigger for available copies
+
+The `books` table didn't have an available-copy count, so I added an
+`available_copies` column and filled it with the number of in-collection
+copies that aren't out on a loan. Then I wrote a trigger on
+`borrow_requests`: when a loan is inserted the book's count goes down by
+one, and when `returned_on` is set the count goes back up by one.
+
+I tested it in DBeaver with no application code running:
+
+| Step | Dune `available_copies` |
+|---|---:|
+| Before the loan | 3 |
+| After inserting a loan for a Dune copy | 2 |
+| After setting `returned_on` on that loan | 3 |
+
+The count changed on its own both times, just from the SQL I ran in
+DBeaver.
+
+## Task 6: Checking today's queries against the indexes
+
+The three queries from today that the app would run all the time:
+
+| Query | What it filters / joins on | Index from Tuesday |
+|---|---|---|
+| Overdue notice (Ex 2, Task 3) | `returned_on IS NULL` and `due_on < today` on `borrow_requests` | `borrow_requests_overdue_due_on_idx` (partial index on `due_on` where not returned) |
+| Every genre this book belongs to (Ex 2, Task 4) | `book_genres.book_id` | Primary key `(book_id, genre_id)` |
+| Every book in this genre (Ex 2, Task 4) | `book_genres.genre_id` | **None** |
+
+The first two are covered. The third one isn't. The primary key on
+`book_genres` is `(book_id, genre_id)`, and because `book_id` comes first,
+it only helps when you look up by book. Looking up by `genre_id` alone
+can't use it, so Postgres would have to read the whole junction table. I
+added `book_genres_genre_id_idx` on `book_genres (genre_id)` to the
+database and to `schema.sql`.
+
+What I missed: on Tuesday I looked at the composite primary key and
+thought the junction table was already indexed. I was designing from the
+schema, so I only saw that the table had an index, not which direction it
+works in. Once I wrote the real query going from a genre to its books, it
+was obvious the index only covers one direction. It's the same column-order
+rule from the composite index task, and I still missed it on my own table.

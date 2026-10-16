@@ -292,3 +292,197 @@ JOIN branches AS br ON br.branch_id = cp1.branch_id
 WHERE cp1.inventory_status = 'in_collection'
   AND cp2.inventory_status = 'in_collection'
 ORDER BY br.name, b1.title, b2.title;
+
+
+-- Exercise 3, Task 1: how many books are in the catalogue?
+SELECT COUNT(*) AS total_books
+FROM books;
+
+-- Exercise 3, Task 1: how much in fines is still owed?
+-- (fines assessed on loans minus what has been paid)
+SELECT
+    (SELECT COALESCE(SUM(fine_assessed), 0) FROM borrow_requests)
+  - (SELECT COALESCE(SUM(amount), 0) FROM fine_payments) AS fines_outstanding;
+
+-- Exercise 3, Task 1: average loan length in days (returned loans only).
+SELECT ROUND(AVG(returned_on - borrowed_on), 2) AS avg_loan_days
+FROM borrow_requests
+WHERE returned_on IS NOT NULL;
+
+-- Exercise 3, Task 1: oldest year in the catalogue.
+-- There is no publication year in the schema, so this uses acquisition_year.
+SELECT MIN(acquisition_year) AS oldest_year
+FROM book_copies;
+
+-- Exercise 3, Task 1: the busiest single day (most loans borrowed).
+SELECT borrowed_on, COUNT(*) AS loans
+FROM borrow_requests
+GROUP BY borrowed_on
+ORDER BY loans DESC
+LIMIT 1;
+
+-- Exercise 3, Task 2: fines per branch (assessed, paid, and still owed).
+-- Payments are summed per loan first so a loan with two payments isn't counted twice.
+SELECT
+    br.name AS branch_name,
+    COALESCE(SUM(loan.fine_assessed), 0) AS fines_assessed,
+    COALESCE(SUM(paid.total_paid), 0) AS fines_paid,
+    COALESCE(SUM(loan.fine_assessed), 0) - COALESCE(SUM(paid.total_paid), 0) AS fines_owed
+FROM branches AS br
+LEFT JOIN borrow_requests AS loan ON loan.branch_id = br.branch_id
+LEFT JOIN (
+    SELECT loan_id, SUM(amount) AS total_paid
+    FROM fine_payments
+    GROUP BY loan_id
+) AS paid ON paid.loan_id = loan.loan_id
+GROUP BY br.branch_id, br.name
+ORDER BY fines_owed DESC, br.name;
+
+-- Exercise 3, Task 2: loans per member (members with no loans show 0).
+SELECT m.name AS member_name, COUNT(loan.loan_id) AS loans
+FROM members AS m
+LEFT JOIN borrow_requests AS loan ON loan.member_id = m.member_id
+GROUP BY m.member_id, m.name
+ORDER BY loans DESC, m.name;
+
+-- Exercise 3, Task 2: books per genre (genres with no books show 0).
+SELECT g.name AS genre_name, COUNT(bg.book_id) AS books
+FROM genres AS g
+LEFT JOIN book_genres AS bg ON bg.genre_id = g.genre_id
+GROUP BY g.genre_id, g.name
+ORDER BY books DESC, g.name;
+
+-- Exercise 3, Task 2: loans per month.
+SELECT DATE_TRUNC('month', borrowed_on)::date AS loan_month, COUNT(*) AS loans
+FROM borrow_requests
+GROUP BY loan_month
+ORDER BY loan_month;
+
+-- Exercise 3, Task 2: deliberately wrong - borrowed_on is neither grouped nor aggregated.
+-- Postgres refuses this with an error.
+SELECT br.name AS branch_name, loan.borrowed_on, COUNT(*) AS loans
+FROM borrow_requests AS loan
+JOIN branches AS br ON br.branch_id = loan.branch_id
+GROUP BY br.name;
+
+-- Exercise 3, Task 3: deliberately wrong - an aggregate in WHERE.
+-- Postgres: "aggregate functions are not allowed in WHERE".
+SELECT
+    br.name AS branch_name,
+    SUM(loan.fine_assessed - COALESCE(paid.total_paid, 0)) AS fines_owed
+FROM branches AS br
+JOIN borrow_requests AS loan ON loan.branch_id = br.branch_id
+LEFT JOIN (
+    SELECT loan_id, SUM(amount) AS total_paid
+    FROM fine_payments
+    GROUP BY loan_id
+) AS paid ON paid.loan_id = loan.loan_id
+WHERE SUM(loan.fine_assessed - COALESCE(paid.total_paid, 0)) > 10000
+GROUP BY br.branch_id, br.name;
+
+-- Exercise 3, Task 3: which branches owe more than 10,000 rupees in outstanding fines?
+SELECT
+    br.name AS branch_name,
+    SUM(loan.fine_assessed - COALESCE(paid.total_paid, 0)) AS fines_owed
+FROM branches AS br
+JOIN borrow_requests AS loan ON loan.branch_id = br.branch_id
+LEFT JOIN (
+    SELECT loan_id, SUM(amount) AS total_paid
+    FROM fine_payments
+    GROUP BY loan_id
+) AS paid ON paid.loan_id = loan.loan_id
+GROUP BY br.branch_id, br.name
+HAVING SUM(loan.fine_assessed - COALESCE(paid.total_paid, 0)) > 10000;
+
+-- Exercise 3, Task 4: members with more than three overdue books,
+-- with the count and what they owe on them, worst first.
+SELECT
+    m.name AS member_name,
+    COUNT(*) AS overdue_books,
+    SUM(loan.fine_assessed - COALESCE(paid.total_paid, 0)) AS total_owed
+FROM members AS m
+JOIN borrow_requests AS loan ON loan.member_id = m.member_id
+LEFT JOIN (
+    SELECT loan_id, SUM(amount) AS total_paid
+    FROM fine_payments
+    GROUP BY loan_id
+) AS paid ON paid.loan_id = loan.loan_id
+WHERE loan.returned_on IS NULL
+  AND loan.due_on < CURRENT_DATE
+GROUP BY m.member_id, m.name
+HAVING COUNT(*) > 3
+ORDER BY overdue_books DESC, total_owed DESC;
+
+-- Exercise 3, Task 5: add an available-copy count to books and fill it from
+-- the current data (in-collection copies that are not out on a loan).
+ALTER TABLE books
+    ADD COLUMN available_copies INTEGER NOT NULL DEFAULT 0;
+
+UPDATE books AS b
+SET available_copies = (
+    SELECT COUNT(*)
+    FROM book_copies AS bc
+    WHERE bc.book_id = b.book_id
+      AND bc.inventory_status = 'in_collection'
+      AND NOT EXISTS (
+          SELECT 1
+          FROM borrow_requests AS loan
+          WHERE loan.copy_id = bc.copy_id
+            AND loan.returned_on IS NULL
+      )
+);
+
+-- Exercise 3, Task 5: trigger that keeps available_copies correct when a loan
+-- is created (count goes down) or returned (count goes up).
+CREATE OR REPLACE FUNCTION update_available_copies()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' AND NEW.returned_on IS NULL THEN
+        UPDATE books
+        SET available_copies = available_copies - 1
+        WHERE book_id = (SELECT book_id FROM book_copies WHERE copy_id = NEW.copy_id);
+    ELSIF TG_OP = 'UPDATE' AND OLD.returned_on IS NULL AND NEW.returned_on IS NOT NULL THEN
+        UPDATE books
+        SET available_copies = available_copies + 1
+        WHERE book_id = (SELECT book_id FROM book_copies WHERE copy_id = NEW.copy_id);
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER borrow_requests_available_copies
+AFTER INSERT OR UPDATE OF returned_on ON borrow_requests
+FOR EACH ROW
+EXECUTE FUNCTION update_available_copies();
+
+-- Exercise 3, Task 5: test in DBeaver with no application code running.
+-- 1. Check Dune's count before the loan.
+SELECT title, available_copies
+FROM books
+WHERE title = 'Dune';
+
+-- 2. Insert a loan directly for one of Dune's copies.
+INSERT INTO borrow_requests (member_id, copy_id, branch_id, due_on)
+SELECT m.member_id, bc.copy_id, bc.branch_id, CURRENT_DATE + 14
+FROM members AS m
+CROSS JOIN book_copies AS bc
+WHERE m.name = 'Omar Sethi'
+  AND bc.copy_id = 'f1000000-0000-4000-8000-000000000002';
+
+-- 3. Check the count again (it should have gone down by one).
+SELECT title, available_copies
+FROM books
+WHERE title = 'Dune';
+
+-- 4. Return the loan.
+UPDATE borrow_requests
+SET returned_on = CURRENT_DATE,
+    status = 'returned'
+WHERE copy_id = 'f1000000-0000-4000-8000-000000000002'
+  AND returned_on IS NULL;
+
+-- 5. Check the count again (it should be back up).
+SELECT title, available_copies
+FROM books
+WHERE title = 'Dune';
