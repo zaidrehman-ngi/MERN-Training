@@ -1,7 +1,27 @@
 import { ApiError } from "../errors/ApiError.js";
 
-// Load the member and the book together with the request, in the same call.
-const include = { members: true, books: true };
+// Only fetch the columns we actually send back.
+const requestColumns = {
+  api_id: true,
+  status: true,
+  requested_on: true,
+  due_on: true,
+  fine_per_day: true,
+};
+
+// The list only needs the member's name and the book's title.
+const listSelect = {
+  ...requestColumns,
+  members: { select: { api_id: true, name: true } },
+  books: { select: { api_id: true, title: true } },
+};
+
+// One borrow request gets a bit more about its member and book.
+const detailSelect = {
+  ...requestColumns,
+  members: { select: { api_id: true, name: true, email: true } },
+  books: { select: { api_id: true, title: true, author: true } },
+};
 
 const toDate = (date) => (date ? date.toISOString().slice(0, 10) : null);
 
@@ -26,6 +46,19 @@ const toBorrowRequest = (row) => ({
   },
 });
 
+// For the list: just the name and title, nothing else per row.
+const toListItem = (row) => ({
+  id: row.api_id,
+  bookId: row.books.api_id,
+  userId: row.members.api_id,
+  status: row.status,
+  requestedAt: toDate(row.requested_on),
+  dueDate: toDate(row.due_on),
+  finePerDay: row.fine_per_day,
+  memberName: row.members.name,
+  bookTitle: row.books.title,
+});
+
 const notFoundField = (field) =>
   new ApiError("A related record does not exist.", 422, {
     code: "VALIDATION_ERROR",
@@ -47,6 +80,7 @@ const toRow = async (prisma, request) => {
   if (request.userId !== undefined) {
     const member = await prisma.members.findFirst({
       where: { api_id: request.userId, is_active: true },
+      select: { member_id: true },
     });
     if (!member) {
       throw notFoundField("userId");
@@ -57,6 +91,7 @@ const toRow = async (prisma, request) => {
   if (request.bookId !== undefined) {
     const book = await prisma.books.findFirst({
       where: { api_id: request.bookId, is_active: true },
+      select: { book_id: true },
     });
     if (!book) {
       throw notFoundField("bookId");
@@ -85,16 +120,16 @@ const createBorrowRequestsRepository = (prisma) => ({
 
     const rows = await prisma.book_requests.findMany({
       where,
-      include,
+      select: listSelect,
       orderBy: { api_id: "asc" },
     });
-    return rows.map(toBorrowRequest);
+    return rows.map(toListItem);
   },
 
   async findById(id) {
     const row = await prisma.book_requests.findUnique({
       where: { api_id: id },
-      include,
+      select: detailSelect,
     });
     return row ? toBorrowRequest(row) : null;
   },
@@ -102,7 +137,7 @@ const createBorrowRequestsRepository = (prisma) => ({
   async create(requestData) {
     const row = await prisma.book_requests.create({
       data: await toRow(prisma, requestData),
-      include,
+      select: detailSelect,
     });
     return toBorrowRequest(row);
   },
@@ -110,6 +145,7 @@ const createBorrowRequestsRepository = (prisma) => ({
   async updateById(id, changes) {
     const existing = await prisma.book_requests.findUnique({
       where: { api_id: id },
+      select: { request_id: true },
     });
     if (!existing) {
       return null;
@@ -118,7 +154,7 @@ const createBorrowRequestsRepository = (prisma) => ({
     const row = await prisma.book_requests.update({
       where: { request_id: existing.request_id },
       data: await toRow(prisma, changes),
-      include,
+      select: detailSelect,
     });
     return toBorrowRequest(row);
   },

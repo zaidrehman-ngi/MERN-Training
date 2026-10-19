@@ -3,9 +3,9 @@ import { unauthorized } from "../errors/ApiError.js";
 
 const createAuthService = (usersRepository) => ({
   async authenticate(email, password) {
-    const user = await usersRepository.findByEmail(email);
+    const user = await usersRepository.findCredentialsByEmail(email);
     const passwordMatches =
-      user && (await verifyPassword(password, user.password));
+      user && (await verifyPassword(password, user.passwordHash));
 
     if (!passwordMatches) {
       throw unauthorized(

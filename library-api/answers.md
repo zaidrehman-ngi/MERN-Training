@@ -1017,3 +1017,240 @@ same results every time (43 of 48, same status codes as the JSON server).
 I also ran it against `karachi_library_empty`, built only from the
 migrations and the seed, and got the same results, so a colleague starting
 from nothing gets the same as me.
+
+# Exercise 6 — One hundred and one queries
+
+## Task 1: Query logging
+
+I already had Prisma's query log from Exercise 5, but it only came on with
+`LOG_LEVEL=debug`, which turns on all the other debug logs too. I gave it
+its own setting, `DB_QUERY_LOG=true` in `.env`, which goes through the
+config module like everything else. In `src/db/prisma.js` Prisma sends each
+query as an event and I print it with how long it took and its parameters:
+
+```
+[query] 7ms SELECT "public"."members"."member_id", ... FROM "public"."members" WHERE "public"."members"."member_id" IN ($1,$2,...) OFFSET $41 ["..."]
+```
+
+Loading `GET /borrow-requests` right now prints 3 queries: the requests,
+then their members, then their books.
+
+## Task 2: Building the N+1 bug
+
+I wrote `db/n-plus-one-demo.js`. There were only 43 borrow requests, so it
+first adds test ones until there are 100 (`npm run db:seed` removes them
+again). Then it does it the wrong way on purpose: one `findMany` for 100
+borrow requests, then a loop that does `findUnique` on `members` for each
+one to get the name.
+
+With `DB_QUERY_LOG=true` I counted the log: **101 queries**. 1 for the list,
+then 100 that all look the same:
+
+```
+[query] 2ms SELECT ... FROM "public"."book_requests" ... LIMIT $1 OFFSET $2
+[query] 1ms SELECT ... FROM "public"."members" WHERE "member_id" = $1 ...
+[query] 1ms SELECT ... FROM "public"."members" WHERE "member_id" = $1 ...
+... 98 more of the same ...
+```
+
+That pattern is the **N+1 query problem**: 1 query to get the list, then 1
+more for every row (N). It scales badly because the number of queries grows
+with the number of rows, and every query is a full round trip to the
+database: Node sends it, waits, gets the answer, and only then sends the
+next one, since the loop waits on each `await`.
+
+On my machine it took 115 ms because the database is on localhost and each
+round trip is about 1 ms. On a real server where each round trip is more
+like 40 ms, 101 queries is about 4 seconds, which is the page from the
+story: the server and database are idle, they're just waiting on each
+other one query at a time.
+
+At **a thousand rows** it's 1,001 queries. Even locally that's about a
+second, and at 40 ms a round trip it's around 40 seconds for one page,
+when the same data could come back in 1 or 2 queries.
+
+## Task 3: Fixing it with include
+
+I fixed it with Prisma's way of loading relations, `include`:
+
+```js
+const requests = await prisma.book_requests.findMany({
+  take: 100,
+  include: { members: true },
+});
+```
+
+Then `request.members.name` is already there, no loop of queries. Counting
+the log again:
+
+| Version | Queries | Time (localhost) |
+|---|---:|---:|
+| Loop with `findUnique` per row | 101 | 186 ms |
+| `include: { members: true }` | 2 | 14 ms |
+
+The SQL it generated (shortened):
+
+```sql
+SELECT "book_requests"."request_id", ... FROM "book_requests"
+ORDER BY "request_id" LIMIT $1 OFFSET $2;
+
+SELECT "members"."member_id", "members"."name", "members"."email",
+       "members"."password_hash", ... FROM "members"
+WHERE "members"."member_id" IN ($1, $2, ..., $100) OFFSET $101;
+```
+
+Compared to the join I wrote by hand in Exercise 2 (the overdue notice):
+
+- Mine was **one query** with `JOIN members AS m ON m.member_id =
+  loan.member_id`, and Postgres matched the rows. Prisma made **two
+  queries** with no JOIN: it gets the requests, collects their
+  `member_id`s, asks for those members with `IN (...)`, and matches them up
+  in JavaScript.
+- I only selected the columns I needed (name, email, title...). Prisma
+  selects every column of both tables, including `password_hash`, even
+  though I only use the name.
+- It sent all 100 `member_id`s in the `IN` list even though a lot of them
+  are the same member.
+
+**Why two and not one:** Prisma does this on purpose (its default
+"query" strategy). A JOIN repeats the parent's columns on every row it
+matches. That's fine for one member per request, but for a one-to-many like
+"members with their loans" it gets big fast: a member with 80,000 loans
+would have their name and email sent 80,000 times, and two to-many includes
+in one JOIN multiply each other. Separate queries send every row only once,
+and the number of queries depends on how many relations you include, not
+how many rows there are, so it's still 2 queries at a thousand rows.
+Prisma can do it as one query (`relationLoadStrategy: "join"` with the
+`relationJoins` preview feature), but that's not the default.
+
+## Task 4: One query with two joins vs three queries
+
+My guess (in `guesses.md`) was that the single query with two joins would
+be faster, because it's one round trip instead of three, but that both
+would only take a few milliseconds.
+
+I built both in `db/join-vs-three-queries.js` for the 10 most recent borrow
+requests with their member and book. The join version uses
+`prisma.$queryRaw` with `JOIN members` and `JOIN books`. The other one does
+three `findMany`s (the 10 requests, then their members, then their books)
+and matches them up in JavaScript with a `Map`. I checked both return the
+same 10 rows, then ran each 500 times after a warm-up. I ran the whole
+thing three times:
+
+| Run | One query, two joins (median) | Three queries + JS (median) |
+|---|---:|---:|
+| 1 | 0.95 ms | 1.85 ms |
+| 2 | 0.91 ms | 1.67 ms |
+| 3 | 0.82 ms | 1.56 ms |
+
+So the join was about 2 times faster on my data. Most of the difference is
+just the two extra round trips, since my database is on the same machine.
+
+**What would change it:**
+
+- **A slower network** makes the join win by more. Every extra query costs
+  a full round trip, so at 40 ms each the three queries would take about
+  120 ms and the join about 40 ms.
+- **One-to-many relations** can make the separate queries win. If it was
+  "10 members with all their loans", the join would repeat each member's
+  columns on every loan row (one of my members has 80,000 loans), while
+  separate queries send each row once. That's the reason Prisma uses
+  separate queries by default.
+- **Missing indexes on the join columns.** My joins are on primary keys.
+  Joining on a column without an index could make Postgres scan a whole
+  table, and then the small `IN (...)` queries on primary keys could be
+  faster.
+- **Running the two lookups at the same time.** The members and books
+  queries don't depend on each other, so with `Promise.all` it's really
+  two round trips, not three, which gets closer to the join.
+- **Caching.** If the members and books were already cached in the app,
+  the separate version would only need the first query.
+
+## Task 5: Fetch only what you need
+
+My books don't have a long description column, but the borrow requests list
+had the same problem. Every row in `GET /borrow-requests` came with full
+`member` and `book` objects, and behind that Prisma's `include` was doing
+`SELECT` of every column of the request, the member and the book. The
+frontend's borrow requests page only shows the id, book id, user id, dates,
+fine and status.
+
+I changed the repository to use `select` with only the columns it sends
+back. The list now gets just the member's name and the book's title
+(`memberName`, `bookTitle`), and `GET /borrow-requests/:id` still returns
+the `member` and `book` objects from Task 3 of Exercise 5.
+
+For 100 borrow requests:
+
+| | Before | After |
+|---|---:|---:|
+| HTTP response size | 27,999 bytes | 19,605 bytes |
+| Data Prisma pulled from the database | 85,842 bytes | 23,356 bytes |
+| Password hashes pulled into memory | yes | no |
+
+The response got about 30% smaller, and what came out of the database
+dropped by almost three quarters, because it was fetching things like every
+member's `password_hash` and every book's ISBN, cover and counts just to
+show a name and a title.
+
+**The security version:** my member endpoints were not sending the password
+hash, but only because `users.controller.js` deleted it with
+`toPublicUser` before sending. The repository was returning `password` on
+every user it loaded (`findAll`, `findById`, create, update), so it was in
+memory everywhere, and any new route that forgot `toPublicUser` would have
+leaked it. The borrow requests `include` was also loading every member's
+hash.
+
+I fixed it in the repository instead:
+
+- `users.repository.js` has one `publicSelect` that lists the allowed
+  columns, and `password_hash` isn't in it. Every method uses it, so the
+  hash never leaves the database.
+- There's one separate method, `findCredentialsByEmail`, that also selects
+  the hash. Only the auth service uses it for login.
+- I removed `toPublicUser` from the controller because there's nothing to
+  delete any more.
+
+I checked: the users repository now returns 0 rows with a password, `GET
+/users` and register don't have a hash in them, the password column in the
+database still has the bcrypt hash, login still works (and a wrong password
+still gives 401), and the Postman collection gives the same results as
+before.
+
+## Task 6: Three symptoms
+
+**1. A page that's slow with a hundred rows but fine with ten.**
+
+Cause: N+1 queries. The code gets the list in one query and then runs
+another query for every row (like the member loop in Task 2), so the time
+grows with the number of rows. With ten rows it's 11 queries and nobody
+notices, with a hundred it's 101 round trips.
+
+First thing I'd look at: the query log (`DB_QUERY_LOG=true`) for one page
+load. If the same query shows up over and over with only the id changing,
+that's it, and the fix is loading the relation together (`include` or a
+join).
+
+**2. A query that's fast in DBeaver but slow through the ORM.**
+
+Cause: it isn't actually the same query. The ORM is sending something
+different from what I typed in DBeaver: more queries than I think (like
+Prisma splitting `include` into separate queries), every column instead of
+the few I picked, or a different `WHERE` / `ORDER BY` that can't use the
+index. DBeaver also only fetches the first 200 rows by default, so it can
+look fast while the app is fetching all of them.
+
+First thing I'd look at: the query log, then copy the exact SQL it printed
+into DBeaver with `EXPLAIN` in front of it, and compare it to my version.
+
+**3. A response that's large but quick to produce.**
+
+Cause: fetching and sending more than the page needs. The database finds
+the rows quickly, but every column comes back (or whole related objects,
+like the full member and book on every borrow request in Task 5), so the
+response is big even though it was fast to build. It then gets slow for the
+user on a slow connection, and it can leak things like the password hash.
+
+First thing I'd look at: the response itself in Postman or the browser's
+network tab, and its size. Then check which fields the page actually uses
+and change the repository to `select` only those.

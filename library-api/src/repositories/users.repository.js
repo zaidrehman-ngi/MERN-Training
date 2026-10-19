@@ -1,10 +1,17 @@
 import { ApiError } from "../errors/ApiError.js";
 
-// Always load the branch so we can return its name like db.json did.
-const include = { branches: true };
+// The columns a user is allowed to have in a response. password_hash is
+// left out on purpose, so it never leaves the database by accident.
+const publicSelect = {
+  api_id: true,
+  name: true,
+  email: true,
+  role: true,
+  joined_on: true,
+  branches: { select: { name: true } },
+};
 
 // Turns a members row into the same user shape the API returned from db.json.
-// password is only used by the auth service; the controller removes it.
 const toUser = (row) => ({
   id: row.api_id,
   name: row.name,
@@ -12,7 +19,6 @@ const toUser = (row) => ({
   role: row.role,
   branch: row.branches.name,
   joined: row.joined_on ? row.joined_on.toISOString().slice(0, 10) : null,
-  password: row.password_hash,
 });
 
 // API field names -> column names. The API sends the branch by name.
@@ -45,7 +51,7 @@ const createUsersRepository = (prisma) => ({
   async findAll() {
     const rows = await prisma.members.findMany({
       where: { is_active: true },
-      include,
+      select: publicSelect,
       orderBy: { api_id: "asc" },
     });
     return rows.map(toUser);
@@ -54,7 +60,7 @@ const createUsersRepository = (prisma) => ({
   async findById(id) {
     const row = await prisma.members.findFirst({
       where: { api_id: id, is_active: true },
-      include,
+      select: publicSelect,
     });
     return row ? toUser(row) : null;
   },
@@ -62,15 +68,24 @@ const createUsersRepository = (prisma) => ({
   async findByEmail(email) {
     const row = await prisma.members.findFirst({
       where: { email, is_active: true },
-      include,
+      select: publicSelect,
     });
     return row ? toUser(row) : null;
+  },
+
+  // Only for logging in: the one place the password hash is read.
+  async findCredentialsByEmail(email) {
+    const row = await prisma.members.findFirst({
+      where: { email, is_active: true },
+      select: { ...publicSelect, password_hash: true },
+    });
+    return row ? { ...toUser(row), passwordHash: row.password_hash } : null;
   },
 
   async findByEmailExcludingId(email, id) {
     const row = await prisma.members.findFirst({
       where: { email, is_active: true, api_id: { not: id } },
-      include,
+      select: publicSelect,
     });
     return row ? toUser(row) : null;
   },
@@ -78,7 +93,7 @@ const createUsersRepository = (prisma) => ({
   async create(userData) {
     const row = await prisma.members.create({
       data: await toRow(prisma, userData),
-      include,
+      select: publicSelect,
     });
     return toUser(row);
   },
@@ -86,6 +101,7 @@ const createUsersRepository = (prisma) => ({
   async updateById(id, changes) {
     const existing = await prisma.members.findFirst({
       where: { api_id: id, is_active: true },
+      select: { member_id: true },
     });
     if (!existing) {
       return null;
@@ -94,7 +110,7 @@ const createUsersRepository = (prisma) => ({
     const row = await prisma.members.update({
       where: { member_id: existing.member_id },
       data: await toRow(prisma, changes),
-      include,
+      select: publicSelect,
     });
     return toUser(row);
   },

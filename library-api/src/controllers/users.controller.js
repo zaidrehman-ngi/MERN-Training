@@ -1,21 +1,19 @@
-const toPublicUser = ({ password, ...user }) => user;
-
 const getUsers = async (req, res) => {
   const users = await req.app.locals.services.users.list();
   res.status(200).json({
-    data: users.map(toPublicUser),
+    data: users,
   });
 };
 
 const getUserById = async (req, res) => {
   const user = await req.app.locals.services.users.getById(req.params.id);
-  res.status(200).json(toPublicUser(user));
+  res.status(200).json(user);
 };
 
 const createUser = async (req, res) => {
   const newUser = await req.app.locals.services.users.create(req.body);
   res.status(201).json({
-    data: toPublicUser(newUser),
+    data: newUser,
   });
 };
 
@@ -25,7 +23,7 @@ const updateUser = async (req, res) => {
     req.body,
   );
   res.status(200).json({
-    data: toPublicUser(updatedUser),
+    data: updatedUser,
   });
 };
 

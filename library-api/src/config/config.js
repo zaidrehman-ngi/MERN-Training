@@ -27,6 +27,7 @@ const result = configSchema.safeParse({
   SEARCH_RATE_LIMIT_WINDOW_MS: process.env.SEARCH_RATE_LIMIT_WINDOW_MS,
   SEARCH_RATE_LIMIT_MAX: process.env.SEARCH_RATE_LIMIT_MAX,
   LOG_LEVEL: process.env.LOG_LEVEL,
+  DB_QUERY_LOG: process.env.DB_QUERY_LOG,
 });
 
 if (!result.success) {
@@ -58,6 +59,7 @@ const config = Object.freeze({
   searchRateLimitWindowMs: values.SEARCH_RATE_LIMIT_WINDOW_MS,
   searchRateLimitMax: values.SEARCH_RATE_LIMIT_MAX,
   logLevel: values.LOG_LEVEL,
+  dbQueryLog: values.DB_QUERY_LOG === "true",
 });
 
 export default config;

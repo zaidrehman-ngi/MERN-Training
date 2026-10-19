@@ -48,6 +48,7 @@ const configSchema = z.object({
   SEARCH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive(),
   SEARCH_RATE_LIMIT_MAX: z.coerce.number().int().positive(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "silent"]),
+  DB_QUERY_LOG: z.enum(["true", "false"]).default("false"),
 });
 
 export default configSchema;
