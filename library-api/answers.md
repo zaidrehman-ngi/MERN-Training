@@ -729,3 +729,291 @@ P2022 - The column `books.publication_year` does not exist in the current databa
 
 So any route that reads books would return an error until they run
 `migrate deploy`.
+
+# Exercise 5 — The API stops pretending
+
+## Task 1: Books through Prisma
+
+The books repository now uses Prisma instead of the `db.json` array. The
+routes, controllers, services, validation and error handling are the same,
+I only changed the repository and passed Prisma into it from `app.js`.
+Users and borrow requests still use the JSON data for now.
+
+The API's book and my `books` table didn't match, so I had to make some
+choices:
+
+- **IDs:** the API uses ids like `bk-1` and Postman calls `/books/bk-1`, but
+  my table uses UUIDs. I added an `api_id` column. New books get their id
+  from a sequence (`bk-1004`, `bk-1005`...), starting at 1000 so it never
+  clashes with the `bk-1` to `bk-9` ids from `db.json`.
+- **Fields:** `year` goes into `publication_year` (from Exercise 4) and
+  `onShelf` into `available_copies` (from Exercise 3). I added columns for
+  `author`, `coverUrl`, `finePerDay`, `status` and `totalCopies`. I kept
+  `author` as a text column instead of using the `authors` table because the
+  API only ever has one author per book and needs `sort=author`, and Prisma
+  can't sort by a field in a many-to-many table.
+- **Delete:** Postman deletes `bk-1` (Dune) and expects 204, but Dune has
+  copies and loans in my database, so a real delete is blocked by the
+  foreign keys. I made it a soft delete with an `is_active` column, the
+  same idea as members on Tuesday. ISBN only has to be unique among active
+  books now.
+- **Data:** `db/seed-books.js` (now run with `npm run db:seed`) loads the 159
+  books from `db.json` into the database. One book had its year saved as the
+  string `"2003"` and Prisma refused it, so the seed converts it. Running
+  the seed again resets the books, so the Postman collection can be run
+  more than once.
+
+All of this went in as a third migration, `books_api_fields`.
+
+**Postman results:** I ran the collection on the old JSON server first, so
+I had something to compare against, then again on the Prisma version. Every
+request returned the same status code. In the Books folder (with an admin
+token) 11 of 13 checks pass on both. The 2 that fail were already failing
+before: "Create Book" uses Dune's ISBN, so it gets a 409 instead of 201.
+I also checked that a book from the database looks exactly the same as it
+did in `db.json`, and that filtering, sorting and paging work.
+
+## Task 2: Database errors in the error handler
+
+With the JSON array nothing stopped bad data, but now the database does.
+When it rejects something, Prisma throws a `PrismaClientKnownRequestError`.
+Before this change my error handler didn't know that error, so it would have
+sent a 500, and in development the message was Prisma's full
+"Invalid `prisma.books.create()` invocation..." text with the constraint
+names in it.
+
+The three errors I got when I tried them directly through Prisma:
+
+| What went wrong | Prisma code | Postgres code |
+|---|---|---|
+| Duplicate ISBN | `P2002` | `23505` |
+| Foreign key to a row that doesn't exist | `P2003` | `23503` |
+| CHECK constraint (negative copy count) | `P2039` | `23514` |
+
+There wasn't actually a check on the copy counts in `books`, so I added a
+small migration (`books_copy_count_check`) so `available_copies` and
+`total_copies` can't go below 0.
+
+I added `src/errors/prismaErrors.js`, which turns these into my normal
+`ApiError`, and the error handler from Friday calls it first. The logs
+still show the original database error so I can debug it, but the member
+only sees my error shape:
+
+| What went wrong | Status | Response |
+|---|---|---|
+| Duplicate ISBN | 409 | `CONFLICT`, "A book with this ISBN already exists.", field `isbn` |
+| Missing foreign key | 422 | `VALIDATION_ERROR`, "A related record does not exist.", field e.g. `book_id` |
+| Negative copy count | 422 | `VALIDATION_ERROR`, "One of the values is not allowed." |
+
+I tested it by running the three failing Prisma calls through the real
+error handler and got those exact responses. The Books folder in Postman
+still gives the same results as before.
+
+**The duplicate ISBN:** it's a 409 Conflict, and yes, it matches Week 1.
+In my status code table I said 409 for "ISBN already belongs to another
+book", and my API spec says 409 for conflicts with existing resources. I
+used the same message and details as the books service, so it doesn't
+matter if the duplicate is caught by the service check or by the database,
+the response looks the same. The database one matters more, because if two
+requests with the same ISBN come in at the same time, both could pass the
+service check, and only the unique index stops the second one.
+
+For the other two I first used 400, but then I checked my Week 1 spec: 400
+is for missing or malformed fields, 422 is for a valid request with a bad
+value. A negative count or an id that doesn't exist is a properly formed
+request with a bad value, so I changed them to 422.
+
+## Task 3: Members and borrow requests
+
+I moved the other two repositories to Prisma the same way as books, so now
+nothing reads `db.json` at runtime. `app.js` doesn't even import it any
+more. `npm run db:seed` loads the books, users and borrow requests from
+`db.json` into the database (and resets them for Postman).
+
+**Members:** the API's users go into my `members` table. I added `api_id`
+(`m-1000`...), `password_hash` and `role` columns. The API sends the branch
+by name, so the repository looks it up in `branches`. "Gulshan Branch" was
+in `db.json` but not in my database, so the seed adds it. If the branch
+name doesn't exist you get a 422. Delete is a soft delete with `is_active`,
+which I already had from Tuesday, and the unique email index was already
+only for active members.
+
+**Borrow requests:** these didn't fit my `borrow_requests` table. That
+table is actually the loans: one row per physical copy someone has, with
+status out/overdue/returned. A borrow request in the API is a member asking
+for a book (pending/approved/rejected/returned) and it doesn't have a copy
+yet. So I made a new table, `book_requests`, with a foreign key to
+`members` and one to `books`, and left the loans table alone. The API path
+is still `/borrow-requests`.
+
+**Loading the relationships:** a borrow request now comes back with its
+member and its book in one call:
+
+```json
+{ "id": "br-100", "bookId": "bk-1", "userId": "m-1000", "status": "pending",
+  "requestedAt": "2026-01-10", "dueDate": "2026-01-20", "finePerDay": 20,
+  "member": { "id": "m-1000", "name": "Aisha Khan", "email": "aisha0@lib.pk" },
+  "book": { "id": "bk-1", "title": "Dune", "author": "Frank Herbert" } }
+```
+
+Prisma calls this a **relation query** or **nested read**, and you do it
+with `include` (`include: { members: true, books: true }`). It's what other
+people call eager loading.
+
+To see the SQL I turned on Prisma's query log (`LOG_LEVEL=debug`). I
+expected a JOIN, but Prisma doesn't write one. For one request it ran three
+queries:
+
+```sql
+SELECT ... FROM "book_requests" WHERE "api_id" = $1 LIMIT $2 OFFSET $3
+SELECT ... FROM "members" WHERE "member_id" = $1 OFFSET $2
+SELECT ... FROM "books" WHERE "book_id" = $1 OFFSET $2
+```
+
+For the list of 40 requests it was still three queries, not 81. It gets
+all the requests first, then all their members with
+`WHERE member_id IN ($1, ..., $40)`, then all the books the same way, and
+puts them together in JS. So `include` doesn't cause the N+1 problem, but
+it also isn't a join. Prisma can do it as one query with a JOIN if you
+turn on the `relationJoins` preview feature and pass
+`relationLoadStrategy: "join"`. I tried it without the preview feature and
+Prisma said `Unknown argument relationLoadStrategy`.
+
+I also noticed it does `SELECT` of every column even if I only use a few,
+so for members it pulls `password_hash` into memory too. Using `select`
+instead of `include` would fix that.
+
+**Postman:** I ran the whole collection on the JSON server before changing
+anything and again after. All 25 requests returned the same status codes,
+and the same 43 of 48 checks passed. The responses also look the same as
+`db.json` apart from the new `member` and `book` objects.
+
+## Task 4: Transactions
+
+Borrowing a book is two writes: create the loan in `borrow_requests`, and
+take one off `available_copies` on the book. I wrote this in
+`db/transaction-demo.js`.
+
+First I had to drop the trigger from Exercise 3 Task 5. It was still on my
+database and it was doing the decrement itself inside the same `INSERT`,
+so the problem would never show up. My decision in Exercise 3 was to keep
+this in the code anyway, so I removed it with a migration
+(`drop_available_copies_trigger`).
+
+To make the second write fail I set Dune's `available_copies` to 0 first,
+like someone had just taken the last copy. Taking one off makes it -1, and
+the `CHECK (available_copies >= 0)` from Task 2 rejects it.
+
+**Without a transaction:**
+
+```
+Before: open loans on this copy = 0, available_copies = 0
+Second write failed: P2039 (Postgres 23514)
+After:  open loans on this copy = 1, available_copies = 0
+```
+
+The loan was saved but the count wasn't changed. So the database says
+someone has this copy, but the catalogue still counts it as on the shelf
+(or here, says there were none to give out at all). I deleted that loan by
+hand afterwards.
+
+**With a transaction** (`prisma.$transaction(async (tx) => { ... })`, using
+`tx` instead of `prisma` for both writes):
+
+```
+Before: open loans on this copy = 0, available_copies = 0
+Second write failed: P2039 (Postgres 23514)
+After:  open loans on this copy = 0, available_copies = 0
+```
+
+Same failure, but no loan was left behind. In the query log I could see the
+`INSERT` for the loan and then a `ROLLBACK`, so Postgres threw the loan away
+when the update failed. Either both writes happen or neither does.
+
+**Two other operations that need the same treatment:**
+
+1. **Returning a book.** Set `returned_on` and the status on the loan, add
+   one back to `available_copies`, and work out the fine. If the loan is
+   marked returned but the count isn't increased, the book looks like it's
+   still out forever.
+2. **Approving a borrow request.** Mark the request in `book_requests` as
+   approved, create the loan for a copy, and take one off the count. If it
+   fails half way, the member's request says approved but they never got a
+   loan, or they got a loan for a request that still says pending.
+
+## Task 5: Where does the code live?
+
+I didn't have to move anything for this one. In Week 5 I already split it
+into routes -> controllers -> services -> repositories, with one repository
+per resource (`books.repository.js`, `users.repository.js`,
+`borrowRequests.repository.js`). The controllers call things like
+`services.books.list(req.query)`, the services call
+`booksRepository.findAll(filters)`, and only the repositories use Prisma.
+I checked with a search: none of the routes, controllers or services
+import Prisma. That's also why Tasks 1 to 3 only needed the repository
+files rewritten; the controllers and services didn't change.
+
+**What I'd still have to change next week:** my repositories still do some
+things that aren't data access. They turn rows into the API shape, and the
+users and borrow request repositories throw HTTP errors (422 for a branch
+or book that doesn't exist), so that would move up into the services, and
+the borrow transaction from Task 4 is still only in a script instead of a
+service.
+
+## Task 6: Deleting db.json
+
+I deleted `db.json`. The array loader was already gone from `app.js` since
+Task 3, so the server started fine and nothing in `src/` was using it.
+
+**Postman, first run:** exactly the same as the JSON server baseline. All 25
+requests gave the same status codes and the same 43 of 48 checks passed.
+
+**Postman, second run:** 11 checks failed instead of 5.
+
+| Request | Run 1 | Run 2 |
+|---|---|---|
+| Create Book | 409 | 201 |
+| Get Book `bk-1` | 200 | 404 |
+| Update Book `bk-1` | 200 | 409 |
+| Delete Book `bk-1` | 204 | 404 |
+| Register User | 201 | 409 |
+| Get / Update / Delete User `m-1000` | 200 / 200 / 204 | 404 / 404 / 404 |
+
+So what was never real:
+
+1. **The collection only ever worked because the data reset.** With the
+   JSON array every change was only in memory, so restarting the server put
+   `bk-1` and `m-1000` back. Now the data is actually saved: run 1 deletes
+   `bk-1` and `m-1000` and registers `newuser@lib.pk`, and on run 2 they're
+   still deleted and the email is already taken. The collection depends on
+   hard-coded ids like `bk-1` existing, instead of creating its own record
+   and using the id it gets back.
+2. **The "Create Book" test only passes by accident.** It uses Dune's ISBN,
+   so it fails while Dune exists and only passes once Dune has been deleted.
+3. **My seed scripts.** `npm run db:seed` now fails with
+   `Cannot find module ...db.json`, because the seeds were just copying the
+   JSON file into the database. There's no way to reset the data for
+   Postman any more.
+
+One more thing I found: on run 2, updating `bk-1` gave 409 instead of 404.
+The books service checks for a duplicate ISBN before it checks whether the
+book exists, and "Test Book" from run 2 now has Dune's ISBN. That order was
+there in Week 5 too, it just never showed up.
+
+**What I did about it:** I replaced the two seed scripts with one,
+`db/seed.js` (`npm run db:seed`), that has its own small test data inside
+it instead of reading `db.json`: the 9 original books (`bk-1` to `bk-9`), 6
+members including the two test logins, and 3 borrow requests. Running it
+again removes anything the API created (anything with an id from the
+sequences, like `bk-1004` or `m-5001`) and puts the test rows back. While
+doing it I also stopped storing `test@lib.pk`'s password as plain text; the
+seed hashes it with bcrypt now and login still works.
+
+I also fixed the update order in the books service so it checks the book
+exists first, so updating a deleted book now gives 404.
+
+After that, with `npm run db:seed` before each run, the collection gives the
+same results every time (43 of 48, same status codes as the JSON server).
+I also ran it against `karachi_library_empty`, built only from the
+migrations and the seed, and got the same results, so a colleague starting
+from nothing gets the same as me.

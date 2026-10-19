@@ -51,14 +51,22 @@ model book_genres {
 }
 
 model books {
-  book_id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  book_id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  api_id           String          @unique @default(dbgenerated("('bk-'::text || nextval('books_api_id_seq'::regclass))"))
   title            String
-  isbn             String?        @unique
+  author           String?
+  isbn             String?         @unique(map: "books_active_isbn_unique", where: raw("(is_active = true)"))
   publication_year Int?
-  available_copies Int            @default(0)
+  cover_url        String?
+  available_copies Int             @default(0)
+  total_copies     Int             @default(0)
+  fine_per_day     Int?
+  status           String          @default("available")
+  is_active        Boolean         @default(true)
   book_authors     book_authors[]
   book_copies      book_copies[]
   book_genres      book_genres[]
+  book_requests    book_requests[]
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -114,12 +122,35 @@ model genres {
 
 model members {
   member_id       String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  api_id          String            @unique @default(dbgenerated("('m-'::text || nextval('members_api_id_seq'::regclass))"))
   name            String
   email           String?           @unique(map: "members_active_email_unique", where: raw("(is_active = true)"))
+  password_hash   String?
+  role            String            @default("user")
   phone           String?
   joined_on       DateTime?         @db.Date
   branch_id       String            @db.Uuid
   is_active       Boolean           @default(true)
   borrow_requests borrow_requests[]
+  book_requests   book_requests[]
   branches        branches          @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+// A member asking to borrow a book (the API's /borrow-requests).
+// Not the same as borrow_requests, which holds the actual loans of a copy.
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model book_requests {
+  request_id   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  api_id       String    @unique @default(dbgenerated("('br-'::text || nextval('book_requests_api_id_seq'::regclass))"))
+  member_id    String    @db.Uuid
+  book_id      String    @db.Uuid
+  status       String    @default("pending")
+  requested_on DateTime  @default(dbgenerated("CURRENT_DATE")) @db.Date
+  due_on       DateTime? @db.Date
+  fine_per_day Int       @default(20)
+  members      members   @relation(fields: [member_id], references: [member_id], onDelete: NoAction, onUpdate: NoAction)
+  books        books     @relation(fields: [book_id], references: [book_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([member_id])
+  @@index([book_id])
 }

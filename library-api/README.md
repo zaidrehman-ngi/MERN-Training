@@ -8,3 +8,9 @@ Copy `.env.example` to `.env` and set `DATABASE_URL`, then run:
 npm install && npx prisma generate
 npx prisma migrate deploy
 ```
+
+To load the test data (also resets it after a Postman run):
+
+```bash
+npm run db:seed
+```

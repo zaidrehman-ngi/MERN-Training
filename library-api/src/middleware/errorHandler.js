@@ -1,9 +1,12 @@
 import { inspect } from "node:util";
 import { ApiError } from "../errors/ApiError.js";
+import translatePrismaError from "../errors/prismaErrors.js";
 import config from "../config/config.js";
 import logger from "../config/logger.js";
 
-const errorHandler = (err, req, res, next) => {
+const errorHandler = (originalErr, req, res, next) => {
+  // database errors from Prisma become our own ApiError (409, 400, ...)
+  const err = translatePrismaError(originalErr);
   const isErrorObject = err !== null && typeof err === "object";
   const isMalformedJson = isErrorObject && err.type === "entity.parse.failed";
   const isExpected = err instanceof ApiError || isMalformedJson;
@@ -38,10 +41,10 @@ const errorHandler = (err, req, res, next) => {
 
   const logDetails =
     config.nodeEnv === "development"
-      ? inspect(err, { depth: 5 })
-      : err instanceof Error
-        ? `${err.name}: ${err.message}`
-        : inspect(err, { depth: 5 });
+      ? inspect(originalErr, { depth: 5 })
+      : originalErr instanceof Error
+        ? `${originalErr.name}: ${originalErr.message}`
+        : inspect(originalErr, { depth: 5 });
   if (isExpected) {
     logger.warn(
       `${req.requestId} ${req.method} ${req.originalUrl}: ${statusCode} ${response.error} ${logDetails}`,

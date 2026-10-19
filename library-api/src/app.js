@@ -4,7 +4,6 @@ import morgan from "morgan";
 import fs from "fs";
 import helmet from "helmet";
 import cors from "cors";
-import db from "../db.json" with { type: "json" };
 
 import requestLog from "./middleware/requestLog.js";
 import requestId from "./middleware/requestId.js";
@@ -22,6 +21,7 @@ import authRouter from "./routes/auth.routes.js";
 
 import createRepositories from "./repositories/createRepositories.js";
 import createServices from "./services/createServices.js";
+import prisma from "./db/prisma.js";
 
 const accessLogStream = logger.isEnabled("info")
   ? fs.createWriteStream(config.accessLogPath, { flags: "a" })
@@ -29,7 +29,7 @@ const accessLogStream = logger.isEnabled("info")
 
 const app = express();
 
-const repositories = createRepositories(db);
+const repositories = createRepositories(prisma);
 app.locals.services = createServices(repositories);
 
 // 1. Security headers apply to responses from all later middleware and routes.

@@ -25,6 +25,10 @@ const createBooksService = (booksRepository) => ({
   },
 
   async update(id, changes) {
+    // check the book exists first, otherwise a missing book with a taken
+    // ISBN gave 409 instead of 404
+    await this.getById(id);
+
     if (changes.isbn !== undefined) {
       const duplicate = await booksRepository.findByIsbn(changes.isbn);
       if (duplicate && duplicate.id !== id) {
