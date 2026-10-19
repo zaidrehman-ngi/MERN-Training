@@ -1,15 +1,10 @@
-import "dotenv/config";
 import { performance } from "node:perf_hooks";
 import pg from "pg";
+import config from "../src/config/config.js";
 
 const { Client } = pg;
-const { DATABASE_URL } = process.env;
 
-if (!DATABASE_URL) {
-  throw new Error("DATABASE_URL is required to run the overdue benchmark.");
-}
-
-const client = new Client({ connectionString: DATABASE_URL });
+const client = new Client({ connectionString: config.databaseUrl });
 
 await client.connect();
 

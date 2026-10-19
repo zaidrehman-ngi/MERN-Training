@@ -14,6 +14,9 @@ const configSchema = z.object({
     .enum(["development", "production", "test"])
     .default("development"),
   PORT: z.coerce.number().int().min(1).max(65535),
+  DATABASE_URL: z
+    .string()
+    .regex(/^postgres(ql)?:\/\//, "must be a postgresql:// connection string"),
   JWT_SECRET: z
     .string()
     .min(32, "must be at least 32 characters long")

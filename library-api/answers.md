@@ -464,3 +464,268 @@ schema, so I only saw that the table had an index, not which direction it
 works in. Once I wrote the real query going from a genre to its books, it
 was obvious the index only covers one direction. It's the same column-order
 rule from the composite index task, and I still missed it on my own table.
+
+# Exercise 4 — Choosing an ORM
+
+## Task 1: The overdue notice in Prisma, Sequelize and Drizzle
+
+I wrote the overdue notice query from Exercise 2 Task 3 in all three ORMs
+using their docs. I haven't made any models yet so I just assumed names like
+`Loan`, `Member`, `BookCopy`, `Book` and `Branch`, with camelCase fields
+(`dueOn` for `due_on` etc).
+
+**SQL (what I already have)**
+
+```sql
+SELECT m.name, m.email, bk.title, br.name, loan.due_on,
+       CURRENT_DATE - loan.due_on AS days_overdue
+FROM borrow_requests AS loan
+JOIN members AS m ON m.member_id = loan.member_id
+JOIN book_copies AS cp ON cp.copy_id = loan.copy_id
+JOIN books AS bk ON bk.book_id = cp.book_id
+JOIN branches AS br ON br.branch_id = loan.branch_id
+WHERE loan.returned_on IS NULL
+  AND loan.due_on < CURRENT_DATE
+ORDER BY loan.due_on, loan.loan_id;
+```
+
+**Prisma**
+
+```js
+const today = new Date();
+
+const loans = await prisma.loan.findMany({
+  where: {
+    returnedOn: null,
+    dueOn: { lt: today },
+  },
+  select: {
+    dueOn: true,
+    member: { select: { name: true, email: true } },
+    copy: { select: { book: { select: { title: true } } } },
+    branch: { select: { name: true } },
+  },
+  orderBy: [{ dueOn: "asc" }, { loanId: "asc" }],
+});
+
+// Prisma can't do CURRENT_DATE - due_on here, so days overdue is worked out in JS
+const notices = loans.map((loan) => ({
+  memberName: loan.member.name,
+  memberEmail: loan.member.email,
+  bookTitle: loan.copy.book.title,
+  branchName: loan.branch.name,
+  dueOn: loan.dueOn,
+  daysOverdue: Math.floor((today - loan.dueOn) / (1000 * 60 * 60 * 24)),
+}));
+```
+
+**Sequelize**
+
+```js
+const { Op, literal } = require("sequelize");
+
+const notices = await Loan.findAll({
+  attributes: [
+    "dueOn",
+    [literal('CURRENT_DATE - "Loan"."due_on"'), "daysOverdue"],
+  ],
+  where: {
+    returnedOn: null,
+    dueOn: { [Op.lt]: literal("CURRENT_DATE") },
+  },
+  include: [
+    { model: Member, attributes: ["name", "email"] },
+    {
+      model: BookCopy,
+      attributes: [],
+      include: [{ model: Book, attributes: ["title"] }],
+    },
+    { model: Branch, attributes: ["name"] },
+  ],
+  order: [
+    ["dueOn", "ASC"],
+    ["loanId", "ASC"],
+  ],
+});
+```
+
+**Drizzle**
+
+```js
+import { and, asc, eq, isNull, lt, sql } from "drizzle-orm";
+
+const notices = await db
+  .select({
+    memberName: members.name,
+    memberEmail: members.email,
+    bookTitle: books.title,
+    branchName: branches.name,
+    dueOn: borrowRequests.dueOn,
+    daysOverdue: sql`CURRENT_DATE - ${borrowRequests.dueOn}`,
+  })
+  .from(borrowRequests)
+  .innerJoin(members, eq(members.memberId, borrowRequests.memberId))
+  .innerJoin(bookCopies, eq(bookCopies.copyId, borrowRequests.copyId))
+  .innerJoin(books, eq(books.bookId, bookCopies.bookId))
+  .innerJoin(branches, eq(branches.branchId, borrowRequests.branchId))
+  .where(
+    and(
+      isNull(borrowRequests.returnedOn),
+      lt(borrowRequests.dueOn, sql`CURRENT_DATE`),
+    ),
+  )
+  .orderBy(asc(borrowRequests.dueOn), asc(borrowRequests.loanId));
+```
+
+Drizzle looks the closest to the SQL, the joins are basically the same.
+In Prisma and Sequelize I didn't write any joins, I just said which related
+data I wanted and they do the joins themselves. In Prisma I couldn't do the
+date subtraction in the query so I had to calculate days overdue in JS after.
+
+## Task 2: Comparing the three
+
+**Prisma**
+
+It needs the least SQL. You don't write joins at all, you just say what
+related data you want and it gets it. That's easy but I think you could use
+it for a long time without really knowing what a join is.
+
+For a few tables it's easy to read, but the nesting gets deep fast. Just to
+get the book title I had to go `copy -> book -> title` with a `select`
+inside a `select`. Also things like days overdue can't be done in the query,
+I had to do it in JS.
+
+If Prisma can't do something you use `$queryRaw` and write normal SQL.
+So you still need to know SQL for the hard queries.
+
+For migrations you change `schema.prisma` and run `prisma migrate dev`. It
+creates the SQL migration file for you in `prisma/migrations`, and you can
+open it and see the SQL. `prisma migrate deploy` runs them on another
+database.
+
+**Sequelize**
+
+It needs some SQL knowledge. You don't write joins but you have to set up
+associations like `hasMany` and `belongsTo` properly or the `include`
+doesn't work.
+
+I found it the hardest to read. Even my one query is a lot of nested
+`include` arrays, and for the date part I had to write raw SQL inside
+`literal()` with the table name in quotes.
+
+When it doesn't support something you use `literal()` for a small part or
+`sequelize.query()` for the whole query. I had to use `literal()` twice
+just for this query.
+
+Migrations are written by hand with `sequelize-cli` (an `up` and a `down`
+function). They aren't made from the models, so the models and the
+migrations can get out of sync. There's also `sync()` which changes the
+tables to match the models but from what I read that's not safe to use on a
+real database.
+
+**Drizzle**
+
+It needs the most SQL. It's pretty much SQL written in JS, you write every
+join and condition yourself, so you have to know what you're doing.
+
+For me it was the easiest to read because it's in the same order as the SQL
+query. If I can read the SQL I can read this.
+
+If something isn't supported you use the `sql` tag and write that part in
+SQL, like I did for `CURRENT_DATE`. It fits in the query so it doesn't feel
+like a workaround.
+
+Migrations are similar to Prisma. You define the tables in code, run
+`drizzle-kit generate` to make SQL migration files and `drizzle-kit migrate`
+to run them.
+
+**Which gives the best error messages for a trainee?**
+
+I think Prisma. Since it generates the client from the schema, a lot of
+mistakes get caught before the query even runs. If I spell a field wrong it
+tells me that argument doesn't exist and shows the ones that do, and in
+TypeScript the editor shows it straight away. Database errors also come
+with a code like `P2002` (unique constraint failed) and the field name, so
+it's easy to search.
+
+Sequelize mostly just passes the Postgres error through, and some of its own
+errors are confusing, like "Member is not associated to Loan" when you've
+just set up the association the wrong way. Drizzle is good in TypeScript
+because of the types, but when it fails at runtime it mostly just gives you
+the Postgres error as it is.
+
+## Task 4: Installing Prisma and running one query
+
+Before installing I checked the version note: `prisma` and `@prisma/client`
+both had to be the same major version. I installed them pinned to 7, and
+`npx prisma --version` showed **7.10.0** for both. Prisma 7 also needs a
+driver adapter to connect to Postgres, so I installed `@prisma/adapter-pg`
+on the same version.
+
+I didn't write the models by hand. I ran `npx prisma db pull`, which reads
+the tables I already made on Tuesday and writes them into
+`prisma/schema.prisma`. It picked up all 10 tables with their relations,
+unique constraints and indexes, including the partial ones. It warned that
+the `CHECK` constraints (like the loan `status` values) aren't supported by
+Prisma Client, so those only exist in the database.
+
+The connection string is in `.env` as `DATABASE_URL` and is only read in
+the config module (`src/config/config.js`), with a check in
+`config.schema.js`. `prisma.config.js` and `src/db/prisma.js` both import
+it from there. The benchmark script from Exercise 1 was reading
+`process.env.DATABASE_URL` directly, so I changed it to use the config too.
+
+For the end-to-end query I ran the overdue notice through Prisma
+(`db/prisma-check.js`). It returned the same row as the SQL version: Aisha
+Khan, "Stories from Karachi", Clifton Branch, due 2026-08-15, 65 days
+overdue.
+
+## Task 5: Migrations
+
+I generated the first migration (`init`) from the Prisma schema I pulled in
+Task 4. Prisma doesn't create `CHECK` constraints, so I added the seven
+checks (loan status, inventory status, fine amounts etc) to the end of the
+migration file by hand.
+
+To check it builds from nothing I made a new empty database,
+`karachi_library_empty`, and ran `npx prisma migrate deploy` on it. All 10
+tables were created with 11 foreign keys, 7 check constraints and the same
+indexes as my real database (21 vs 20, the extra one is Prisma's own
+`_prisma_migrations` table).
+
+My real `karachi_library` database already had all the tables, so running
+the migration on it would fail. I used `npx prisma migrate resolve
+--applied` to mark `init` as already done there. That doesn't change any
+tables or data, it just tells Prisma where the database is up to.
+
+For the small change I added `publication_year` to `books`. The schema
+never had it, which is why I kept using `acquisition_year` instead. The
+second migration (`add_publication_year`) is just one line:
+`ALTER TABLE "books" ADD COLUMN "publication_year" INTEGER;`. I applied it to
+both databases with `migrate deploy`.
+
+**What does a colleague run after pulling my branch?**
+
+```
+npm install && npx prisma generate
+npx prisma migrate deploy
+```
+
+`npm install` gets the packages, `prisma generate` builds the client from
+the schema (the generated folder isn't committed), and `migrate deploy`
+runs any migrations their database doesn't have yet. This is in the README.
+
+**What happens if they have the old schema and my new code?**
+
+The code works with a database that has `publication_year`, but theirs
+doesn't. Nothing warns them when the app starts. It only breaks when a
+query touches `books`, because Prisma selects every column it knows about.
+I tested this on a database with only the first migration and
+`prisma.books.findMany()` failed with:
+
+```
+P2022 - The column `books.publication_year` does not exist in the current database.
+```
+
+So any route that reads books would return an error until they run
+`migrate deploy`.

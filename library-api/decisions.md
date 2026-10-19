@@ -29,3 +29,39 @@ why. Nothing in `src/` points to the trigger.
 stored number that can drift away from the real loans. If it ever gets too
 slow, I would move it into the service layer so the logic is visible in the
 code, before using a trigger.
+
+# Exercise 4 — Choosing an ORM
+
+## Task 3: Which ORM for the capstone
+
+I'm going with **Prisma**.
+
+Reasons:
+
+1. The error messages. When I get a field name or a relation wrong it
+   tells me before the query runs, and the database errors have codes I
+   can look up. As a trainee that saves me a lot of time.
+2. Migrations are generated from `schema.prisma` as SQL files I can read,
+   and they can run from an empty database, which is what the hand-in
+   needs. With Sequelize I'd be writing every migration by hand.
+
+What I'm giving up: control over the SQL. Prisma writes the queries for me
+and they're not always the same as what I would write. Some things, like
+the days overdue calculation, can't be done in a normal Prisma query, so
+for those I'll need `$queryRaw` and plain SQL. Drizzle would have let me
+keep the queries close to the SQL I wrote this week.
+
+**What would it cost to change this in Week 8?**
+
+The database itself wouldn't change. The tables, data and indexes stay the
+same whichever ORM I use, and the migrations are just SQL. What would need
+redoing is the ORM schema file and every query in the repositories, plus
+testing all the routes again. If all the database code stays in the
+repository files (like the JSON repositories now) and the routes and
+services only call those, it's a few days of work, mostly rewriting the
+queries in the repositories. If Prisma calls end up all over the
+controllers, it gets a lot harder.
+
+So I don't think I need to worry much about which ORM I pick. The
+important part is keeping all the database code in one layer, because
+that's what makes changing it later cheap or expensive.

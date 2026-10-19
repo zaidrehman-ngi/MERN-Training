@@ -14,6 +14,7 @@ const millisecondsByUnit = {
 const result = configSchema.safeParse({
   NODE_ENV: process.env.NODE_ENV,
   PORT: process.env.PORT,
+  DATABASE_URL: process.env.DATABASE_URL,
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN,
   CORS_ORIGIN: process.env.CORS_ORIGIN,
@@ -43,6 +44,7 @@ const expiryParts = values.JWT_EXPIRES_IN.match(/^(\d+)(ms|s|m|h|d|w)$/);
 const config = Object.freeze({
   nodeEnv: values.NODE_ENV,
   port: values.PORT,
+  databaseUrl: values.DATABASE_URL,
   jwtSecret: values.JWT_SECRET,
   jwtExpiresIn: values.JWT_EXPIRES_IN,
   jwtExpiresInMs: Number(expiryParts[1]) * millisecondsByUnit[expiryParts[2]],

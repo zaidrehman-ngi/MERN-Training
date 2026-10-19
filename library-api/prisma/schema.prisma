@@ -1,0 +1,125 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model authors {
+  author_id    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  book_authors book_authors[]
+}
+
+model book_authors {
+  book_id   String  @db.Uuid
+  author_id String  @db.Uuid
+  authors   authors @relation(fields: [author_id], references: [author_id], onDelete: NoAction, onUpdate: NoAction)
+  books     books   @relation(fields: [book_id], references: [book_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([book_id, author_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model book_copies {
+  copy_id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  book_id            String            @db.Uuid
+  branch_id          String            @db.Uuid
+  copy_number        Int
+  acquisition_year   Int?
+  acquisition_method String?
+  condition_notes    String?
+  inventory_status   String            @default("in_collection")
+  books              books             @relation(fields: [book_id], references: [book_id], onDelete: NoAction, onUpdate: NoAction)
+  branches           branches          @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction)
+  borrow_requests    borrow_requests[]
+
+  @@unique([book_id, branch_id, copy_number])
+}
+
+model book_genres {
+  book_id  String @db.Uuid
+  genre_id String @db.Uuid
+  books    books  @relation(fields: [book_id], references: [book_id], onDelete: NoAction, onUpdate: NoAction)
+  genres   genres @relation(fields: [genre_id], references: [genre_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([book_id, genre_id])
+  @@index([genre_id])
+}
+
+model books {
+  book_id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title            String
+  isbn             String?        @unique
+  publication_year Int?
+  available_copies Int            @default(0)
+  book_authors     book_authors[]
+  book_copies      book_copies[]
+  book_genres      book_genres[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model borrow_requests {
+  loan_id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  member_id         String          @db.Uuid
+  copy_id           String          @db.Uuid
+  borrowed_on       DateTime        @default(dbgenerated("CURRENT_DATE")) @db.Date
+  due_on            DateTime        @db.Date
+  returned_on       DateTime?       @db.Date
+  status            String          @default("out")
+  branch_id         String          @db.Uuid
+  fine_rate_per_day Decimal         @default(20.00) @db.Decimal(6, 2)
+  fine_assessed     Decimal         @default(0) @db.Decimal(8, 2)
+  branches          branches        @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction)
+  book_copies       book_copies     @relation(fields: [copy_id], references: [copy_id], onDelete: NoAction, onUpdate: NoAction)
+  members           members         @relation(fields: [member_id], references: [member_id], onDelete: NoAction, onUpdate: NoAction)
+  fine_payments     fine_payments[]
+
+  @@index([branch_id])
+  @@index([copy_id])
+  @@index([member_id])
+  @@index([due_on], map: "borrow_requests_overdue_due_on_idx", where: raw("(returned_on IS NULL)"))
+  @@index([status, due_on])
+}
+
+model branches {
+  branch_id       String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String
+  address         String?
+  phone           String?
+  book_copies     book_copies[]
+  borrow_requests borrow_requests[]
+  members         members[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model fine_payments {
+  payment_id      String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  loan_id         String          @db.Uuid
+  amount          Decimal         @db.Decimal(8, 2)
+  paid_on         DateTime        @default(dbgenerated("CURRENT_DATE")) @db.Date
+  borrow_requests borrow_requests @relation(fields: [loan_id], references: [loan_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([loan_id])
+}
+
+model genres {
+  genre_id    String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  book_genres book_genres[]
+}
+
+model members {
+  member_id       String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String
+  email           String?           @unique(map: "members_active_email_unique", where: raw("(is_active = true)"))
+  phone           String?
+  joined_on       DateTime?         @db.Date
+  branch_id       String            @db.Uuid
+  is_active       Boolean           @default(true)
+  borrow_requests borrow_requests[]
+  branches        branches          @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction)
+}
