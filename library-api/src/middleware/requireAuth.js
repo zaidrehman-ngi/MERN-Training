@@ -2,36 +2,38 @@ import jwt from "jsonwebtoken";
 import { unauthorized } from "../errors/ApiError.js";
 import config from "../config/config.js";
 
-const requireAuth = (req, res, next) => {
+// Checks the token, then loads the member it belongs to from the database.
+// The token only says who the member is; their current role (and whether
+// they still have an account at all) comes from the database, so a member
+// who was deleted or had their role changed can't keep using an old token.
+const requireAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return next(unauthorized());
   }
 
-  // if (!authHeader || !authHeader.startsWith("Bearer ")) {
-  //   res.status(401).json({
-  //     error: "UNAUTHORIZED",
-  //     message: "Authentication required.",
-  //     details: [],
-  //   });
-  //   }
-
   const token = authHeader.split(" ")[1];
 
-  jwt.verify(token, config.jwtSecret, (err, payload) => {
-    if (err) {
-      const message =
-        err.name === "TokenExpiredError"
-          ? "Token has expired."
-          : "Invalid token.";
-      next(unauthorized(message));
-      return;
-    }
+  let payload;
+  try {
+    payload = jwt.verify(token, config.jwtSecret);
+  } catch (err) {
+    const message =
+      err.name === "TokenExpiredError" ? "Token has expired." : "Invalid token.";
+    return next(unauthorized(message));
+  }
 
-    req.user = payload;
-    next();
-  });
+  const member = await req.app.locals.services.auth.findMemberForToken(
+    payload.sub,
+  );
+  if (!member) {
+    return next(unauthorized("This account no longer exists."));
+  }
+
+  // role comes from the database, not from the token
+  req.user = { sub: member.id, role: member.role, name: member.name };
+  next();
 };
 
 export default requireAuth;

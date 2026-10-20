@@ -106,3 +106,37 @@ message was the same, but an email that didn't exist came back in about
 So login now checks the password against a dummy hash when the email
 doesn't exist, and both take about 240 ms. Now both endpoints really do
 what the Week 1 decision says.
+
+# Exercise 8 — Login and the token
+
+## Task 2: Load the member on every request, or trust the token?
+
+**Trusting the token's claims.** The token is signed, so nobody can change
+the role in it without the secret. Checking it needs no database at all,
+so it's fast, the auth part keeps working even if the database is slow, and
+it scales easily to more servers. The problem is that the token is a copy
+of what was true when it was issued. If an admin is demoted, or a member is
+deleted or banned, their old token still says what it said for up to the
+whole expiry time (1 hour for me), and there's nothing I can do about it
+except wait or change the secret, which logs out everyone.
+
+**Loading the member every time.** The database is the real answer, so a
+role change or a deleted account counts on the very next request. I tested
+it: after changing Sara to admin in the database, her old token got 200 on
+`GET /users`, and after changing her back it got 403 again. A token signed
+with the right secret that claims `role: admin` still got 403, because the
+database said `user`. After her account was soft deleted, her token got 401
+straight away. The cost is one more query on every protected request and
+the auth now depends on the database being up.
+
+**My decision: load the member every time.** For this library the cost is
+tiny: it's one query on the primary key that only selects the id, name and
+role, and I measured it at about 1 to 2 ms per request. Being able to remove
+someone's access straight away matters more here, for example a librarian
+who leaves or a member who is banned. The token is now only used to say who
+the member is, and the database says what they're allowed to do.
+
+If the API got much busier, I'd keep the same idea but cache the member for
+a short time, or keep the database check for the risky routes (admin,
+deleting, changing other people) and trust the token for read-only ones,
+together with a shorter token expiry.

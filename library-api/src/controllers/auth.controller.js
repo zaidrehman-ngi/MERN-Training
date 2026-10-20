@@ -2,11 +2,13 @@ import jwt from "jsonwebtoken";
 import config from "../config/config.js";
 import { registrationResponse } from "./users.controller.js";
 
+// Only the member id and role go in the token. Anyone holding a token can
+// read the payload (it's only encoded, not encrypted, Week 1 Day 4), so
+// nothing personal or secret goes in it: no email, no password hash.
 const createAccessToken = (user) =>
   jwt.sign(
     {
       sub: user.id,
-      email: user.email,
       role: user.role,
     },
     config.jwtSecret,
@@ -56,7 +58,6 @@ const logout = (req, res) => {
 const refreshToken = (req, res) => {
   const accessToken = createAccessToken({
     id: req.user.sub,
-    email: req.user.email,
     role: req.user.role,
   });
 

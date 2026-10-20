@@ -29,6 +29,9 @@ const members = [
   { id: "m-1003", name: "Bilal Memon", email: "bilal3@lib.pk", role: "librarian", branch: "Clifton Branch", joined: "2021-04-15" },
   { id: "m-test", name: "Test User", email: "test@lib.pk", password: "test123", role: "user", branch: "Clifton Branch", joined: "2026-09-30" },
   { id: "m-admin-test", name: "Postman Test Admin", email: "admin-test@lib.pk", passwordHash: "$2b$12$4UlWWwiq4v5LcFRNS4QjluTp56s4.ahaQ9.mJd75DwqKTjFel3OUG", role: "admin", branch: "Clifton Branch", joined: "2026-10-08" },
+  // Exercise 7 Task 3: two members with the same password, to show the hashes differ
+  { id: "m-2001", name: "Sara Malik", email: "sara.malik@lib.pk", password: "Library@2026", role: "user", branch: "Clifton Branch", joined: "2026-10-20" },
+  { id: "m-2002", name: "Usman Tariq", email: "usman.tariq@lib.pk", password: "Library@2026", role: "user", branch: "Clifton Branch", joined: "2026-10-20" },
 ];
 
 const borrowRequests = [

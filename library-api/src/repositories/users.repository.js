@@ -73,6 +73,16 @@ const createUsersRepository = (prisma) => ({
     return row ? toUser(row) : null;
   },
 
+  // For requireAuth on every protected request: one small query, only what
+  // the auth checks need.
+  async findForAuth(id) {
+    const row = await prisma.members.findFirst({
+      where: { api_id: id, is_active: true },
+      select: { api_id: true, name: true, role: true },
+    });
+    return row ? { id: row.api_id, name: row.name, role: row.role } : null;
+  },
+
   // Only for logging in: the one place the password hash is read.
   async findCredentialsByEmail(email) {
     const row = await prisma.members.findFirst({

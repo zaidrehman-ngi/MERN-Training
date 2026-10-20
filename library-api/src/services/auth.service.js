@@ -23,8 +23,14 @@ const createAuthService = (usersRepository) => ({
       );
     }
 
-    return user;
+    // the hash was only needed for the check above, don't pass it on
+    const { passwordHash, ...member } = user;
+    return member;
   },
+
+  // Used by requireAuth on every protected request: the member the token
+  // belongs to, or null if they were deleted (soft delete) since.
+  findMemberForToken: (id) => usersRepository.findForAuth(id),
 });
 
 export default createAuthService;

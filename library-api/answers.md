@@ -1360,8 +1360,13 @@ them in the table:
 
 | api_id | name | password_hash |
 |---|---|---|
-| m-5021 | Sara Malik | `$2b$12$6Q4iIluBAHPEURn6Kc328.Ir6foWFDymPUftZEHQzTqLlm.8ln272` |
-| m-5022 | Usman Tariq | `$2b$12$pcOEaYRBoJpzYOFgZuHGXOj5o15.jyTkNfbIXxAX.r4HE7A2dkSNG` |
+| m-2001 | Sara Malik | `$2b$12$Y0j1cR/1VTlvKqN9qO3JAea1PIzNVeSa0F6eKe5uT7VDyRN0XG1dS` |
+| m-2002 | Usman Tariq | `$2b$12$QFXXWkb7ybdOiJ9.EDy9WOyi4cpDSYsLEOFC78bKFefMNqOtX15Nm` |
+
+(Later I added these two members to `db/seed.js` so they are always there
+for the review. The seed hashes `Library@2026` again every time it runs, so
+the exact values change after each `npm run db:seed`, but they always differ
+from each other.)
 
 They're different. The first 7 characters (`$2b$12$`, the algorithm and
 cost) are the same, but the next 22 characters are the salt, and that's
@@ -1500,3 +1505,145 @@ once, not setting the cost higher than needed, and for a lot of traffic
 moving hashing to worker threads or a separate service. Making the thread
 pool bigger (`UV_THREADPOOL_SIZE`) doesn't help much here, because there are
 only 4 CPU cores to do the hashing anyway.
+
+# Exercise 8 — Login and the token
+
+## Task 1: POST /auth/login
+
+I already had `POST /auth/login` from Week 5, but back then it checked
+against the JSON file, and since Exercise 7 it checks real members in the
+database. It finds the member by email (`findCredentialsByEmail`, the only
+method that reads `password_hash`), compares the password with
+`bcrypt.compare`, and on success signs a token with `jwt.sign` using
+`config.jwtSecret`, with `expiresIn: config.jwtExpiresIn` (1 hour in my
+`.env`). If the email doesn't exist or the password is wrong it's the same
+401 "Email or password is incorrect." (and the same time, from Exercise 7
+Task 4).
+
+**Checking against Week 1 Day 4.** There I found `cnic` and `passwordHash`
+in a token, and wrote that neither should ever be there, because a JWT
+payload is only base64 encoded and anyone holding the token can read it. I
+decoded a real token from my login:
+
+```
+before: {"sub":"m-5021","email":"sara.malik@lib.pk","role":"user","iat":...,"exp":...}
+after:  {"sub":"m-2001","role":"user","iat":...,"exp":...}
+```
+
+Neither `cnic` nor `passwordHash` was in it (my members table doesn't even
+have a CNIC column). But it did have the member's `email`, which the task
+didn't ask for and which is the same kind of problem: personal information
+that anyone with the token can read. Nothing used it except the refresh
+endpoint copying it into the new token, so I took it out. Now the payload
+is just the member id (`sub`), the role, and `iat`/`exp`.
+
+I also changed the auth service so it removes the password hash from the
+member before returning it to the controller. The controller never put it
+in the token or the response, but it had no reason to have it at all.
+
+Checked: the new token works on `GET /borrow-requests` (200), a `user`
+token gets 403 on `GET /users`, refresh gives a token with the same small
+payload, a token signed with a different secret gets 401 "Invalid token.",
+and the Postman collection gives the same results as before.
+
+## Task 2: requireAuth loads the real member
+
+`requireAuth` used to verify the token and then trust whatever was in it.
+Now it verifies the token, then loads the member from the database using the
+id in the token (`findForAuth`, one small query on the primary key that only
+selects the id, name and role). If the member doesn't exist any more or was
+soft deleted, it's 401 "This account no longer exists." `req.user.role` is
+set from the database, so `requireRole` now checks the member's real role
+without me changing it.
+
+**Public and protected routes.** On Week 5 Day 3 I listed the routes that
+are public on purpose: `POST /auth/login`, `POST /users` (registration),
+`GET /books` and `GET /books/:id`. `POST /auth/register` from Exercise 7 is
+public for the same reason as `POST /users`. I called every route with no
+token:
+
+- Public, still working without a token: `GET /books` (200),
+  `GET /books/bk-1` (200), `POST /users` (201), `POST /auth/register` (201),
+  `POST /auth/login` (200).
+- Protected, all 401 without a token: create/update/delete book, all five
+  user routes apart from registration, all six borrow request routes
+  (including approve and return), logout and refresh.
+
+**Checking it uses the database and not the token**, with Sara's token
+(a normal user):
+
+| What I did | `GET /users` with the same token |
+|---|---|
+| Nothing (she's a user) | 403 |
+| Changed her role to admin in the database | 200 |
+| Changed her back to user | 403 |
+| Used a token signed with the real secret that claims `role: admin` | 403 |
+| Soft deleted her account | 401 "This account no longer exists." |
+
+The Postman collection still gives the same results. The extra cost is one
+query per protected request, about 1 to 2 ms. At first the lookup used
+`findById`, which also loads the branch name and made it two queries, so I
+gave auth its own smaller lookup. The decision about whether this is worth
+it is in `decisions.md`.
+
+## Task 3: When the token expires
+
+I started the server with `JWT_EXPIRES_IN=10s` (the expiry comes from
+config, so no code change), logged in as Sara and decoded the token: `iat`
+and `exp` were 10 seconds apart. Straight after logging in,
+`GET /borrow-requests` gave 200. I waited 12 seconds and called it again
+with the same token. Exactly what came back:
+
+```
+HTTP/1.1 401 Unauthorized
+X-Request-Id: req-1792499730751
+Access-Control-Allow-Origin: http://localhost:5173
+Content-Type: application/json; charset=utf-8
+Content-Length: 68
+
+{"error":"UNAUTHORIZED","message":"Token has expired.","details":[]}
+```
+
+Two things I noticed:
+
+- The `error` code is `UNAUTHORIZED`, the same as when there's no token at
+  all or the token is fake. Only the `message` says it expired, so a client
+  would have to compare message text to know the difference.
+- `POST /auth/refresh` with the expired token also gave the same 401
+  "Token has expired." Refresh only works while the token is still valid,
+  so once it has expired the only way back is logging in again.
+
+**What my Week 4 Axios interceptor does with this today.** The response
+interceptor in `library-web/src/api/client.js` only has cases for 404,
+timeouts, no connection and 500+. A 401 falls through to the last one, so
+the page shows:
+
+> "Something went wrong. Please try again." / "Retry the request."
+
+That's wrong in every way: nothing went wrong with the server, retrying
+sends the same expired token and gets the same 401 forever, and the member
+isn't told they need to log in again. (I also found the frontend never
+sends the token as an `Authorization` header. It only sends the
+`accessToken` cookie because of `withCredentials: true`, and my
+`requireAuth` only reads the header, so the frontend's protected calls get
+401 even with a fresh login. That needs fixing on one side or the other.)
+
+**What it should do:**
+
+1. Have its own case for 401. Don't show "something went wrong", and don't
+   offer a retry, because retrying can't fix it.
+2. If it's an expired token and refreshing is possible, try to get a new
+   token once and then repeat the original request, so the member doesn't
+   notice. With my API as it is that can't work, because refresh needs a
+   token that hasn't expired, so it needs a proper refresh token (longer
+   lived, only used for `/auth/refresh`). If refreshing fails, go to the
+   next step and don't loop.
+3. Otherwise clear whatever login state the app keeps (right now the
+   frontend doesn't keep any, it just calls the login endpoint), send the
+   member to the login page with a message like "Your session has expired,
+   please log in again", and remember which page they were on so they go
+   back there after logging in.
+4. To make this easier, the API should send a different code for an
+   expired token, like `TOKEN_EXPIRED`, instead of `UNAUTHORIZED`, so the
+   interceptor can tell "expired, try to refresh" apart from "not logged in
+   / invalid token, go to login" without reading the message.
