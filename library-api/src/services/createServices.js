@@ -7,7 +7,11 @@ const createServices = (repositories) => ({
   books: createBooksService(repositories.books),
   users: createUsersService(repositories.users),
   borrowRequests: createBorrowRequestsService(repositories.borrowRequests),
-  auth: createAuthService(repositories.users),
+  auth: createAuthService(
+    repositories.users,
+    repositories.refreshTokens,
+    repositories.revokedTokens,
+  ),
 });
 
 export default createServices;

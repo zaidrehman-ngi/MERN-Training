@@ -26,11 +26,8 @@ router.post(
   logout,
 );
 
-router.post(
-  "/refresh",
-  requireAuth,
-  requireRole("user", "librarian", "admin", "super admin"),
-  refreshToken,
-);
+// No requireAuth: the refresh token cookie is what proves who you are here,
+// so it still works after the access token has expired.
+router.post("/refresh", refreshToken);
 
 export default router;

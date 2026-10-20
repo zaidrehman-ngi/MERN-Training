@@ -426,30 +426,6 @@
           "response": []
         },
         {
-          "name": "Logout",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status code is 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\n\r\npm.test(\"Content-Type is JSON\", function () {\r\n    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");\r\n});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/logout",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "logout"]
-            }
-          },
-          "response": []
-        },
-        {
           "name": "Refresh Token",
           "event": [
             {
@@ -762,6 +738,434 @@
             }
           },
           "response": []
+        }
+      ]
+    },
+    {
+      "name": "Logout (runs last)",
+      "item": [
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\n\r\npm.test(\"Content-Type is JSON\", function () {\r\n    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");\r\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Exercise 8 Task 6 - Full Auth Flow",
+      "description": "Register, login, protected route, forbidden route, expiry, refresh, logout. Start the API with JWT_EXPIRES_IN=10s so step 5 only waits about 10 seconds.",
+      "item": [
+        {
+          "name": "1. Register",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// a new email every run, so the flow can be run again and again",
+                  "pm.environment.set(\"flowEmail\", `flow-${Date.now()}@lib.pk`);",
+                  "pm.environment.set(\"flowPassword\", \"FlowTest123!\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "pm.test(\"Response has the registration message\", () => {",
+                  "    pm.expect(pm.response.json().message).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test(\"Response has no password or hash in it\", () => {",
+                  "    const text = pm.response.text();",
+                  "    pm.expect(text).to.not.include(\"password\");",
+                  "    pm.expect(text).to.not.match(/\\$2[aby]\\$/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"name\": \"Flow Test Member\",\r\n  \"email\": \"{{flowEmail}}\",\r\n  \"password\": \"{{flowPassword}}\",\r\n  \"branch\": \"Clifton Branch\",\r\n  \"joined\": \"2026-10-20\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            }
+          }
+        },
+        {
+          "name": "2. Login and save the token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// a JWT payload is only base64url encoded, so it can be read without the secret",
+                  "const decodePayload = (token) => JSON.parse(Buffer.from(token.split(\".\")[1], \"base64\").toString());",
+                  "",
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"Got an access token and it is the member who registered\", () => {",
+                  "    pm.expect(body.accessToken).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.user.email).to.eql(pm.environment.get(\"flowEmail\"));",
+                  "    pm.expect(body.user.role).to.eql(\"user\");",
+                  "});",
+                  "",
+                  "pm.test(\"Token payload only has the member id, role and times\", () => {",
+                  "    const payload = decodePayload(body.accessToken);",
+                  "    pm.expect(payload.sub).to.eql(body.user.id);",
+                  "    pm.expect(payload.role).to.eql(\"user\");",
+                  "    pm.expect(payload).to.have.property(\"exp\");",
+                  "    pm.expect(payload).to.not.have.any.keys(\"email\", \"password\", \"passwordHash\", \"cnic\");",
+                  "});",
+                  "",
+                  "// capture the token for the next requests",
+                  "pm.environment.set(\"flowToken\", body.accessToken);",
+                  "pm.environment.set(\"flowMemberId\", body.user.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"email\": \"{{flowEmail}}\",\r\n  \"password\": \"{{flowPassword}}\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3. Protected route (allowed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"Borrow requests come back as a list\", () => {",
+                  "    pm.expect(pm.response.json().data).to.be.an(\"array\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{flowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrow-requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "borrow-requests"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4. Route this member is not allowed (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 403\", () => pm.response.to.have.status(403));",
+                  "",
+                  "pm.test(\"Forbidden error in the standard shape\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.all.keys(\"error\", \"message\", \"details\");",
+                  "    pm.expect(body.error).to.eql(\"FORBIDDEN\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{flowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "5. Let it expire (401)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// a JWT payload is only base64url encoded, so it can be read without the secret",
+                  "const decodePayload = (token) => JSON.parse(Buffer.from(token.split(\".\")[1], \"base64\").toString());",
+                  "",
+                  "// Wait until the token's own expiry has passed. Only done if that is",
+                  "// at most 60 seconds away, so run the API with JWT_EXPIRES_IN=10s for this.",
+                  "const exp = decodePayload(pm.environment.get(\"flowToken\")).exp * 1000;",
+                  "const wait = exp - Date.now() + 1500;",
+                  "if (wait > 60000) {",
+                  "    console.log(`Token expires in ${Math.round(wait / 1000)}s - start the API with JWT_EXPIRES_IN=10s to see this step pass.`);",
+                  "} else if (wait > 0) {",
+                  "    console.log(`Waiting ${Math.round(wait / 1000)}s for the token to expire...`);",
+                  "    setTimeout(() => {}, wait);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 401\", () => pm.response.to.have.status(401));",
+                  "",
+                  "pm.test(\"Message says the token expired\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.error).to.eql(\"UNAUTHORIZED\");",
+                  "    pm.expect(body.message).to.eql(\"Token has expired.\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{flowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrow-requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "borrow-requests"
+              ]
+            }
+          }
+        },
+        {
+          "name": "6. Refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// a JWT payload is only base64url encoded, so it can be read without the secret",
+                  "const decodePayload = (token) => JSON.parse(Buffer.from(token.split(\".\")[1], \"base64\").toString());",
+                  "",
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const newToken = pm.response.json().accessToken;",
+                  "",
+                  "pm.test(\"Got a new access token for the same member\", () => {",
+                  "    pm.expect(newToken).to.be.a(\"string\").and.not.eql(pm.environment.get(\"flowToken\"));",
+                  "    pm.expect(decodePayload(newToken).sub).to.eql(pm.environment.get(\"flowMemberId\"));",
+                  "});",
+                  "",
+                  "pm.test(\"New token works on the protected route\", (done) => {",
+                  "    pm.sendRequest({",
+                  "        url: `${pm.environment.get(\"baseUrl\")}/api/v1/borrow-requests`,",
+                  "        header: { Authorization: `Bearer ${newToken}` },",
+                  "    }, (err, res) => {",
+                  "        pm.expect(err).to.be.null;",
+                  "        pm.expect(res.code).to.eql(200);",
+                  "        done();",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.environment.set(\"flowToken\", newToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [],
+            "description": "No token needed: the refreshToken cookie that login set (httpOnly, path /api/v1/auth) is sent automatically.",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            }
+          }
+        },
+        {
+          "name": "7. Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const loggedOutToken = pm.environment.get(\"flowToken\");",
+                  "",
+                  "pm.test(\"The same token no longer works after logout\", (done) => {",
+                  "    pm.sendRequest({",
+                  "        url: `${pm.environment.get(\"baseUrl\")}/api/v1/borrow-requests`,",
+                  "        header: { Authorization: `Bearer ${loggedOutToken}` },",
+                  "    }, (err, res) => {",
+                  "        pm.expect(err).to.be.null;",
+                  "        pm.expect(res.code).to.eql(401);",
+                  "        pm.expect(res.json().message).to.eql(\"This token has been logged out.\");",
+                  "        done();",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{flowToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            }
+          }
         }
       ]
     }

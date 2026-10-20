@@ -17,6 +17,7 @@ const result = configSchema.safeParse({
   DATABASE_URL: process.env.DATABASE_URL,
   JWT_SECRET: process.env.JWT_SECRET,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN,
+  JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN,
   CORS_ORIGIN: process.env.CORS_ORIGIN,
   UPLOADS_PATH: process.env.UPLOADS_PATH,
   ACCESS_LOG_PATH: process.env.ACCESS_LOG_PATH,
@@ -41,7 +42,10 @@ if (!result.success) {
 }
 
 const values = result.data;
-const expiryParts = values.JWT_EXPIRES_IN.match(/^(\d+)(ms|s|m|h|d|w)$/);
+const toMs = (duration) => {
+  const [, amount, unit] = duration.match(/^(\d+)(ms|s|m|h|d|w)$/);
+  return Number(amount) * millisecondsByUnit[unit];
+};
 
 const config = Object.freeze({
   nodeEnv: values.NODE_ENV,
@@ -49,7 +53,9 @@ const config = Object.freeze({
   databaseUrl: values.DATABASE_URL,
   jwtSecret: values.JWT_SECRET,
   jwtExpiresIn: values.JWT_EXPIRES_IN,
-  jwtExpiresInMs: Number(expiryParts[1]) * millisecondsByUnit[expiryParts[2]],
+  jwtExpiresInMs: toMs(values.JWT_EXPIRES_IN),
+  refreshExpiresIn: values.JWT_REFRESH_EXPIRES_IN,
+  refreshExpiresInMs: toMs(values.JWT_REFRESH_EXPIRES_IN),
   corsOrigin: values.CORS_ORIGIN,
   uploadsPath: path.resolve(process.cwd(), values.UPLOADS_PATH),
   accessLogPath: path.resolve(process.cwd(), values.ACCESS_LOG_PATH),

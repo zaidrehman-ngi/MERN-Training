@@ -133,6 +133,7 @@ model members {
   is_active       Boolean           @default(true)
   borrow_requests borrow_requests[]
   book_requests   book_requests[]
+  refresh_tokens  refresh_tokens[]
   branches        branches          @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction)
 }
 
@@ -153,4 +154,27 @@ model book_requests {
 
   @@index([member_id])
   @@index([book_id])
+}
+
+// Refresh tokens (Exercise 8 Task 4). Only a SHA-256 hash of the token is
+// stored, so a copy of this table can't be used to log in.
+model refresh_tokens {
+  token_id   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  member_id  String    @db.Uuid
+  token_hash String    @unique @db.Char(64)
+  expires_at DateTime  @db.Timestamptz(6)
+  revoked_at DateTime? @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  members    members   @relation(fields: [member_id], references: [member_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([member_id])
+}
+
+// Access tokens that were logged out before they expired (Exercise 8 Task 5).
+// A row only needs to stay until expires_at; after that the token is dead anyway.
+model revoked_tokens {
+  jti        String   @id @db.Uuid
+  expires_at DateTime @db.Timestamptz(6)
+
+  @@index([expires_at])
 }

@@ -9,6 +9,20 @@ const millisecondsByUnit = {
   w: 604_800_000,
 };
 
+// "15m", "1h", "7d" etc.
+const duration = z
+  .string()
+  .regex(/^[1-9]\d*(ms|s|m|h|d|w)$/, "must be a duration such as 15m or 1h")
+  .refine((expiry) => {
+    const match = expiry.match(/^(\d+)(ms|s|m|h|d|w)$/);
+    if (!match) {
+      return false;
+    }
+
+    const [, amount, unit] = match;
+    return Number.isSafeInteger(Number(amount) * millisecondsByUnit[unit]);
+  }, "must be a supported duration");
+
 const configSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
@@ -24,18 +38,9 @@ const configSchema = z.object({
       (secret) => !secret.toLowerCase().includes("replace-with"),
       "must not be a placeholder value",
     ),
-  JWT_EXPIRES_IN: z
-    .string()
-    .regex(/^[1-9]\d*(ms|s|m|h|d|w)$/, "must be a duration such as 15m or 1h")
-    .refine((expiry) => {
-      const match = expiry.match(/^(\d+)(ms|s|m|h|d|w)$/);
-      if (!match) {
-        return false;
-      }
-
-      const [, amount, unit] = match;
-      return Number.isSafeInteger(Number(amount) * millisecondsByUnit[unit]);
-    }, "must be a supported duration"),
+  JWT_EXPIRES_IN: duration,
+  // the refresh token lives much longer than the access token
+  JWT_REFRESH_EXPIRES_IN: duration.default("7d"),
   CORS_ORIGIN: z
     .url()
     .refine((origin) => /^https?:\/\//i.test(origin), "must use http or https"),

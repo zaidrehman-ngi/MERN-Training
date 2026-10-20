@@ -24,6 +24,15 @@ const requireAuth = async (req, res, next) => {
     return next(unauthorized(message));
   }
 
+  // logged out tokens are on the denylist (tokens without an id are old or
+  // not made by us, so they're refused too)
+  if (
+    !payload.jti ||
+    (await req.app.locals.services.auth.isAccessTokenRevoked(payload.jti))
+  ) {
+    return next(unauthorized("This token has been logged out."));
+  }
+
   const member = await req.app.locals.services.auth.findMemberForToken(
     payload.sub,
   );
@@ -33,6 +42,8 @@ const requireAuth = async (req, res, next) => {
 
   // role comes from the database, not from the token
   req.user = { sub: member.id, role: member.role, name: member.name };
+  // logout needs the token's id and expiry
+  req.token = { jti: payload.jti, exp: payload.exp };
   next();
 };
 

@@ -1647,3 +1647,155 @@ sends the token as an `Authorization` header. It only sends the
    expired token, like `TOKEN_EXPIRED`, instead of `UNAUTHORIZED`, so the
    interceptor can tell "expired, try to refresh" apart from "not logged in
    / invalid token, go to login" without reading the message.
+
+## Task 4: Refresh tokens
+
+Login now gives two tokens:
+
+- The **access token**: the same JWT as before (member id and role), but
+  only valid for **15 minutes** now (`JWT_EXPIRES_IN=15m`). It's sent with
+  every request.
+- A **refresh token**: a long random string (32 random bytes), valid for
+  **7 days** (`JWT_REFRESH_EXPIRES_IN=7d`, through the config module like
+  the rest). It isn't a JWT, because the server has to look it up in the
+  database anyway to check if it was revoked. It goes in an `httpOnly`
+  cookie with `Path=/api/v1/auth/refresh`, so page JavaScript can't read it
+  and the browser only sends it to the refresh endpoint, not with every
+  request.
+
+The database only stores a SHA-256 hash of the refresh token, in a new
+`refresh_tokens` table (migration `refresh_tokens`), with when it expires
+and when it was revoked. A fast hash is fine here, unlike for passwords,
+because the token is random and far too long to guess.
+
+`POST /auth/refresh` no longer needs a valid access token. It reads the
+refresh token cookie, checks it in the database (exists, not revoked, not
+expired, member still active), revokes it, and sends back a new access
+token **and a new refresh token** (rotation), so each refresh token only
+works once.
+
+What I tested, with the access token set to 5 seconds:
+
+| Step | Result |
+|---|---|
+| Login | both cookies set; refresh one has `Path=/api/v1/auth/refresh`, `HttpOnly`, 7 days |
+| Database | 64-character hash stored, not the 43-character token |
+| Access token after 6 seconds | 401 "Token has expired." |
+| `POST /auth/refresh` with the cookie | 200, new access token, new refresh token |
+| New access token | 200 |
+| Old refresh token used again | 401 `INVALID_REFRESH_TOKEN` |
+| No cookie, or a made-up token | 401 |
+| Member soft deleted, then refresh | 401 |
+
+The Postman collection still gives the same results.
+
+**What problem it actually solves:** a stolen access token works for anyone
+until it expires and can't be taken back, but it's only good for 15
+minutes, while the refresh token, which lasts 7 days, is never sent with
+normal requests or readable by page JavaScript, so it's much harder to
+steal. And if a refresh token is stolen anyway, it can be revoked in the
+database and only works once, so the thief loses it as soon as the real
+member refreshes, instead of having a long-lived token that can't be
+cancelled.
+
+One thing still missing: logout doesn't revoke the refresh token yet, so
+until it does, the cookie keeps working for 7 days after logging out. I
+left it because the Postman collection calls Refresh after Logout and
+expects 200.
+
+## Task 5: Logout
+
+I couldn't find my Week 1 answer about un-issuing tokens in the repo (I
+searched every branch and the git history). The two usual ways are a
+**denylist** (remember the ids of logged-out tokens until they expire and
+refuse them) or **short-lived access tokens plus revocable refresh tokens**
+(don't track access tokens, just let them run out). I went with the
+denylist, because it's the only one that stops the old token straight away.
+
+**First, the test on the old logout**, before changing anything: log in,
+log out, replay the old token.
+
+```
+logged in, protected route: 200
+logout: {"message":"Logged out successfully."} -> 200
+replay OLD access token after logout: 200
+refresh with the cookie after logout: 200
+```
+
+So my logout was **cosmetic**. It only sent back a message. The token kept
+working until it expired, and the refresh cookie could keep getting new
+tokens for 7 days.
+
+**What I built:**
+
+- Every access token now gets its own id (`jti`, a UUID) when it's signed.
+- New table `revoked_tokens` (`jti`, `expires_at`). Logout puts the token's
+  `jti` in it with the token's own expiry, revokes the refresh token, and
+  clears both cookies. Rows whose expiry has passed get deleted, because
+  those tokens are rejected anyway, so the table stays small.
+- `requireAuth` checks the list on every request and refuses a listed
+  token with 401 "This token has been logged out." It also refuses tokens
+  without a `jti`, since every real token has one now.
+
+**The test again, after:**
+
+| Step | Result |
+|---|---|
+| Logged in | 200 |
+| Logout | 200, both cookies cleared |
+| Replay the old access token | **401 "This token has been logged out."** |
+| Replay the old refresh token | **401 `INVALID_REFRESH_TOKEN`** |
+| Logout again with the same token | 401 |
+| Same member logged in on another device | still 200, refresh still works |
+| Logging in again | new token works |
+
+The first time I ran this, the old refresh token still worked after logout.
+In Task 4 I had set the refresh cookie's path to `/api/v1/auth/refresh`, so
+the browser (and curl) never sent it to `/api/v1/auth/logout`, and logout
+never saw it to revoke it. I changed the path to `/api/v1/auth`, which
+still keeps it away from every non-auth route.
+
+**The Postman collection** called Logout in the middle and then kept using
+the same token for Refresh, all the borrow request requests and the wrong
+role check. That only ever worked because logout didn't do anything. With a
+real logout 7 requests got 401, so I moved the Logout request to the end of
+the collection (its own folder, "Logout (runs last)"). I didn't change any
+request or test. With that, every request gives the same status code as the
+JSON server baseline again.
+
+**Limits:** it's one more small query on every protected request, and
+logout only ends the session it's called from. Logging out everywhere (for
+example after a stolen phone) would need something like a "tokens valid
+after" time on the member, which `requireAuth` could check in the same
+member lookup it already does.
+
+## Task 6: The whole flow in Postman
+
+I added a folder to the collection, **"Exercise 8 Task 6 - Full Auth Flow"**,
+with the seven requests in order. It keeps its own token in a separate
+environment variable (`flowToken`) so it doesn't mix with the `accessToken`
+the rest of the collection uses.
+
+| # | Request | What the tests check |
+|---|---|---|
+| 1 | `POST /auth/register` | 201, the registration message, no "password" or bcrypt hash anywhere in the response. A pre-request script makes a new email every run (`flow-<time>@lib.pk`). |
+| 2 | `POST /auth/login` | 200, got an `accessToken` for the member who just registered, and the token's payload only has `sub`, `role`, `iat`, `exp`, no email, password, hash or cnic. Then it **saves the token** into `flowToken`. |
+| 3 | `GET /borrow-requests` | 200 and a list, using `{{flowToken}}`. |
+| 4 | `GET /users` | 403 `FORBIDDEN` in the standard error shape, because a normal member isn't allowed. |
+| 5 | `GET /borrow-requests` again | A pre-request script reads `exp` from the token and waits until it has passed, then the test checks 401 "Token has expired." |
+| 6 | `POST /auth/refresh` | 200, a new access token for the same member (no token sent, the refresh cookie from login is sent by itself), and the new token works on the protected route. Saves the new token. |
+| 7 | `POST /auth/logout` | 200, and then it replays the same token and checks it now gets 401 "This token has been logged out." |
+
+The expiry step only waits if the token expires within 60 seconds, so for
+the demo the API has to be started with `JWT_EXPIRES_IN=10s` (I put the
+commands in the README). With the normal 15 minutes, step 5 doesn't wait
+and fails, which is right, because the token hasn't expired.
+
+I ran it with newman: all 7 requests and all 17 assertions passed, and step
+5 waited 11 seconds for the real expiry. Running the whole collection gives
+65 assertions with only the same 5 failures the collection had on the JSON
+server.
+
+At first newman printed a warning that `atob` (which I used to decode the
+token payload) is deprecated in its sandbox, so I changed it to
+`Buffer.from(..., "base64")`.
