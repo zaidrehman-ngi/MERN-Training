@@ -28,6 +28,7 @@ const result = configSchema.safeParse({
   SEARCH_RATE_LIMIT_MAX: process.env.SEARCH_RATE_LIMIT_MAX,
   LOG_LEVEL: process.env.LOG_LEVEL,
   DB_QUERY_LOG: process.env.DB_QUERY_LOG,
+  BCRYPT_COST: process.env.BCRYPT_COST,
 });
 
 if (!result.success) {
@@ -60,6 +61,7 @@ const config = Object.freeze({
   searchRateLimitMax: values.SEARCH_RATE_LIMIT_MAX,
   logLevel: values.LOG_LEVEL,
   dbQueryLog: values.DB_QUERY_LOG === "true",
+  bcryptCost: values.BCRYPT_COST,
 });
 
 export default config;

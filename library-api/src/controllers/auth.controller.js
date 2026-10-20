@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import config from "../config/config.js";
+import { registrationResponse } from "./users.controller.js";
 
 const createAccessToken = (user) =>
   jwt.sign(
@@ -18,6 +19,14 @@ const setAccessTokenCookie = (res, accessToken) => {
     sameSite: "strict",
     maxAge: config.jwtExpiresInMs,
   });
+};
+
+// The users service hashes the password and saves the member, unless the
+// email is already registered. The response is the same either way, so it
+// can't be used to check if someone has an account.
+const register = async (req, res) => {
+  await req.app.locals.services.users.create(req.body);
+  res.status(201).json(registrationResponse);
 };
 
 const login = async (req, res) => {
@@ -58,4 +67,4 @@ const refreshToken = (req, res) => {
   });
 };
 
-export { login, logout, refreshToken };
+export { register, login, logout, refreshToken };

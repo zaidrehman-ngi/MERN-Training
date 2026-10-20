@@ -14,20 +14,21 @@ const createUsersService = (usersRepository) => ({
     return user;
   },
 
+  // Registration. It doesn't say if the email is already taken (see
+  // decisions.md, Exercise 7 Task 4): the caller gets the same answer either
+  // way, so nobody can use this to find out who has an account.
   async create(userData) {
+    // hash first, so a taken email takes as long as a new one
+    const passwordHash = await hashPassword(userData.password);
+
     const existingUser = await usersRepository.findByEmail(userData.email);
     if (existingUser) {
-      throw conflict("A user with this email already exists.", [
-        {
-          field: "email",
-          message: "Email must be unique.",
-        },
-      ]);
+      return null;
     }
 
     return usersRepository.create({
       ...userData,
-      password: await hashPassword(userData.password),
+      password: passwordHash,
       role: "user",
     });
   },

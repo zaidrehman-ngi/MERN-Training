@@ -1254,3 +1254,249 @@ user on a slow connection, and it can leak things like the password hash.
 First thing I'd look at: the response itself in Postman or the browser's
 network tab, and its size. Then check which fields the page actually uses
 and change the repository to `select` only those.
+
+# Exercise 7 — Registration, done properly
+
+## Task 1: The password column
+
+I actually already had a `password_hash` column. I added it as `TEXT` in
+Exercise 5 Task 3, just so the users from `db.json` had somewhere to go,
+without thinking about the type. So this migration fixes it properly
+instead of adding a new one.
+
+Before deciding the type I generated some real hashes with the same
+`hashPassword` function the app uses (bcrypt, 12 rounds):
+
+```
+60  $2b$12$HyXWmYJaknaVGu7ErXBxp.HU0HJ3QKq3F5jIrZtPvStfHIDT/YAdG   "test123"
+60  $2b$12$ZRR9tLiq8DUC5.wGrrJZSum0QwyEApoFqY1SwBQHS0WhdSKrsF2aO   a long password with spaces and ünïcödé
+60  $2b$12$Q0MVepkeB/jJW0xHkwDLOu6mKnPZD.yLqIXpzgUaWaOvmDbgsPPfW   ""
+    $2b$10$KmSj0kc.24Agtf6/0WYPouFjBdE8sis.RcDFr.90M6EgsnIrqBLx2   10 rounds
+    $2b$14$83n8BESKPQRA3Gf8J8VXauICkaPj5E8QThoI7fnVUVMsSPzoZiUwi   14 rounds
+```
+
+Every one is exactly **60 characters**, no matter how long the password is
+or how many rounds. It's always `$2b$`, then the cost (`12$`), then 22
+characters of salt and 31 of hash, and only letters, numbers, `.` and `/`.
+
+So the migration (`members_password_hash_bcrypt`) does two things:
+
+- Changes the column to **`CHAR(60)`**, because a bcrypt hash is always that
+  exact length.
+- Adds a **`CHECK`** that the value looks like a bcrypt hash
+  (`^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$`). I tried saving `test123`
+  in it straight from psql and Postgres rejected it, so a plain-text
+  password can't end up in this column even by mistake. A real hash is
+  accepted.
+
+I kept the name **`password_hash`**. It says it's a hash, so nobody reading
+the schema would think it's the actual password, which a column just
+called `password` could look like.
+
+I checked that registering, logging in (and a wrong password giving 401)
+and the seed all still work with the new column.
+
+## Task 2: POST /auth/register
+
+`POST /api/v1/auth/register` uses `createUserSchema`, the same zod schema
+from Friday that `POST /users` uses, then calls the users service. The
+service checks the email isn't taken (409 if it is), hashes the password,
+saves the member, and the route sends back 201 with the new member and a
+`Location` header. I left `POST /users` as it was because the Postman
+collection uses it.
+
+```
+POST /api/v1/auth/register  ->  201
+Location: /api/v1/users/m-5013
+{"data":{"id":"m-5013","name":"Leak Check","email":"leakcheck@lib.pk",
+         "role":"user","branch":"Clifton Branch","joined":"2026-10-20"}}
+```
+
+**1. No hash in the response.** That was already fixed at the data layer in
+Exercise 6: the users repository never selects `password_hash`, so the
+member the service gets back doesn't have it. The response above has no
+`password` or hash field.
+
+**2. The password never reaches a log.** I registered with a password I
+could search for (`Zebra-Leak-Check-9137`) and ran everything with the most
+logging on (`NODE_ENV=development`, `LOG_LEVEL=debug`, `DB_QUERY_LOG=true`):
+a normal register, the same email again, a bad email, a branch that doesn't
+exist, broken JSON, and a login. Then I searched the server output and
+`logs/access.log` for the password.
+
+It found one leak: **the broken JSON one.** When the JSON can't be parsed,
+Express's error has the raw request body on it, and my error handler logged
+the whole error in development, so the log had
+`body: '{"email":"leak3@lib.pk","password":"Zebra-Leak-Check-9137",,}'`.
+I changed the error handler so for that error it only logs "Request body
+contains invalid JSON (body not logged)", because even the error message
+can quote part of the body.
+
+The query log was also printing every parameter, which for a register is
+the new bcrypt hash. It's not the password, but a hash in a log file can
+still be cracked offline, so the query log now replaces anything that looks
+like a bcrypt hash with `[hidden hash]`.
+
+After both fixes I ran it all again: the password was in the logs 0 times
+and there were no hashes either.
+
+**3. The cost factor comes from config.** It was `const SALT_ROUNDS = 12`
+in `src/utils/password.js`. Now it's `BCRYPT_COST` in `.env`, checked in
+`config.schema.js` (a number from 10 to 15, default 12), and
+`hashPassword` uses `config.bcryptCost`. I checked it: with
+`BCRYPT_COST=10` the hash starts `$2b$10$`, with 13 it starts `$2b$13$`,
+and with 4 the app refuses to start ("BCRYPT_COST: Too small").
+
+I also added the members email index to the database error translation
+from Exercise 5, so if two people register the same email at the same time
+and the database catches it, they get the same 409 as the service check.
+
+## Task 3: Two members with the same password
+
+My guess (in `guesses.md`) was that the two stored values would be
+different because of the salt. I registered two members through
+`POST /auth/register`, both with the password `Library@2026`, and looked at
+them in the table:
+
+| api_id | name | password_hash |
+|---|---|---|
+| m-5021 | Sara Malik | `$2b$12$6Q4iIluBAHPEURn6Kc328.Ir6foWFDymPUftZEHQzTqLlm.8ln272` |
+| m-5022 | Usman Tariq | `$2b$12$pcOEaYRBoJpzYOFgZuHGXOj5o15.jyTkNfbIXxAX.r4HE7A2dkSNG` |
+
+They're different. The first 7 characters (`$2b$12$`, the algorithm and
+cost) are the same, but the next 22 characters are the salt, and that's
+random for each one, so the rest of the hash is different too. Both members
+can still log in with `Library@2026`, because bcrypt reads the salt back out
+of the stored value when it checks the password.
+
+**What's different about seeing it in a table.** In Week 1 it was two
+hashes printed by a script and then gone (and back then I actually guessed
+they'd be the same). Here they're stored permanently, next to a name and an
+email, in a table that has backups, can be exported from DBeaver, and that
+anyone with database access can read. So this column is the part that
+would actually get copied if the database was ever leaked, and that's when
+the salt matters: in a table you can sort or group by `password_hash`, and
+if the values were the same you'd see straight away which members share a
+password.
+
+**What an attacker with a copy of this table can do:**
+
+- See every member's name and email, and which ones are admins or
+  librarians from the `role` column. That alone is a leak.
+- See the algorithm and cost (`$2b$12$`) and each salt, so they know exactly
+  how to check a guess.
+- Guess passwords offline, one member at a time: hash a guess with that
+  row's salt and see if it matches. Nothing stops them trying as many times
+  as they want. A common pattern like `Library@2026` would probably be found
+  quickly from a word list.
+- Go after one person they care about, like an admin.
+
+**What they can't do:**
+
+- Turn a hash back into the password. bcrypt is one-way, there's no
+  decrypting it.
+- Tell that Sara and Usman have the same password, because the hashes don't
+  match.
+- Use a rainbow table (a list of pre-computed hashes), because every hash
+  has its own salt, so they'd need a separate table for every member.
+- Crack everyone at once. Each guess only tests one member, and at cost 12
+  each guess takes a noticeable fraction of a second, so trying a big list
+  against all members takes a very long time.
+- Log in with the hash itself. The login hashes whatever is typed in, so
+  pasting the hash as the password doesn't work.
+
+## Task 4: Email already registered
+
+The decision is in `decisions.md`. In short: registration now gives the same
+answer whether the email is new or already taken, to match my Week 1
+decision that login shouldn't reveal if an account exists.
+
+The two disagreed before this. Login said "Email or password is incorrect"
+for both cases, but `POST /auth/register` (and `POST /users`) answered
+`409 "A user with this email already exists."`, which tells anyone who has
+an account.
+
+What I changed:
+
+- The users service hashes the password first, then if the email is taken it
+  just doesn't save anything. Both `POST /auth/register` and `POST /users`
+  now always reply `201` with
+  `"Registration received. If this email wasn't already registered, the account has been created and you can log in."`
+  There's no member data or `Location` header any more, because those would
+  only be there for a new account and give it away. The frontend's register
+  page doesn't use the response body, so it still works.
+- Login checks against a dummy hash when the email doesn't exist.
+
+I timed both before and after:
+
+| Request | Before | After |
+|---|---|---|
+| Register, email already taken | 409, ~5 ms | 201, ~240 ms |
+| Register, new email | 201, ~240 ms | 201, ~290 ms |
+| Login, email doesn't exist | 401, ~4 ms | 401, ~245 ms |
+| Login, real email, wrong password | 401, ~240 ms | 401, ~240 ms |
+
+Before, both endpoints could be used to check if an email has an account,
+register by its message and login by its timing. Now they look the same. A
+taken email doesn't change the existing account (Sara could still log in
+with her own password), the new account is created and can log in, and the
+Postman collection still gives the same results.
+
+## Task 5: How long registering takes
+
+I timed `POST /auth/register` 10 times at each cost (after one warm-up):
+
+| `BCRYPT_COST` | Average register time |
+|---|---:|
+| 12 | 301 ms |
+| 14 | 1,150 ms |
+
+Raising it by two made it about 4 times slower, because each +1 doubles the
+work bcrypt does. Almost all of that time is the hashing; the database
+insert is only a few milliseconds.
+
+**Connecting it to Week 5.** On Week 5 Day 1 I wrote that `fs.readFile`
+doesn't block because file reading happens outside the main thread, in
+Node's thread pool, but a CPU-heavy loop runs on the main thread and blocks
+the event loop. Hashing a password is CPU work, so the question is where it
+runs.
+
+I wrote `db/register-load-test.js` to find out. It sends 50 registrations at
+the same time, and while they run it keeps timing two other requests:
+`GET /` (only JavaScript on the main thread) and `GET /uploads/dune.jpg`
+(a static file, so it needs a file read, which uses the thread pool). I ran
+it with the normal `bcrypt.hash` (async) and then once with
+`bcrypt.hashSync` swapped in just for the test.
+
+| | Quiet server | During 50 registrations, async `hash` | During 50 registrations, `hashSync` |
+|---|---|---|---|
+| All 50 registrations done | | 5.1 s | 14.1 s |
+| `GET /` | avg 14 ms | avg 19 ms, max 180 ms | avg 1,706 ms, max **13,408 ms** |
+| `GET /uploads/dune.jpg` | avg 13 ms | avg 411 ms, max **4,166 ms** | avg 2,297 ms, max **13,452 ms** |
+
+**With `hashSync`** it's exactly the CPU loop from Week 5. Each hash runs on
+the main thread for about 250 ms, and nothing else can happen while it
+does. 50 of them one after another is about 14 seconds, and every other
+request to the server (the home page, the books list, a login, anything)
+just waits for all of them to finish. One simple `GET /` took 13.4 seconds.
+50 people signing up at once would freeze the whole API for everyone.
+
+**With the async `bcrypt.hash`** (what my code uses) the hashing runs in the
+thread pool, not on the main thread. So `GET /` stayed fast, because the
+event loop was free. But it doesn't fully fix it, because the thread pool is
+small: it has 4 threads by default (and my laptop has 4 cores). Only 4
+hashes run at once and the other 46 wait in a queue, which is why all 50
+took about 5 seconds. Anything else that needs the thread pool waits in the
+same queue. That's why the static file went from 13 ms to up to 4 seconds:
+its file read was stuck behind the password hashes. File reads, `dns.lookup`
+and other `crypto` calls all use that pool.
+
+So the async version helps a lot, because it keeps the event loop free for
+normal requests, but the work isn't free, it's just moved. With 4 threads
+the server can only hash about 4 passwords at a time, and while it does,
+anything else that uses the thread pool is slowed down. Things that would
+help: rate limiting the register and login endpoints so 50 can't arrive at
+once, not setting the cost higher than needed, and for a lot of traffic
+moving hashing to worker threads or a separate service. Making the thread
+pool bigger (`UV_THREADPOOL_SIZE`) doesn't help much here, because there are
+only 4 CPU cores to do the hashing anyway.

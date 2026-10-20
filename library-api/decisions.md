@@ -65,3 +65,44 @@ controllers, it gets a lot harder.
 So I don't think I need to worry much about which ORM I pick. The
 important part is keeping all the database code in one layer, because
 that's what makes changing it later cheap or expensive.
+
+# Exercise 7 — Registration, done properly
+
+## Task 4: What to say when the email is already registered
+
+**Option 1: tell them the email is taken (409).**
+It's the friendliest. Someone who forgot they already signed up finds out
+straight away and goes to log in instead. It's also simpler and easier to
+debug. The problem is that anyone can type any email into the register form
+and find out if that person is a member of the library. For a library
+that's not the worst leak, but it's still personal information, it gives
+an attacker a list of real accounts to try passwords on, and it can be done
+automatically for thousands of emails.
+
+**Option 2: return the same success either way.**
+Nobody can tell from the response if an email has an account. The cost is
+that a real person who already has an account gets "registration received"
+and might be confused about why they can't log in with the new password.
+Done properly it needs email: the new person gets a "welcome" email and the
+existing owner gets a "someone tried to register with your email, did you
+forget your password?" email. I don't have email sending yet.
+
+**My decision: option 2.** Registration returns the same 201 and the same
+message whether the email was new or already registered. If it was taken,
+nothing is saved. It also hashes the password in both cases so the response
+takes the same time, otherwise the timing would give it away. Once there is
+email sending, the existing owner should get a message about it.
+
+**Is it consistent with the login decision?** In Week 1 (Day 3) I decided
+login should say "Invalid email or password" for both a wrong email and a
+wrong password, so it doesn't reveal whether an account exists. Before this
+task the two disagreed: login hid it, but register said "A user with this
+email already exists", so hiding it at login was pointless. Register was
+the wrong one, so I changed it.
+
+While checking I found login was also leaking it a different way. The
+message was the same, but an email that didn't exist came back in about
+4 ms (no hash to check) and a real one in about 240 ms (bcrypt running).
+So login now checks the password against a dummy hash when the email
+doesn't exist, and both take about 240 ms. Now both endpoints really do
+what the Week 1 decision says.

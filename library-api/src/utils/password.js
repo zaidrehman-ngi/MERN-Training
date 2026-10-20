@@ -1,25 +1,19 @@
 import bcrypt from "bcrypt";
-import { timingSafeEqual } from "node:crypto";
-
-const SALT_ROUNDS = 12;
+import config from "../config/config.js";
 
 async function hashPassword(password) {
-  return bcrypt.hash(password, SALT_ROUNDS);
+  // the cost factor comes from config (BCRYPT_COST), not typed in here
+  return bcrypt.hash(password, config.bcryptCost);
 }
 
-async function verifyPassword(password, storedPassword) {
-  if (typeof storedPassword !== "string") {
+// Only bcrypt hashes are stored now (the database CHECK makes sure of it),
+// so there is no plain-text comparison any more.
+async function verifyPassword(password, storedHash) {
+  if (typeof storedHash !== "string") {
     return false;
   }
 
-  if (/^\$2[aby]\$\d{2}\$/.test(storedPassword)) {
-    return bcrypt.compare(password, storedPassword);
-  }
-
-  const provided = Buffer.from(password);
-  const stored = Buffer.from(storedPassword);
-
-  return provided.length === stored.length && timingSafeEqual(provided, stored);
+  return bcrypt.compare(password, storedHash);
 }
 
 export { hashPassword, verifyPassword };

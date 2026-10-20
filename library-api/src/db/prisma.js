@@ -13,7 +13,9 @@ const prisma = new PrismaClient({
 
 if (config.dbQueryLog) {
   prisma.$on("query", (event) => {
-    console.log(`[query] ${Math.round(event.duration)}ms ${event.query} ${event.params}`);
+    // hide bcrypt hashes so they never end up in the terminal or a log file
+    const params = event.params.replace(/\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}/g, "[hidden hash]");
+    console.log(`[query] ${Math.round(event.duration)}ms ${event.query} ${params}`);
   });
 }
 

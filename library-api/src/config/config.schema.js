@@ -49,6 +49,8 @@ const configSchema = z.object({
   SEARCH_RATE_LIMIT_MAX: z.coerce.number().int().positive(),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "silent"]),
   DB_QUERY_LOG: z.enum(["true", "false"]).default("false"),
+  // bcrypt cost factor: below 10 is too fast to guess, above 15 makes login very slow
+  BCRYPT_COST: z.coerce.number().int().min(10).max(15).default(12),
 });
 
 export default configSchema;

@@ -125,7 +125,7 @@ model members {
   api_id          String            @unique @default(dbgenerated("('m-'::text || nextval('members_api_id_seq'::regclass))"))
   name            String
   email           String?           @unique(map: "members_active_email_unique", where: raw("(is_active = true)"))
-  password_hash   String?
+  password_hash   String?           @db.Char(60)
   role            String            @default("user")
   phone           String?
   joined_on       DateTime?         @db.Date

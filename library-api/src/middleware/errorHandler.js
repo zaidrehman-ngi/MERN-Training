@@ -39,8 +39,11 @@ const errorHandler = (originalErr, req, res, next) => {
         details: [],
       };
 
-  const logDetails =
-    config.nodeEnv === "development"
+  // A broken JSON body error has the raw body on it (and its message can quote
+  // part of it), which could be a password, so never log it.
+  const logDetails = isMalformedJson
+    ? "Request body contains invalid JSON (body not logged)."
+    : config.nodeEnv === "development"
       ? inspect(originalErr, { depth: 5 })
       : originalErr instanceof Error
         ? `${originalErr.name}: ${originalErr.message}`

@@ -10,11 +10,15 @@ const getUserById = async (req, res) => {
   res.status(200).json(user);
 };
 
+// Same response whether the email was new or already registered.
+const registrationResponse = {
+  message:
+    "Registration received. If this email wasn't already registered, the account has been created and you can log in.",
+};
+
 const createUser = async (req, res) => {
-  const newUser = await req.app.locals.services.users.create(req.body);
-  res.status(201).json({
-    data: newUser,
-  });
+  await req.app.locals.services.users.create(req.body);
+  res.status(201).json(registrationResponse);
 };
 
 const updateUser = async (req, res) => {
@@ -32,4 +36,11 @@ const deleteUser = async (req, res) => {
   res.status(204).send();
 };
 
-export { getUsers, getUserById, createUser, updateUser, deleteUser };
+export {
+  getUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser,
+  registrationResponse,
+};

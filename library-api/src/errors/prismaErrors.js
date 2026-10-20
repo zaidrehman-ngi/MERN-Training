@@ -7,6 +7,11 @@ const uniqueMessages = {
     field: "isbn",
     detail: "ISBN must be unique.",
   },
+  members_active_email_unique: {
+    message: "A user with this email already exists.",
+    field: "email",
+    detail: "Email must be unique.",
+  },
 };
 
 // Prisma puts the original Postgres error under meta.driverAdapterError.cause

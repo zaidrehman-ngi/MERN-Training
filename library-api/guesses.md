@@ -65,3 +65,16 @@ milliseconds.
 
 After running it: I was right that the join was faster, about 2 times
 (around 0.9 ms against 1.7 ms), and that both are only a millisecond or two.
+
+# Exercise 7 — Registration, done properly
+
+## Task 3: Same password, same stored value?
+
+My guess is that the two stored values will **not** be the same. bcrypt
+adds a random salt every time it hashes, and the salt is part of what it
+stores, so even with the exact same password (`Library@2026`) the two hashes
+should come out different. Both should still start the same way, `$2b$12$`,
+because that's just the algorithm and the cost.
+
+After doing it: my guess was right. The two hashes were completely
+different, but both started with `$2b$12$`.
