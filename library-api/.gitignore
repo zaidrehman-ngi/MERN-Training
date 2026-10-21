@@ -7,3 +7,4 @@ node_modules/
 .env
 library-spreadsheet.csv
 src/generated/
+logs/*.log

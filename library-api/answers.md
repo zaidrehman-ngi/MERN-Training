@@ -1799,3 +1799,186 @@ server.
 At first newman printed a warning that `atob` (which I used to decode the
 token payload) is deprecated in its sandbox, so I changed it to
 `Buffer.from(..., "base64")`.
+
+# Exercise 9 — OAuth, and shipping it
+
+## Task 1: Re-reading my Week 1 Day 4 answers
+
+- **Steps 4–5 were wrong about the browser.** Google doesn't hand the code to my browser app to pass on. It redirects the browser to my server's callback URL (`redirect_uri`) with `?code=...&state=...`, so my server gets it directly.
+- **"Exchange it for the token and user information" was vague.** The server sends the code plus its client secret to Google and gets back an ID token. It has to check that token (signature, `aud`, `iss`, expiry) and then use Google's `sub`, not the email, to find or link the member.
+- **Step 8, "signs them in", now has a real meaning.** After Google, my server issues its own access token and refresh token cookie, exactly like `/auth/login`. Google's tokens are never our session, and the browser never sees them.
+- **The state part was right but incomplete.** I didn't say where `state` is kept: it has to be saved (e.g. a short-lived cookie) before the redirect, compared on the callback, then thrown away.
+
+## Task 2: Two ways to sign in
+
+Right now a member can only sign in with an email and a `password_hash`.
+With Google there's a second way, so a member might have a password, a
+Google account, or both. What changes:
+
+- **Add `google_sub`.** That's Google's id for the account (the `sub` in the
+  ID token). It never changes, unlike the email, so it's what I'd look the
+  member up by. It has to be unique.
+- **`password_hash` becomes properly nullable.** It's already nullable (only
+  because the fixture members had no passwords), but now it means something:
+  a member who only uses Google has no password.
+- **`branch_id` becomes nullable.** Registering with a password asks for a
+  branch, but Google doesn't know it, so a Google sign-up has no branch
+  until the member picks one after their first login.
+- **At least one way to sign in.** A check that a member has a password, a
+  Google id, or both, so no account can exist that nobody can log into.
+- **Email stays unique among active members** (the index from Tuesday). I
+  don't want two accounts with the same email, one per sign-in method.
+
+The migration I'd write:
+
+```sql
+ALTER TABLE members ADD COLUMN google_sub TEXT;
+ALTER TABLE members ADD COLUMN google_linked_at TIMESTAMPTZ;
+
+-- one member per Google account
+CREATE UNIQUE INDEX members_google_sub_unique
+    ON members (google_sub)
+    WHERE google_sub IS NOT NULL;
+
+-- Google sign-ups don't come with a branch
+ALTER TABLE members ALTER COLUMN branch_id DROP NOT NULL;
+
+-- password_hash is already nullable; it keeps its bcrypt CHECK from
+-- Exercise 7 for when it isn't null.
+
+-- a member must be able to sign in somehow
+ALTER TABLE members ADD CONSTRAINT members_has_login_method
+    CHECK (password_hash IS NOT NULL OR google_sub IS NOT NULL)
+    NOT VALID;
+```
+
+`NOT VALID` because the old fixture members have neither, so the check only
+applies to new and changed rows until those are cleaned up. If more
+providers came later I'd move this into a separate `member_logins` table
+(member, provider, provider id), but for just Google one column is enough.
+
+**March password, June Google, same email.** What my endpoint would do:
+
+1. Verify Google's ID token, then look the member up by `google_sub`. If
+   found, log them in. Nothing to do with the email at all.
+2. Not found, but there is already a member with that email: **don't log
+   them in and don't link it.** Tell them an account with this email
+   already exists and to log in with their password first, then connect
+   Google from their account. Linking only happens while they're logged in
+   the normal way, and only if Google says `email_verified: true`.
+3. No member with that email at all: create a new one with `google_sub`
+   set and no password (again only if Google's email is verified).
+
+This doesn't go against my Exercise 7 decision about not revealing
+accounts, because the person in step 2 has just proved to Google that they
+own that email.
+
+**Why the naive answer is a serious bug.** The naive version is "same email,
+so it's the same person, link it and log them in." But my app never checks
+that someone owns the email they register with. So an attacker can register
+in March with the victim's email and a password they know. In June the real
+person signs in with Google, gets linked into that account, and from then on
+the attacker can log in with their password and see everything the real
+member does. It also works the other way: if Google ever sends an email that
+isn't verified, anyone could take over an existing account just by putting
+that email on a Google account. Matching on email gives the account to
+whoever typed the email first, not to whoever owns it.
+
+## Task 3: What's left to ship Google sign-in (for the committee)
+
+**Already done this week, and reused as it is:** a real members table,
+hashed passwords, login that issues our own short access token and a
+refresh token cookie, refresh, logout that really logs out, every request
+checking the member in the database, and one standard error format. Google
+sign-in ends with "log this member in", and that part exists now.
+
+**What's left:**
+
+| Piece | Rough time |
+|---|---|
+| Google Cloud setup: OAuth client id and secret, consent screen, allowed redirect URLs for local and live | half a day |
+| Put the Google settings in the config module and `.env` | an hour |
+| The migration from Task 2 (`google_sub`, nullable `branch_id`, the "has a way to log in" check), and cleaning up old test members that have neither | half a day |
+| `GET /auth/google`: make a random `state`, keep it in a short-lived cookie, send the member to Google | half a day |
+| `GET /auth/google/callback`: check `state`, swap the code for an ID token, verify the token, then the three cases from Task 2 (known Google account, email already exists, brand new member) | 1.5 days |
+| "Connect Google" for a member who is already logged in, and not letting someone remove their only way to log in | 1 day |
+| Asking a new Google member for their branch after their first login | half a day |
+| Frontend: the button, the page Google sends people back to, the "log in with your password first" message. The frontend also doesn't send the token or handle 401s yet (Exercise 8 Task 3), so that has to be fixed first | 2 days |
+| Testing the failures: wrong `state`, member cancels on Google, unverified email, code used twice, the March/June case, and a Postman flow like Exercise 8 Task 6 | 1.5 days |
+| Going live: HTTPS, `Secure` cookies, the live redirect URL registered with Google | half a day (with the deploy) |
+
+**Total: about 8 to 9 working days, so roughly two weeks for me**, with
+some room for things going wrong with Google's setup. It would be a bit
+less for someone who has done it before.
+
+**Compared to Week 1.** In Week 1 I said the button takes minutes but the
+system behind it is "not realistically an afternoon's work". I was right
+about that, but I never gave a number, so it wasn't really an estimate. I
+was also missing things I only know now that I've built the rest: the
+account-linking bug from Task 2, the members table needing a branch Google
+doesn't give us, and the frontend not handling login at all yet. With the
+user table, tokens and logout already built it's about two weeks, and
+without this week's work it would have been at least double that.
+
+## Task 4: Shipping it, checked as a reviewer
+
+I checked everything on a database made from nothing, and at the end on a
+copy of only the files git would give a reviewer (no `.env`, no
+`node_modules`, no generated Prisma client), following the README.
+
+| Check | Result |
+|---|---|
+| Migrations run from empty | All 9 ran on a new database, and `prisma migrate diff` shows the schema and migrations match. 14 tables, 13 check constraints. |
+| Seed gives a working dataset | 9 books, 8 members (including logins for a user, an admin and the two `Library@2026` members), 3 borrow requests. Running it twice is fine. |
+| No password hash returned | I saved all 40 responses from a full Postman run and searched them: no bcrypt hash or password value anywhere. In the code only `findCredentialsByEmail` reads `password_hash`, and login strips it. |
+| No secret in the repository | `.env` was never committed. **But the real JWT secret was in old `jwt-demo.js` files from Weeks 1 and 5, on `master`, already pushed.** Not in this branch's files, but still in the git history. |
+| Protected and public routes | All 20 routes: the 6 public ones work without a token, the 14 others give 401, and so does an admin token signed with the old secret. |
+| Postman collection green | At first 17 of 65 failed. After the fixes below: **67 of 67** on the fresh database, and again on the fresh clone. |
+
+**What I fixed:**
+
+- **The leaked secret:** I made a new random `JWT_SECRET` in `.env`, so the
+  old one in the history can't sign anything this API accepts any more. I
+  didn't rewrite `master`'s history; rotating is what makes it safe.
+- **The collection** only passed on my machine because a token was already
+  saved in my Postman environment. On a clean run the Books and Users
+  requests had no token. I added a "Setup" folder at the start that logs in
+  as the seeded test admin (the seed now gives that account a known test
+  password). The other failures were test data: "Create Book" used Dune's
+  ISBN, so I gave it one no seeded book has; "Update Borrow Request" needs a
+  librarian or admin but used the normal user's token, so it uses the admin
+  token now; and the rate limit test's script used top-level `await`, which
+  newman can't run, so I rewrote it without. I didn't change what any test
+  checks.
+- **`logs/access.log`** was committed and changed on every run. There was
+  nothing secret in it, but it's a runtime file, so it's in `.gitignore`
+  now (the folder stays with a `.gitkeep`, because the app writes there).
+- The README explains how to run the collection: seed first, then start
+  the API with `JWT_EXPIRES_IN=20s` because the expiry step waits for the
+  real expiry.
+
+## Task 5: Three places I'd least like a reviewer to see
+
+**1. The repositories do more than data access.** `users.repository.js` and
+`borrowRequests.repository.js` turn rows into the API shape, look up
+branches and books by name or `api_id`, and throw HTTP 422 errors. A
+repository shouldn't know what a status code is. **Week 7 fixes it**, that's
+exactly what the layered refactor is for, as long as I actually move the
+mapping and the errors into the services instead of just renaming folders.
+
+**2. The `books` table has shortcuts in it.** To keep the old API shape I
+added an `author` text column even though there's an `authors` table, and
+stored `available_copies` / `total_copies` even though `book_copies` already
+holds the real copies (and in Exercise 3 I decided to work the count out
+instead). On top of that, `borrow_requests` is actually the loans table and
+the API's borrow requests live in `book_requests`, which confuses anyone
+reading the schema. **I need to fix this one.** Week 7 doesn't touch the
+data model; it needs migrations and a decision on what the API should send.
+
+**3. The frontend still doesn't really do auth.** It never sends the token
+as an `Authorization` header (only the cookie, which `requireAuth` ignores),
+and its Axios interceptor shows "Something went wrong" on a 401 instead of
+refreshing or sending the member to login (Exercise 8 Task 3). So the API
+works in Postman, but the React app can't use any protected route. **I need
+to fix this.** Real-time updates and TypeScript won't change it, and it has
+to work before Google sign-in or anything else is built on top.
