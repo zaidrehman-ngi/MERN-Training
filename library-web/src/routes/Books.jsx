@@ -30,23 +30,37 @@ function Books() {
   useEffect(() => {
     dispatch(fetchBooks({ filter, search: debouncedSearchText }));
   }, [dispatch, filter, debouncedSearchText]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      dispatch(fetchBooks({ filter, search: debouncedSearchText }));
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [dispatch, filter, debouncedSearchText]);
+
   const handleSelect = useCallback(
     (selectedBook) => {
       navigate(`/books/${selectedBook.id}`);
     },
     [navigate],
   );
+
   const handleFilterChange = useCallback(
     (filter) => dispatch(filterChanged(filter)),
     [dispatch],
   );
+
   const handleRetry = () => {
     dispatch(fetchBooks({ filter, search: debouncedSearchText }));
   };
+
   return (
     <main>
       <h1>Books</h1>
-      <FilterChips activeFilter={filter} onFilterChange={handleFilterChange} />{" "}
+      <FilterChips
+        activeFilter={filter}
+        onFilterChange={handleFilterChange}
+      />{" "}
       <SearchBox
         searchText={searchText}
         onSearchChange={(search) => dispatch(searchChanged(search))}
