@@ -23,7 +23,6 @@ model book_authors {
   @@id([book_id, author_id])
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model book_copies {
   copy_id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   book_id            String            @db.Uuid
@@ -69,7 +68,6 @@ model books {
   book_requests    book_requests[]
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model borrow_requests {
   loan_id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   member_id         String          @db.Uuid
@@ -103,7 +101,6 @@ model branches {
   members         members[]
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model fine_payments {
   payment_id      String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   loan_id         String          @db.Uuid
@@ -139,7 +136,6 @@ model members {
 
 // A member asking to borrow a book (the API's /borrow-requests).
 // Not the same as borrow_requests, which holds the actual loans of a copy.
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model book_requests {
   request_id   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   api_id       String    @unique @default(dbgenerated("('br-'::text || nextval('book_requests_api_id_seq'::regclass))"))
