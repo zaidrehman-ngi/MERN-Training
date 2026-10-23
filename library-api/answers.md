@@ -5,168 +5,217 @@
 ## Task 1: Polling the catalogue
 
 I made the catalogue page (`library-web/src/routes/Books.jsx`) fetch the
-books again every 3 seconds with `setInterval`, and stop when you leave the
-page. Then I left the page open for 5 minutes without changing anything.
-
-To count it I wrote `library-web/scripts/measure-polling.mjs`. It opens the
-page in a headless Chrome and listens to the browser's network events (the
-same thing as the Network tab in DevTools), so the byte counts are what
-really came over the network, headers included. To know if the data had
-changed, it compares a hash of each response with the one before.
+books every 3 seconds with `setInterval`, left it open for 5 minutes and
+watched the catalogue requests in the Network tab.
 
 | In 5 minutes | Result |
 |---|---:|
-| Catalogue requests | 100 |
-| Responses where the data had changed | 1 (the first load) |
-| Bytes transferred in total | 108,208 |
-| Bytes transferred for nothing | 105,122 |
+| Requests | 100 |
+| Responses with changed data | 1 (the first load) |
+| Bytes in total | 108,208 |
+| Bytes for nothing | 105,122 |
 
-So 99 out of 100 requests got back exactly the same books, about 1 KB
-each time. That's for one open page showing 10 books. With every
-librarian's screen open all day it's thousands of useless requests per hour,
-and the screen can still be up to 3 seconds out of date.
+99 of 100 requests got the same 10 books back, about 1 KB each.
 
 ## Task 2: The arithmetic
 
-My three numbers from Task 1, over 5 minutes:
+- 40 librarians × 20 requests a minute = **800 requests per minute**.
+- Useful: almost none. In my test only the first load had new data. Even
+  if 5 books were checked out a minute, only about 200 of the 800 would
+  see a change.
+- About 0.85 MB a minute for nothing.
 
-- **100** requests
-- **1** of them returned data that had changed (the first load)
-- **105,122** bytes transferred for nothing (about 1,062 bytes per request)
-
-**Forty librarians at 3 seconds.** One page polling every 3 seconds is 20
-requests a minute, so 40 librarians is **800 requests per minute**, or
-48,000 an hour. From my measurement only about 1 in 100 had new data, and
-that one was the first load, so with nothing happening it's closer to 0%
-useful. Even on a busy day, if 5 books were checked out every minute, only
-about 5 × 40 = 200 of the 800 would see a change, so at best around a
-quarter are useful and the rest are the server answering "nothing new". In
-bytes it's about 800 × 1 KB, so roughly 0.85 MB a minute or 50 MB an hour
-for a catalogue page showing 10 books.
-
-**One second instead of three.** That's 40 × 60 = **2,400 requests a
-minute**, three times the load, and still mostly useless. The screen would
-be at most 1 second out of date instead of 3, so the 90 second problem gets
-a lot smaller, but it doesn't go away. There's still a gap where the first
-librarian has checked out the last copy and the second one's screen hasn't
-asked yet, and she can still promise it. Making the interval shorter just
-trades a smaller gap for more load. It never gets to zero, because the
-browser only finds out when it asks. To actually fix it the server has to
-tell the screens when something changes, and the checkout itself has to be
-checked on the server, so the second librarian's checkout gets refused
-even if her screen is out of date.
+At **1 second** it's 2,400 requests a minute, three times the load. The
+screen is at most 1 second old instead of 3, so the 90 second problem gets
+smaller but never goes away: there's always a gap before the next request
+where a librarian can still promise a copy that's gone. The fix is the
+server telling the screens when something changes, and the checkout being
+checked on the server so the second one is refused anyway.
 
 ## Task 3: Four ways to get new data to the browser
 
-| Way | How it works | Direction | Holds a connection open? |
+| Way | How it works | Direction | Connection open? |
 |---|---|---|---|
-| **Polling** | The browser asks every few seconds and the server answers straight away, even if nothing changed (what I built in Task 1). | One way: the browser asks, the server answers | No, a new request each time |
-| **Long polling** | The browser asks, and the server doesn't answer until there's something new (or a timeout). Then the browser asks again straight away. | One way: updates only come back as answers | Yes, each request stays open until there's news |
-| **Server-sent events (SSE)** | The browser opens one normal HTTP request and the server keeps it open and writes events down it whenever something happens. | One way: server to browser only | Yes, one long-lived connection |
-| **WebSockets** | The browser upgrades an HTTP connection into a socket, and after that either side can send a message at any time. | Two way | Yes, one long-lived connection |
+| Polling | The browser asks every few seconds | One way | No |
+| Long polling | The browser asks, the server only answers when there's news, then the browser asks again | One way | Yes, per request |
+| Server-sent events | One HTTP request the server keeps open and writes events into | One way (server → browser) | Yes |
+| WebSockets | An upgraded connection where either side can send any time | Two way | Yes |
 
-**The right one for this problem: WebSockets** (with Socket.IO). The
-librarian's screen needs to hear "the last copy of Dune just went out" the
-moment it happens, and the other ways either waste requests or only go one
-way. For the counter, it isn't only the server talking. Each screen also
-has to tell the server things, like which book it's looking at so it only
-gets that book's updates, and later actions like joining the queue. With
-WebSockets that all goes over the same connection. Socket.IO also handles
-reconnecting when the Wi-Fi drops, and rooms, which we'll need.
+**For this problem: WebSockets (Socket.IO).** The screen needs the update
+straight away, and it also has to tell the server things, like which book
+it's watching. Socket.IO also reconnects by itself and has rooms.
 
-**Where SSE would have been enough:** a member's own notifications, like
-"your book is due tomorrow" or "the book you queued for is now available".
-The member's browser never needs to send anything back over that
-connection; it just listens. If they want to do something about it, like
-borrow the book, that can be a normal HTTP request.
+**SSE would be enough for** a member's notifications ("due tomorrow", "your
+queued book is ready"). The member only listens, and acting on it can be a
+normal HTTP request.
 
 ## Task 4: The handshake
 
-I made a tiny Node server that accepts an upgrade and sent it a handshake
-with curl, to see the real thing. The browser's request is a normal HTTP
-`GET`:
+The browser sends a normal `GET`:
 
 ```
 GET /socket.io/?EIO=4 HTTP/1.1
-Host: localhost:3999
 Upgrade: websocket
 Connection: Upgrade
 Sec-WebSocket-Version: 13
 Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
 ```
 
-The header that asks for the upgrade is **`Upgrade: websocket`**, together
-with `Connection: Upgrade`. `Sec-WebSocket-Key` is a random value the
-server has to answer correctly, to prove it really understands WebSockets.
-The server answered:
+`Upgrade: websocket` asks for the switch. The server answers
+**`101 Switching Protocols`** with a `Sec-WebSocket-Accept` value worked
+out from the key, which proves it understood the request.
 
-```
-HTTP/1.1 101 Switching Protocols
-Upgrade: websocket
-Connection: Upgrade
-Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
-```
+After that it's still the same TCP connection on the same port, and the
+cookies and headers from the first request are still available to the
+server. But:
 
-**101 Switching Protocols** means "OK, from now on this connection isn't
-HTTP any more". `Sec-WebSocket-Accept` is worked out from the browser's key
-(SHA-1 of the key plus a fixed string, in base64), so the browser knows the
-server did the handshake properly. One thing I noticed: Node didn't send
-this request to the normal request handler at all, it went to a separate
-`upgrade` event.
-
-**What's still true afterwards:** it's the same TCP connection, on the same
-port, started by the same browser, and the cookies and headers from that
-first request were sent once and the server can still look at them.
-
-**What isn't:**
-
-- **No more requests and responses.** After the 101, either side can send a
-  message at any time. A message doesn't have to be an answer to anything,
-  and there can be many in a row from one side.
-- **No more status codes.** There's no 200 or 404 for each message. If
-  something goes wrong, you have to put that in the message yourself (like
-  `{ error: "..." }`). The only codes left are close codes when the
-  connection ends (like 1000 for normal close).
-- **No more Content-Type.** Messages don't have headers. Each frame is just
-  marked as text or binary, and what's inside (JSON or not) is up to us.
-- **No headers per message at all**, so there's no `Authorization` header on
-  each message like with my HTTP requests. Whatever we know about the user
-  comes from that first handshake.
+- no more request/response pairs: either side sends whenever it wants
+- no status codes per message: errors have to go in the message itself
+  (only close codes are left)
+- no Content-Type or headers per message: a frame is just text or binary,
+  so there's no `Authorization` header on each message either
 
 ## Task 5: What really needs real-time
 
-**Three things that genuinely need it:**
+Needs it:
 
-1. **Copy availability at the counter.** This is the story from the start
-   of the exercise. When the last copy of a book goes out, every librarian
-   looking at that book needs to know straight away, or two of them promise
-   the same copy.
-2. **Queue promotion.** When someone returns Dune and the next member in the
-   queue is promoted, that member (and the librarian holding the book for
-   them) should see it now, not whenever they next refresh. Otherwise the
-   book sits on the hold shelf while nobody knows it's theirs.
-3. **New borrow requests on the librarian's screen.** A member asks for a
-   book online and is waiting for an answer. The librarian's list should get
-   the new request as it arrives, instead of the librarian polling or
-   refreshing all day.
+1. **Copy availability at the counter**, so two librarians don't promise
+   the same last copy.
+2. **Queue promotion**, so the next member knows the book is theirs as soon
+   as it comes back.
+3. **New borrow requests on the librarian's screen**, because the member is
+   waiting for an answer.
 
-**Three that look like they need it but don't:**
+Looks like it but doesn't:
 
-1. **Fines going up every day.** A fine only changes once a day, so
-   pushing it live is pointless. Work it out from the due date when someone
-   looks at it (or update it in the nightly job), and show it when the
-   member opens their account page.
-2. **Due-date reminders.** They feel like notifications, but they're on a
-   schedule: "due tomorrow" only needs to be decided once a night. A cron
-   job that sends an email or saves a notification is right. The member
-   doesn't need to be online to get it.
-3. **New books added to the catalogue, and reports like fines per branch.**
-   Nobody is harmed if a new book shows up the next time the page loads, and
-   a report that the committee looks at once a month doesn't need to change
-   while they're reading it. A normal request when the page opens, or a
-   refresh button, is enough.
+1. **Fines** change once a day. Work them out when someone looks (or in the
+   nightly job).
+2. **Due-date reminders** are a schedule. A cron job that sends or saves
+   the reminder is enough, the member doesn't need to be online.
+3. **New books and reports**. Showing them on the next page load or with a
+   refresh button is fine.
 
-If everything was pushed live, every screen would be changing under people
-all the time and it would be much harder to work out why something showed
-up or didn't. So I'd only use sockets for the things where a few seconds'
-delay causes a real mistake.
+I'd only push the things where a few seconds' delay causes a real mistake.
+
+# Exercise 2 — The handshake
+
+## Task 1: Socket.IO on the same server as Express
+
+I installed `socket.io` **4.8.4** (current stable). `src/server.js` now
+creates the HTTP server from the Express app and gives the same server to
+Socket.IO (`src/realtime/socketServer.js`):
+
+```js
+const httpServer = http.createServer(app);
+createSocketServer(httpServer);
+httpServer.listen(config.port, ...);
+```
+
+On one port, `GET /` still returns the API message and `/socket.io/` does
+the Socket.IO handshake and the `101` upgrade.
+
+**The line that made it possible** is `export default app;` at the end of
+`app.js`. `app.js` only builds the app and never calls `listen`, so I could
+change how the server starts in `server.js` without touching it.
+
+**Without the split**, `app.js` would end with `app.listen(port)`, which
+hides the HTTP server inside Express. I'd have had to rework `app.js` to
+get hold of the server and put the socket setup in with the routes, and
+anything importing `app.js` would start listening on the port.
+
+## Task 2: One event each way
+
+The client is `public/socket-test.html`, served by Express on the same
+port, so no CORS. It loads `/socket.io/socket.io.js` (served by Socket.IO
+itself) and `socket-test.js`, which is a separate file because Helmet's
+CSP blocks inline scripts.
+
+1. The page connects and the server logs `Socket connected: <id>`.
+2. The page emits `client:hello` with some text.
+3. The server logs it and emits `server:hello` back to that socket.
+4. The page shows `received: Hi, the server got "Hello from the browser"`.
+
+## Task 3: Watching the connection
+
+In the Network tab, after a reload:
+
+```
+GET  ...transport=polling            -> 200  (session id)
+POST ...transport=polling&sid=...    -> 200  (connect + my first hello)
+GET  ...transport=polling&sid=...    -> 200
+WS   ...transport=websocket&sid=...  -> 101 Switching Protocols (Upgrade: websocket)
+frames: 2probe / 3probe / 5 / 42["client:hello",...] / 42["server:hello",...]
+```
+
+In the Socket filter the request has status **101** and `Upgrade:
+websocket`. In the messages view `2probe`/`3probe` tests the new socket, `5`
+switches over to it, and `42` is an event with its name and data.
+
+It started with **long polling**, and my first hello actually went in a
+POST before the upgrade finished. Socket.IO does this because plain HTTP
+works on every network, while some proxies, firewalls and antivirus block
+WebSockets. It connects straight away, upgrades if it can, and stays on
+polling if it can't.
+
+## Task 4: An event nobody listens for
+
+My guess was silence. I made the page listen for `server:helo` while the
+server sent `server:hello`: no error on the server, nothing in the browser
+console, and the page just never showed the reply. So it was silence. The
+server doesn't care if anyone listens, and the client ignores events it has
+no handler for (same the other way round).
+
+A typo in an event name never shows up as an error, the feature just
+doesn't work. So I put every event name in `src/realtime/events.js` and use
+those constants instead of strings, and the server now warns about unknown
+incoming events (`socket.onAny`). Sending `client:helo` from the page logged
+`sent an unknown event: client:helo`. The naming convention is in
+`decisions.md`.
+
+
+## Task 5: Acknowledgements
+
+Socket.IO's acknowledgement is a callback passed as the last argument of
+`emit`. The other side gets it as the last argument of its handler and
+calls it to answer. `socket.timeout(ms)` makes the callback get an error if
+no answer comes in time.
+
+```js
+// client
+socket.timeout(3000).emit("client:hello", { text }, (err, response) => {
+  if (err) log("no answer after 3s");
+  else log(`ack: ${JSON.stringify(response)}`);
+});
+
+// server
+socket.on(EVENTS.CLIENT_HELLO, (message, ack) => {
+  ...
+  if (typeof ack === "function") ack({ ok: true, receivedAt: ... });
+});
+```
+
+Sending "approve please" got `ack: {"ok":true,...}` back. A second button
+sends `client:nobody-answers`, which the server has no handler for, and
+after 3 seconds the page showed `no answer after 3s`.
+
+**Need an ack:** the client actions that change something, like approving
+or rejecting a request, joining the queue and watching a book. **Don't:**
+the server's notifications (`availability-changed`, `promoted`,
+`created`), because they're just information and the database is still the
+source of truth.
+
+## Task 6: HTTP route, socket event, or both?
+
+| Action | Where | Why |
+|---|---|---|
+| Creating a borrow request | **Both** | The member creates it with `POST /borrow-requests`, so it goes through `requireAuth`, validation and gets a proper 201 or error. Then the server emits an event to the librarians. |
+| Being told a book became available | **Socket** | Only the server knows when it happens, and the browser can't ask for it without polling. |
+| Uploading a cover image | **HTTP** | It's a file upload (multipart) with a size limit and a clear success or error. Nobody else needs to hear about it live. |
+| Approving a request | **Both** | The librarian approves with an HTTP call, so it has auth, role checks and a status code, and can be retried. Then the server emits to the member and the other librarians. |
+| Loading the catalogue on first paint | **HTTP** | It's a normal `GET`, it works before the socket has even connected, and it can be cached. The socket is only for the changes that come after. |
+
+**What the socket adds in the "both" cases:** the HTTP call only answers
+the person who made it. The socket tells everyone else who cares. For a new
+borrow request, the librarians see it appear without refreshing. For an
+approval, the member sees "approved" straight away and the other librarians
+see it's already handled, so two of them don't approve the same request.

@@ -1,4 +1,5 @@
 import express from "express";
+import path from "node:path";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import fs from "fs";
@@ -77,6 +78,9 @@ app.use(
     maxAge: "1h",
   }),
 );
+
+// 9b. Plain HTML pages for testing sockets.
+app.use(express.static(path.resolve(process.cwd(), "public")));
 
 // 10. Register the API root route.
 app.get("/", (req, res) => {
