@@ -1,5 +1,3 @@
-import EVENTS from "../realtime/events.js";
-
 const getBorrowRequests = async (req, res) => {
   const result = await req.app.locals.services.borrowRequests.list(req.query);
   res.status(200).json({
@@ -18,15 +16,6 @@ const createBorrowRequest = async (req, res) => {
   const newBorrowRequest = await req.app.locals.services.borrowRequests.create(
     req.body,
   );
-
-  // only what the availability counter needs, nothing about the member
-  const book = await req.app.locals.services.books.getById(
-    newBorrowRequest.bookId,
-  );
-  req.app.locals.io.emit(EVENTS.SERVER_BOOK_AVAILABILITY_CHANGED, {
-    bookId: book.id,
-    available: book.onShelf,
-  });
 
   res.status(201).json({
     data: newBorrowRequest,

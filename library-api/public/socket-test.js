@@ -100,3 +100,30 @@ socket.on("server:demo:message", ({ mode, from }) => {
 socket.on("server:book:availability-changed", (event) => {
   log(`availability: ${JSON.stringify(event)}`);
 });
+
+// the page pretends to be a book page: socket-test.html?book=bk-1
+let watchedBook = new URLSearchParams(location.search).get("book");
+const watchingEl = document.getElementById("watching");
+
+const watch = (bookId) => {
+  socket.timeout(3000).emit("client:book:watch", { bookId }, (err, res) => {
+    if (err || !res.ok) {
+      log(`could not watch ${bookId}`);
+      return;
+    }
+    watchingEl.textContent = bookId;
+  });
+};
+
+// on every connect, including reconnects, the server has forgotten our rooms
+socket.on("connect", () => {
+  if (watchedBook) watch(watchedBook);
+});
+
+document.getElementById("watch").addEventListener("click", () => {
+  const bookId = document.getElementById("book-id").value.trim();
+  if (!bookId) return;
+  if (watchedBook) socket.emit("client:book:unwatch", { bookId: watchedBook });
+  watchedBook = bookId;
+  watch(bookId);
+});

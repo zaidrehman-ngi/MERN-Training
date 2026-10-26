@@ -2,9 +2,10 @@ import jwt from "jsonwebtoken";
 import { Server } from "socket.io";
 import config from "../config/config.js";
 import logger from "../config/logger.js";
-import EVENTS, { CLIENT_EVENTS } from "./events.js";
+import EVENTS, { CLIENT_EVENTS, bookRoom } from "./events.js";
 import createPresence from "./presence.js";
-import { helloSchema } from "./schemas.js";
+import { DOMAIN_EVENTS } from "../events/domainEvents.js";
+import { bookWatchSchema, helloSchema } from "./schemas.js";
 
 // The member id from the token the browser sent in the handshake, or null.
 const memberIdFromHandshake = (socket) => {
@@ -19,7 +20,27 @@ const memberIdFromHandshake = (socket) => {
   }
 };
 
-const createSocketServer = (httpServer) => {
+// Checks a payload against a zod schema. On failure it answers through the
+// ack (if there is one) and returns null, so the handler can just stop.
+const parsePayload = (schema, payload, reply) => {
+  const result = schema.safeParse(payload);
+  if (result.success) {
+    return result.data;
+  }
+  reply({
+    ok: false,
+    error: "VALIDATION_ERROR",
+    details: result.error.issues.map((issue) => ({
+      field: issue.path.join(".") || "payload",
+      message: issue.message,
+    })),
+  });
+  return null;
+};
+
+const ackOf = (ack) => (typeof ack === "function" ? ack : () => {});
+
+const createSocketServer = (httpServer, domainEvents) => {
   const io = new Server(httpServer, {
     cors: { origin: config.corsOrigin, credentials: true },
   });
@@ -81,24 +102,32 @@ const createSocketServer = (httpServer) => {
       }
     });
 
-    socket.on(EVENTS.CLIENT_HELLO, (payload, ack) => {
-      const reply = typeof ack === "function" ? ack : () => {};
+    socket.on(EVENTS.CLIENT_BOOK_WATCH, (payload, ack) => {
+      const reply = ackOf(ack);
+      const data = parsePayload(bookWatchSchema, payload, reply);
+      if (!data) return;
+      socket.join(bookRoom(data.bookId));
+      logger.info(`Socket ${socket.id} is watching ${data.bookId}`);
+      reply({ ok: true });
+    });
 
+    socket.on(EVENTS.CLIENT_BOOK_UNWATCH, (payload, ack) => {
+      const reply = ackOf(ack);
+      const data = parsePayload(bookWatchSchema, payload, reply);
+      if (!data) return;
+      socket.leave(bookRoom(data.bookId));
+      logger.info(`Socket ${socket.id} stopped watching ${data.bookId}`);
+      reply({ ok: true });
+    });
+
+    socket.on(EVENTS.CLIENT_HELLO, (payload, ack) => {
+      const reply = ackOf(ack);
       // no Express middleware runs for socket events, so check it here
-      const result = helloSchema.safeParse(payload);
-      if (!result.success) {
+      const message = parsePayload(helloSchema, payload, reply);
+      if (!message) {
         logger.warn(`Socket ${socket.id} sent an invalid ${EVENTS.CLIENT_HELLO}`);
-        reply({
-          ok: false,
-          error: "VALIDATION_ERROR",
-          details: result.error.issues.map((issue) => ({
-            field: issue.path.join(".") || "payload",
-            message: issue.message,
-          })),
-        });
         return;
       }
-      const message = result.data;
 
       logger.info(`Socket ${socket.id} says: ${message.text}`);
       socket.emit(EVENTS.SERVER_HELLO, {
@@ -109,6 +138,17 @@ const createSocketServer = (httpServer) => {
       reply({ ok: true, receivedAt: new Date().toISOString() });
     });
   });
+
+  // the one place availability becomes a socket message
+  domainEvents.on(
+    DOMAIN_EVENTS.BOOK_AVAILABILITY_CHANGED,
+    ({ bookId, available }) => {
+      io.to(bookRoom(bookId)).emit(EVENTS.SERVER_BOOK_AVAILABILITY_CHANGED, {
+        bookId,
+        available,
+      });
+    },
+  );
 
   io.presence = presence;
   return io;

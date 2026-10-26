@@ -108,6 +108,24 @@ const createBooksRepository = (prisma) => ({
     return toBook(row);
   },
 
+  // Adds (or with a negative number, takes away) available copies.
+  // The CHECK (available_copies >= 0) stops it going below zero.
+  async changeAvailableCopies(id, change) {
+    const existing = await prisma.books.findFirst({
+      where: { api_id: id, is_active: true },
+      select: { book_id: true },
+    });
+    if (!existing) {
+      return null;
+    }
+
+    const row = await prisma.books.update({
+      where: { book_id: existing.book_id },
+      data: { available_copies: { increment: change } },
+    });
+    return toBook(row);
+  },
+
   // Soft delete: a book with loan history can't be removed from the table,
   // so it is marked inactive and stops showing up in the API.
   async deleteById(id) {

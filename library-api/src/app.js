@@ -23,6 +23,7 @@ import authRouter from "./routes/auth.routes.js";
 import createRepositories from "./repositories/createRepositories.js";
 import createServices from "./services/createServices.js";
 import prisma from "./db/prisma.js";
+import domainEvents from "./events/domainEvents.js";
 
 const accessLogStream = logger.isEnabled("info")
   ? fs.createWriteStream(config.accessLogPath, { flags: "a" })
@@ -31,7 +32,7 @@ const accessLogStream = logger.isEnabled("info")
 const app = express();
 
 const repositories = createRepositories(prisma);
-app.locals.services = createServices(repositories);
+app.locals.services = createServices(repositories, domainEvents);
 
 // 1. Security headers apply to responses from all later middleware and routes.
 app.use(helmet());

@@ -256,13 +256,10 @@ Sources tab, so it couldn't answer the server's pings), which is what the server
 | Close the tab | Yes | 0.3 s | `transport close` |
 | Go to another page | Yes, late | 42.8 s | `ping timeout` |
 | Cable / Wi-Fi / sleep (browser goes silent) | Yes, late | 42.8 s | `ping timeout` |
-| Chrome's "Offline" switch in DevTools | No (waited 70 s) | – | the socket kept working |
 
-**Surprises:** navigating away didn't close the socket straight away. Chrome
+**Surprise:** navigating away didn't close the socket straight away. Chrome
 kept the old page alive for a while (probably its back/forward cache), so
-the server only found out from the heartbeat. And DevTools' "Offline" only
-blocks new requests, it doesn't cut a socket that's already open, so it's
-not a real test of losing the network.
+the server only found out from the heartbeat.
 
 **Why it's 43 seconds:** when the other side just disappears, nothing tells
 the server. It only finds out from Socket.IO's heartbeat: it pings every
@@ -292,25 +289,14 @@ lost on every reload or reconnect, and the id says nothing about who it is.
   and removed from on disconnect.
 
 Memory is fine because sockets only exist while this server is running, so
-there's nothing to keep after a restart. With more than one server it would
-have to move somewhere shared, like Redis.
+there's nothing to keep after a restart.
 
 **Phone and desktop:** the member has **two sockets**, one per device (and
 one more per extra tab). That's why it's a **Set** of sockets per member,
 not one socket id. With one id, the second device would overwrite the
 first, and when either one disconnected the member would look offline even
-though the other device is still open. Testing it:
-
-```
-Socket connected: ek2NbJDy... as m-2001 (1 sockets, 1 members online)
-Socket connected: 45XJbZ7M... as m-2001 (2 sockets, 1 members online)
-Socket connected: qE4nIXnB... as m-2002 (3 sockets, 2 members online)
-Socket disconnected: ek2NbJDy... as m-2001, transport close (2 sockets, 2 members online)
-Socket disconnected: 45XJbZ7M... as m-2001, transport close (1 sockets, 1 members online)
-```
-
-Sara stays online until her last device is gone. "Members online" counts
-members, not sockets.
+though the other device is still open. With the Set, a member is only
+offline once their last socket is gone.
 
 ## Task 4: Reconnection
 
@@ -340,12 +326,6 @@ can't trust what it had while it was disconnected.
   client gets the real number straight away.
 - The page shows `online: unknown` while it's disconnected instead of the
   old number.
-
-| Moment | Page showed |
-|---|---|
-| Logged in as Sara | connected, 1 members (1 sockets) |
-| Server stopped | disconnected, online: unknown |
-| Server started again | connected (new id), 1 members (1 sockets) |
 
 ## Task 5: One process, two servers
 
@@ -396,7 +376,6 @@ way. With three tabs open, tab 1 pressed each button:
 
 `socket` is the one connection the server is handling, `io` is the whole
 server. To send to one specific other socket it's `io.to(socketId).emit()`.
-The bug in the story is `io.emit` being used for every checkout.
 
 ## Task 2: Reproducing the leak
 
@@ -432,10 +411,7 @@ how many copies are left. So the event is now
 { "bookId": "bk-2", "available": 0 }
 ```
 
-No member id, no name, no branch. Running the same test again, Sara's,
-Usman's and the logged-out page all got only that, and the frame went from
-130 bytes to 70. It's still sent to everyone (that's the next exercise),
-but now there's nothing in it that anyone shouldn't see.
+No member id, no name, no branch.
 
 **The rule:** a broadcast should only carry what every single receiver is
 allowed to see and actually needs, because you can't control who reads it
@@ -474,11 +450,6 @@ So "to everyone" really means everyone, the sender too.
 - **The queue.** A member who joins the queue and also gets the "queue
   changed" broadcast could see their position change twice.
 
-Most of my actions come in over HTTP, where there's no `socket` to
-broadcast from, so the sender will get `io.emit` events too. The safe
-rule is to send the new state, not the change, so it doesn't matter who
-gets it twice.
-
 ## Task 5: Trust nothing from a socket
 
 The `client:hello` handler now checks its payload with a zod schema
@@ -486,16 +457,6 @@ The `client:hello` handler now checks its payload with a zod schema
 before doing anything. Bad input gets an ack with
 `{ ok: false, error: "VALIDATION_ERROR", details }`, the same shape as my
 HTTP errors since there are no status codes, and the handler stops.
-
-I forged events from the browser console on the test page:
-
-| Sent | Answer |
-|---|---|
-| `{ text: "hello" }` | `ok: true` |
-| `{ text: 12345 }` | refused: expected string, received number |
-| `{ text: "   " }` | refused: too small |
-| nothing | refused: expected object |
-| 5,000 characters | refused: too big |
 
 **How a client sends made-up data:** it doesn't need my page at all. Anyone
 can open the console on the page and call `socket.emit(...)` with
@@ -511,3 +472,79 @@ handshake. So `helmet`, the rate limiters, `validate`, `requireAuth`,
 sockets. The only check is the token signature in my `connection` handler
 from Exercise 3, and every event handler has to do its own validation and
 permission checks.
+
+# Exercise 5 — A room for every book
+
+## Task 1: One room per book
+
+- `client:book:watch` / `client:book:unwatch` with `{ bookId }` (checked
+  with zod) put the socket in or out of the room `book:<id>`
+  (`socket.join` / `socket.leave`). Disconnecting leaves all rooms by
+  itself.
+- The test page acts as a book page: `socket-test.html?book=bk-1` watches
+  Dune. It sends the watch on every connect, so it rejoins after a
+  reconnect.
+- When a borrow request is created, the availability event now goes to
+  `io.to("book:<id>")` instead of everyone.
+
+Three browsers, two on Dune (bk-1) and one on Hyperion (bk-3):
+
+| Action | Dune tab A | Dune tab B | Hyperion tab C |
+|---|---|---|---|
+| Dune checked out | got it | got it | nothing |
+| Hyperion checked out | nothing | nothing | got it |
+| Tab B switches to Hyperion, Dune checked out again | got it | nothing | nothing |
+
+## Task 2: How rooms come and go
+
+I started the server in a script so I could look at Socket.IO's room list
+(`io.of("/").adapter.rooms`) while tabs joined and left:
+
+```
+nobody connected                     rooms: 0
+emit to book:bk-999 (nobody there)   returned true, no error, rooms: 0
+one tab watching bk-1                rooms: 2, book:bk-1 has 1
+second tab watching bk-1             rooms: 3, book:bk-1 has 2
+first tab closed                     rooms: 2, book:bk-1 has 1
+last tab closed                      rooms: 0, book:bk-1 doesn't exist
+```
+
+- **Emitting to a room nobody has joined:** nothing happens. No error,
+  no warning, and it doesn't create the room. The message just goes
+  nowhere (silent, like the misspelled event).
+- **Creating a room first:** not needed. `socket.join("book:bk-1")` creates
+  it if it doesn't exist.
+- **When the last client leaves:** the room is deleted straight away.
+
+Every socket is also automatically in a room named after its own id, which
+is why one tab watching one book shows 2 rooms.
+
+**At a busy moment:** one room per connected socket, plus one per book that
+somebody is looking at. With a few dozen people each on one book page that's
+under a hundred rooms. Even in the worst case (all 400 members online and
+every one of the 1,400 books being watched) it's under 2,000. Each room is
+just an entry in a `Map` with a `Set` of socket ids, and empty ones are
+deleted, so it's not a problem.
+
+## Task 3: One place that changes availability
+
+The availability event used to be emitted in the `POST /borrow-requests`
+controller, which was wrong twice over: creating a request doesn't change
+availability, and a return or the nightly job would never emit it.
+
+Now:
+
+- **`booksService.changeAvailability(bookId, change)`** is the one method
+  that changes a book's available count. Approving a borrow request calls
+  it with `-1`, returning one at the counter with `+1` (only if it was
+  approved), and Friday's nightly job will call the same method. Editing a
+  book's `onShelf` count goes through the same service and announces too.
+- The books service doesn't know about sockets. It announces
+  `book.availability-changed` on an in-app event bus
+  (`src/events/domainEvents.js`, a Node `EventEmitter`).
+- The socket server listens on that bus and is the only place that sends
+  `server:book:availability-changed`, to the book's room. The controller
+  has no socket code any more.
+
+So there's one place that changes the number and one place that turns it
+into a socket message, whatever caused the change.
