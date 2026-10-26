@@ -4,6 +4,7 @@ import config from "../config/config.js";
 import logger from "../config/logger.js";
 import EVENTS, { CLIENT_EVENTS } from "./events.js";
 import createPresence from "./presence.js";
+import { helloSchema } from "./schemas.js";
 
 // The member id from the token the browser sent in the handshake, or null.
 const memberIdFromHandshake = (socket) => {
@@ -68,17 +69,44 @@ const createSocketServer = (httpServer) => {
       }
     });
 
-    socket.on(EVENTS.CLIENT_HELLO, (message, ack) => {
+    // the three ways to send: only this socket, everyone, everyone else
+    socket.on(EVENTS.CLIENT_DEMO_SEND, ({ mode }) => {
+      const message = { mode, from: socket.id };
+      if (mode === "only-me") {
+        socket.emit(EVENTS.SERVER_DEMO_MESSAGE, message);
+      } else if (mode === "everyone") {
+        io.emit(EVENTS.SERVER_DEMO_MESSAGE, message);
+      } else if (mode === "everyone-else") {
+        socket.broadcast.emit(EVENTS.SERVER_DEMO_MESSAGE, message);
+      }
+    });
+
+    socket.on(EVENTS.CLIENT_HELLO, (payload, ack) => {
+      const reply = typeof ack === "function" ? ack : () => {};
+
+      // no Express middleware runs for socket events, so check it here
+      const result = helloSchema.safeParse(payload);
+      if (!result.success) {
+        logger.warn(`Socket ${socket.id} sent an invalid ${EVENTS.CLIENT_HELLO}`);
+        reply({
+          ok: false,
+          error: "VALIDATION_ERROR",
+          details: result.error.issues.map((issue) => ({
+            field: issue.path.join(".") || "payload",
+            message: issue.message,
+          })),
+        });
+        return;
+      }
+      const message = result.data;
+
       logger.info(`Socket ${socket.id} says: ${message.text}`);
       socket.emit(EVENTS.SERVER_HELLO, {
         text: `Hi, the server got "${message.text}"`,
         at: new Date().toISOString(),
       });
 
-      // the client only passes ack if it wants an answer
-      if (typeof ack === "function") {
-        ack({ ok: true, receivedAt: new Date().toISOString() });
-      }
+      reply({ ok: true, receivedAt: new Date().toISOString() });
     });
   });
 

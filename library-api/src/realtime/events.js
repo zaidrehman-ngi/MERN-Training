@@ -4,6 +4,9 @@ const EVENTS = Object.freeze({
   CLIENT_HELLO: "client:hello",
   SERVER_HELLO: "server:hello",
   SERVER_PRESENCE_CHANGED: "server:presence:changed",
+  SERVER_BOOK_AVAILABILITY_CHANGED: "server:book:availability-changed",
+  CLIENT_DEMO_SEND: "client:demo:send",
+  SERVER_DEMO_MESSAGE: "server:demo:message",
 });
 
 export const CLIENT_EVENTS = new Set(

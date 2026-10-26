@@ -86,3 +86,17 @@ document.getElementById("no-answer").addEventListener("click", () => {
     .emit("client:nobody-answers", { text: "anyone?" }, logAck);
   log("sent: client:nobody-answers");
 });
+
+document.querySelectorAll(".demo").forEach((button) => {
+  button.addEventListener("click", () => {
+    socket.emit("client:demo:send", { mode: button.dataset.mode });
+  });
+});
+
+socket.on("server:demo:message", ({ mode, from }) => {
+  log(`got "${mode}" message from ${from === socket.id ? "me" : from}`);
+});
+
+socket.on("server:book:availability-changed", (event) => {
+  log(`availability: ${JSON.stringify(event)}`);
+});

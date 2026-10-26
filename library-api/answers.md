@@ -379,3 +379,135 @@ turning on sticky sessions in the load balancer. Roughly a day with
 testing, plus one more service to run and keep an eye on. It isn't worth it
 while there's only one server, but because presence is already in its own
 file, only that file and the socket setup would change.
+
+# Exercise 4 — Everybody got everybody's message
+
+## Task 1: Three ways to send
+
+I added three buttons to `socket-test.html`. Each sends `client:demo:send`
+with a mode, and the server sends `server:demo:message` back out in that
+way. With three tabs open, tab 1 pressed each button:
+
+| Tab 1 pressed | Tab 1 | Tab 2 | Tab 3 | Socket.IO call |
+|---|---|---|---|---|
+| Only me | got it | nothing | nothing | `socket.emit(...)` |
+| Everyone | got it | got it | got it | `io.emit(...)` |
+| Everyone else | nothing | got it | got it | `socket.broadcast.emit(...)` |
+
+`socket` is the one connection the server is handling, `io` is the whole
+server. To send to one specific other socket it's `io.to(socketId).emit()`.
+The bug in the story is `io.emit` being used for every checkout.
+
+## Task 2: Reproducing the leak
+
+When a borrow request is created (`POST /borrow-requests`), the controller
+now does `io.emit("server:borrow-request:created", ...)` with the member id,
+name, book and branch. I logged in as Sara in one browser and Usman in
+another, and left a third tab not logged in. Sara created a request for
+Neuromancer, and **all three** pages got:
+
+```
+{"memberId":"m-2001","memberName":"Sara Malik","book":"Neuromancer","branch":"Clifton Branch"}
+```
+
+**Privacy problem:** Usman, and even someone who isn't logged in, can see
+who borrows what and at which branch. What people read is personal
+information. Hiding it on the page doesn't help either, because it has
+already reached their browser and anyone can read it in the Network tab.
+The server should only send data to people who are allowed to see it.
+
+**Scaling problem:** every event goes to every connected browser, so the
+number of messages is events × clients. With 500 people connected and 200
+borrows an hour that's 100,000 messages an hour, nearly all of them to
+people who don't care, and every browser has to receive and throw them
+away. More branches and more members make both numbers grow at once.
+
+## Task 3: Sending less
+
+The availability counter on a book page only needs to know which book and
+how many copies are left. So the event is now
+`server:book:availability-changed` with just:
+
+```json
+{ "bookId": "bk-2", "available": 0 }
+```
+
+No member id, no name, no branch. Running the same test again, Sara's,
+Usman's and the logged-out page all got only that, and the frame went from
+130 bytes to 70. It's still sent to everyone (that's the next exercise),
+but now there's nothing in it that anyone shouldn't see.
+
+**The rule:** a broadcast should only carry what every single receiver is
+allowed to see and actually needs, because you can't control who reads it
+once it's sent.
+
+**The JWT rule from Week 1** is the same: anything in a token can be read by
+whoever holds it (it's only encoded, not encrypted), so it should only have
+what's needed (id and role) and nothing personal like an email, CNIC or
+password hash. Both come down to: once data leaves the server, assume
+anyone who has it can read it, so send the minimum.
+
+## Task 4: Does the sender get its own reply?
+
+My guess: yes with `io.emit`, no with `socket.broadcast.emit`. Testing with
+three tabs where tab 1 sends:
+
+| Server replies with | Tab 1 (sender) | Tabs 2 and 3 |
+|---|---|---|
+| `io.emit` | gets its own reply | get it |
+| `socket.broadcast.emit` | gets nothing | get it |
+
+So "to everyone" really means everyone, the sender too.
+
+**What getting it wrong would break:**
+
+- **Approving a borrow request.** The librarian's screen already updates
+  from the HTTP response. If the broadcast also reaches her and her page
+  adds the change again, the request moves twice or shows up twice in a
+  list. If the page only updated from the broadcast and I used
+  `broadcast.emit`, her own screen wouldn't change at all.
+- **The availability counter.** If the event said "one fewer copy" and the
+  librarian who did the checkout had already taken one off, her counter
+  would go down by two. That's why `server:book:availability-changed`
+  sends the actual number (`available: 0`) and not a change: getting it
+  twice does no harm.
+- **The queue.** A member who joins the queue and also gets the "queue
+  changed" broadcast could see their position change twice.
+
+Most of my actions come in over HTTP, where there's no `socket` to
+broadcast from, so the sender will get `io.emit` events too. The safe
+rule is to send the new state, not the change, so it doesn't matter who
+gets it twice.
+
+## Task 5: Trust nothing from a socket
+
+The `client:hello` handler now checks its payload with a zod schema
+(`src/realtime/schemas.js`: `text` must be a string of 1 to 200 characters)
+before doing anything. Bad input gets an ack with
+`{ ok: false, error: "VALIDATION_ERROR", details }`, the same shape as my
+HTTP errors since there are no status codes, and the handler stops.
+
+I forged events from the browser console on the test page:
+
+| Sent | Answer |
+|---|---|
+| `{ text: "hello" }` | `ok: true` |
+| `{ text: 12345 }` | refused: expected string, received number |
+| `{ text: "   " }` | refused: too small |
+| nothing | refused: expected object |
+| 5,000 characters | refused: too big |
+
+**How a client sends made-up data:** it doesn't need my page at all. Anyone
+can open the console on the page and call `socket.emit(...)` with
+anything, or load the Socket.IO client in their own script and connect to
+my server, or send raw `42["client:hello",...]` frames. The event name and
+payload are whatever they want.
+
+**How much of my Week 5 and 6 middleware applies: none of it.** Socket.IO
+takes the `/socket.io/` requests off the HTTP server before Express sees
+them. My request log didn't have a single `/socket.io` line, even for the
+handshake. So `helmet`, the rate limiters, `validate`, `requireAuth`,
+`requireRole`, the request logger and the error handler never run for
+sockets. The only check is the token signature in my `connection` handler
+from Exercise 3, and every event handler has to do its own validation and
+permission checks.

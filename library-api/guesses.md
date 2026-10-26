@@ -25,3 +25,15 @@ I didn't guess how long each one takes.
 After testing: I was half right. Navigating away did fire, but only after
 about 43 seconds, not straight away. Network loss and sleep fired too, but
 also only after about 43 seconds.
+
+# Exercise 4 — Everybody got everybody's message
+
+## Task 4: Does the sender get its own reply?
+
+If the server replies to everyone with `io.emit`, I think the original
+sender will get its own reply as well. If it used `socket.broadcast.emit`
+instead, the sender wouldn't get it. (I wasn't sure which of the two the
+question meant, but "to everyone" sounds like `io.emit`.)
+
+After testing: right. With `io.emit` the sender got its own reply, with
+`socket.broadcast.emit` it didn't.
