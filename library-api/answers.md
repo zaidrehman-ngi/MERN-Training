@@ -219,3 +219,163 @@ the person who made it. The socket tells everyone else who cares. For a new
 borrow request, the librarians see it appear without refreshing. For an
 approval, the member sees "approved" straight away and the other librarians
 see it's already handled, so two of them don't approve the same request.
+
+# Exercise 3 — Who is actually connected
+
+## Task 1: Counting connections
+
+In `src/realtime/socketServer.js` the server adds 1 on `connection` and
+takes 1 off on `disconnect`, and logs every change with the socket id (and
+the disconnect reason).
+
+I opened `socket-test.html` in three tabs and closed them one at a time:
+
+```
+Socket connected: J3z54oYlkJzUA5pnAAAA (1 connected)
+Socket connected: R_7IZbW-zURx6hAZAAAB (2 connected)
+Socket connected: LMlmufZ1h-Z3scdAAAAC (3 connected)
+Socket disconnected: J3z54oYlkJzUA5pnAAAA, transport close (2 connected)
+Socket disconnected: R_7IZbW-zURx6hAZAAAB, transport close (1 connected)
+Socket disconnected: LMlmufZ1h-Z3scdAAAAC, transport close (0 connected)
+```
+
+The number was right each time. Closing a tab gives the reason
+`transport close`.
+
+## Task 2: When does disconnect fire?
+
+My guess: it fires for everything except navigating to another page. I
+tested each case and timed how long the server took to log the disconnect.
+The server is on my own laptop, so turning off Wi-Fi doesn't touch the
+connection, and sleeping the laptop also sleeps the server. For those two I
+made the browser go completely silent (paused the page in the DevTools
+Sources tab, so it couldn't answer the server's pings), which is what the server sees in both cases.
+
+| Case | Fired? | After | Reason |
+|---|---|---|---|
+| Close the tab | Yes | 0.3 s | `transport close` |
+| Go to another page | Yes, late | 42.8 s | `ping timeout` |
+| Cable / Wi-Fi / sleep (browser goes silent) | Yes, late | 42.8 s | `ping timeout` |
+| Chrome's "Offline" switch in DevTools | No (waited 70 s) | – | the socket kept working |
+
+**Surprises:** navigating away didn't close the socket straight away. Chrome
+kept the old page alive for a while (probably its back/forward cache), so
+the server only found out from the heartbeat. And DevTools' "Offline" only
+blocks new requests, it doesn't cut a socket that's already open, so it's
+not a real test of losing the network.
+
+**Why it's 43 seconds:** when the other side just disappears, nothing tells
+the server. It only finds out from Socket.IO's heartbeat: it pings every
+25 seconds (`pingInterval`) and gives up 20 seconds after a ping isn't
+answered (`pingTimeout`). So a vanished client stays "connected" for up to
+about 45 seconds.
+
+That gap is why the counter said three. A closed laptop lid or a dropped
+Wi-Fi still counts for the best part of a minute, and the librarian whose
+Wi-Fi drops every 90 seconds reconnects with a new socket while the old one
+hasn't timed out yet, so for a while she's counted twice.
+
+## Task 3: Sockets and members
+
+Reloading the page gave a new socket id every time (`jhRW8Tj5...` became
+`ek2NbJDy...` for the same tab). So anything stored against a socket id is
+lost on every reload or reconnect, and the id says nothing about who it is.
+
+**Both directions:**
+
+- **socket → member:** the page sends the login token in the handshake
+  (`io({ auth: ... })`). On `connection` the server checks it with the JWT
+  secret and saves the member id on `socket.data.memberId`. No token means a
+  guest.
+- **member → sockets:** `src/realtime/presence.js` keeps a
+  `Map<memberId, Set<socketId>>` in the server's memory, added to on connect
+  and removed from on disconnect.
+
+Memory is fine because sockets only exist while this server is running, so
+there's nothing to keep after a restart. With more than one server it would
+have to move somewhere shared, like Redis.
+
+**Phone and desktop:** the member has **two sockets**, one per device (and
+one more per extra tab). That's why it's a **Set** of sockets per member,
+not one socket id. With one id, the second device would overwrite the
+first, and when either one disconnected the member would look offline even
+though the other device is still open. Testing it:
+
+```
+Socket connected: ek2NbJDy... as m-2001 (1 sockets, 1 members online)
+Socket connected: 45XJbZ7M... as m-2001 (2 sockets, 1 members online)
+Socket connected: qE4nIXnB... as m-2002 (3 sockets, 2 members online)
+Socket disconnected: ek2NbJDy... as m-2001, transport close (2 sockets, 2 members online)
+Socket disconnected: 45XJbZ7M... as m-2001, transport close (1 sockets, 1 members online)
+```
+
+Sara stays online until her last device is gone. "Members online" counts
+members, not sockets.
+
+## Task 4: Reconnection
+
+With the page open and logged in as Sara, I stopped the server. The page
+showed `disconnected: transport close` and then `reconnecting, attempt 1`,
+`2`, `3`, `4`. When I started the server again it logged `reconnected` by
+itself, with a new socket id (`vJMGaM3t...` became `nxqHeD0E...`).
+
+**The problem:** everything the server held about that socket was in
+memory: the connection count, the presence map, `socket.data.memberId`, and
+later which books a socket is watching. After a restart all of that is
+empty, and the reconnected socket is a brand-new socket to the server. The
+client doesn't know any of that. Its screen still shows whatever it had
+before.
+
+**What the app has to do on reconnect:** treat it like a fresh connection
+on both sides. The client sends its state again (who it is, which books it
+was watching), and the server sends its current state back. The client
+can't trust what it had while it was disconnected.
+
+**For the online count:**
+
+- The token is sent with every connect (`auth` is a function, so it runs
+  again on reconnect), so the server puts the member back in presence.
+- The server sends `server:presence:changed` with the member and socket
+  counts to everyone on every connect and disconnect, so a reconnected
+  client gets the real number straight away.
+- The page shows `online: unknown` while it's disconnected instead of the
+  old number.
+
+| Moment | Page showed |
+|---|---|
+| Logged in as Sara | connected, 1 members (1 sockets) |
+| Server stopped | disconnected, online: unknown |
+| Server started again | connected (new id), 1 members (1 sockets) |
+
+## Task 5: One process, two servers
+
+**Restart:** the count and the presence map are just variables in one Node
+process, so a restart wipes them. They come back as clients reconnect and
+send their token again (Task 4), but for a few seconds the numbers are
+wrong, and any event sent during that gap is lost.
+
+**Two servers behind a load balancer:** each server has its own copy of
+the variables. If librarian A is on server 1 and librarian B is on server 2:
+
+- each server only counts its own sockets, so each screen shows a different,
+  too-small "online" number
+- `io.emit` only reaches sockets on the same server, so when A checks out
+  the last copy, B never hears about it, which is the original problem
+  again
+- Socket.IO starts with long polling, which is several HTTP requests. If
+  the load balancer sends them to different servers, the second server
+  doesn't know the session id and the connection fails
+
+**Standard solution:** a **Redis adapter** for Socket.IO
+(`@socket.io/redis-adapter`). All servers share one Redis, and an emit on
+one server is passed through Redis to the sockets on the others. Presence
+would move from the in-memory `Map` into Redis too. The load balancer also
+needs **sticky sessions**, so a client keeps going to the same server.
+
+**Cost in Week 8:** running Redis (a Docker container or a managed one),
+installing the adapter (a few lines in `socketServer.js`), rewriting
+`presence.js` to use Redis, cleaning up presence when a server dies, and
+turning on sticky sessions in the load balancer. Roughly a day with
+testing, plus one more service to run and keep an eye on. It isn't worth it
+while there's only one server, but because presence is already in its own
+file, only that file and the socket setup would change.
