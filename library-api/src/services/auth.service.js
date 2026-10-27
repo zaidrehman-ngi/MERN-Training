@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import jwt from "jsonwebtoken";
 import { hashPassword, verifyPassword } from "../utils/password.js";
-import { unauthorized } from "../errors/ApiError.js";
+import { AuthenticationError } from "../errors/domainErrors.js";
 import config from "../config/config.js";
 
 // The refresh token is just a long random string. It isn't a JWT because
@@ -30,10 +30,9 @@ const createAuthService = (
     const passwordMatches = await verifyPassword(password, hashToCheck);
 
     if (!user || !user.passwordHash || !passwordMatches) {
-      throw unauthorized(
-        "Email or password is incorrect.",
-        "INVALID_CREDENTIALS",
-      );
+      throw new AuthenticationError("Email or password is incorrect.", {
+        code: "INVALID_CREDENTIALS",
+      });
     }
 
     // the hash was only needed for the check above, don't pass it on
@@ -42,19 +41,19 @@ const createAuthService = (
   },
 
   // The one check for an access token, used by requireAuth (HTTP) and by
-  // the socket server (handshake). Throws 401 if it's missing, invalid,
+  // the socket server (handshake). Throws an AuthenticationError if it's missing, invalid,
   // expired, logged out, or the member no longer exists.
   // The role comes from the database, not from the token.
   async verifyAccessToken(token) {
     if (!token) {
-      throw unauthorized();
+      throw new AuthenticationError();
     }
 
     let payload;
     try {
       payload = jwt.verify(token, config.jwtSecret);
     } catch (err) {
-      throw unauthorized(
+      throw new AuthenticationError(
         err.name === "TokenExpiredError" ? "Token has expired." : "Invalid token.",
       );
     }
@@ -62,13 +61,13 @@ const createAuthService = (
     // logged out tokens are on the denylist (tokens without an id are old or
     // not made by us, so they're refused too)
     if (!payload.jti || (await revokedTokensRepository.isRevoked(payload.jti))) {
-      throw unauthorized("This token has been logged out.");
+      throw new AuthenticationError("This token has been logged out.");
     }
 
     // null if they were deleted (soft delete) since the token was made
     const member = await usersRepository.findForAuth(payload.sub);
     if (!member) {
-      throw unauthorized("This account no longer exists.");
+      throw new AuthenticationError("This account no longer exists.");
     }
 
     return { member, jti: payload.jti, exp: payload.exp };
@@ -106,9 +105,9 @@ const createAuthService = (
     // revoke() only works once, so two requests with the same token can't
     // both get through
     if (!found || !(await refreshTokensRepository.revoke(found.tokenId))) {
-      throw unauthorized(
+      throw new AuthenticationError(
         "Refresh token is missing, expired or already used.",
-        "INVALID_REFRESH_TOKEN",
+        { code: "INVALID_REFRESH_TOKEN" },
       );
     }
 

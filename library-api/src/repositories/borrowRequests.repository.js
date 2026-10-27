@@ -158,6 +158,16 @@ const createBorrowRequestsRepository = (prisma) => ({
     });
     return toBorrowRequest(row);
   },
+
+  // Requests that still count against the member: waiting or out on loan.
+  countOpenForMember(memberId) {
+    return prisma.book_requests.count({
+      where: {
+        members: { api_id: memberId },
+        status: { in: ["pending", "approved"] },
+      },
+    });
+  },
 });
 
 export default createBorrowRequestsRepository;

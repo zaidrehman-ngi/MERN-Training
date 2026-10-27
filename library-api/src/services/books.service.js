@@ -1,10 +1,10 @@
-import { conflict, notFound } from "../errors/ApiError.js";
+import { ConflictError, NotFoundError } from "../errors/domainErrors.js";
 import { DOMAIN_EVENTS } from "../events/domainEvents.js";
 
 const isbnTaken = () =>
-  conflict("A book with this ISBN already exists.", [
-    { field: "isbn", message: "ISBN must be unique." },
-  ]);
+  new ConflictError("A book with this ISBN already exists.", {
+    details: [{ field: "isbn", message: "ISBN must be unique." }],
+  });
 
 const createBooksService = (booksRepository, events) => {
   // the only place that announces an availability change
@@ -21,7 +21,7 @@ const createBooksService = (booksRepository, events) => {
     async getById(id) {
       const book = await booksRepository.findById(id);
       if (!book) {
-        throw notFound("Book not found.");
+        throw new NotFoundError("Book not found.");
       }
       return book;
     },
@@ -48,7 +48,7 @@ const createBooksService = (booksRepository, events) => {
 
       const book = await booksRepository.updateById(id, changes);
       if (!book) {
-        throw notFound("Book not found.");
+        throw new NotFoundError("Book not found.");
       }
       if (book.onShelf !== before.onShelf) {
         announceAvailability(book);
@@ -60,12 +60,14 @@ const createBooksService = (booksRepository, events) => {
     async changeAvailability(id, change) {
       const before = await this.getById(id);
       if (before.onShelf + change < 0) {
-        throw conflict("No copies of this book are available.");
+        throw new ConflictError("No copies of this book are available.", {
+          code: "NO_COPIES_AVAILABLE",
+        });
       }
 
       const book = await booksRepository.changeAvailableCopies(id, change);
       if (!book) {
-        throw notFound("Book not found.");
+        throw new NotFoundError("Book not found.");
       }
       announceAvailability(book);
       return book;
@@ -74,7 +76,7 @@ const createBooksService = (booksRepository, events) => {
     async delete(id) {
       const deleted = await booksRepository.deleteById(id);
       if (!deleted) {
-        throw notFound("Book not found.");
+        throw new NotFoundError("Book not found.");
       }
     },
   };

@@ -1,19 +1,37 @@
 import { inspect } from "node:util";
 import { ApiError } from "../errors/ApiError.js";
 import translatePrismaError from "../errors/prismaErrors.js";
+import {
+  AuthenticationError,
+  ConflictError,
+  DomainError,
+  NotFoundError,
+} from "../errors/domainErrors.js";
 import config from "../config/config.js";
 import logger from "../config/logger.js";
+
+// Services only say what went wrong; this is the one place that decides
+// what that means in HTTP.
+const statusForDomainError = (err) => {
+  if (err instanceof NotFoundError) return 404;
+  if (err instanceof ConflictError) return 409;
+  if (err instanceof AuthenticationError) return 401;
+  return 400;
+};
 
 const errorHandler = (originalErr, req, res, next) => {
   // database errors from Prisma become our own ApiError (409, 400, ...)
   const err = translatePrismaError(originalErr);
   const isErrorObject = err !== null && typeof err === "object";
   const isMalformedJson = isErrorObject && err.type === "entity.parse.failed";
-  const isExpected = err instanceof ApiError || isMalformedJson;
+  const isDomainError = err instanceof DomainError;
+  const isExpected = err instanceof ApiError || isDomainError || isMalformedJson;
   const isDevelopment = config.nodeEnv === "development";
   const statusCode = isMalformedJson
     ? 400
-    : err instanceof ApiError && Number.isInteger(err.statusCode)
+    : isDomainError
+      ? statusForDomainError(err)
+      : err instanceof ApiError && Number.isInteger(err.statusCode)
       ? err.statusCode
       : 500;
   const response = isExpected

@@ -1,5 +1,11 @@
-import { notFound } from "../errors/ApiError.js";
+import {
+  BorrowLimitReachedError,
+  NotFoundError,
+} from "../errors/domainErrors.js";
 import { DOMAIN_EVENTS } from "../events/domainEvents.js";
+
+// pending and approved requests together
+const BORROW_LIMIT = 5;
 
 const createBorrowRequestsService = (
   borrowRequestsRepository,
@@ -11,12 +17,19 @@ const createBorrowRequestsService = (
   async getById(id) {
     const borrowRequest = await borrowRequestsRepository.findById(id);
     if (!borrowRequest) {
-      throw notFound("Borrow request not found.");
+      throw new NotFoundError("Borrow request not found.");
     }
     return borrowRequest;
   },
 
   async create(requestData) {
+    const open = await borrowRequestsRepository.countOpenForMember(
+      requestData.userId,
+    );
+    if (open >= BORROW_LIMIT) {
+      throw new BorrowLimitReachedError(requestData.userId, BORROW_LIMIT);
+    }
+
     const borrowRequest = await borrowRequestsRepository.create(requestData);
     events.emit(DOMAIN_EVENTS.BORROW_REQUEST_CREATED, borrowRequest);
     return borrowRequest;
@@ -32,7 +45,7 @@ const createBorrowRequestsService = (
 
     const borrowRequest = await borrowRequestsRepository.updateById(id, changes);
     if (!borrowRequest) {
-      throw notFound("Borrow request not found.");
+      throw new NotFoundError("Borrow request not found.");
     }
     return borrowRequest;
   },

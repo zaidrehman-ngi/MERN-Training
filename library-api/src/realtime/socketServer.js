@@ -11,6 +11,7 @@ import {
   helloSchema,
 } from "./schemas.js";
 import { forbidden } from "../errors/ApiError.js";
+import { AuthenticationError } from "../errors/domainErrors.js";
 
 const STAFF_ROLES = new Set(["librarian", "admin", "super admin"]);
 // same roles as PATCH /borrow-requests/:id
@@ -54,7 +55,9 @@ const createSocketServer = (httpServer, domainEvents, services) => {
     } catch (err) {
       logger.warn(`Socket rejected: ${err.message}`);
       // the client gets this as a connect_error
-      const error = new Error(err.statusCode === 401 ? err.message : "Server error.");
+      const error = new Error(
+        err instanceof AuthenticationError ? err.message : "Server error.",
+      );
       error.data = { code: err.code ?? "INTERNAL_ERROR" };
       next(error);
     }
@@ -140,7 +143,7 @@ const createSocketServer = (httpServer, domainEvents, services) => {
             message: known ? err.message : "Something went wrong.",
           });
           // the token is no good any more, the client has to reconnect with a new one
-          if (err.statusCode === 401) {
+          if (err instanceof AuthenticationError) {
             socket.emit(EVENTS.SERVER_SESSION_EXPIRED);
             socket.disconnect(true);
           }

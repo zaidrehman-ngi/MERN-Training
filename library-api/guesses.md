@@ -37,3 +37,21 @@ question meant, but "to everyone" sounds like `io.emit`.)
 
 After testing: right. With `io.emit` the sender got its own reply, with
 `socket.broadcast.emit` it didn't.
+
+# Exercise 7 — The four hundred line controller
+
+## Task 3: How does a service say "409" without knowing what 409 is?
+
+I think the service throws an error, like the `ApiError` from Week 5, but
+without the status code in it. The error would only say what happened,
+with a name or code like `BORROW_LIMIT_REACHED` and a message. The error
+handler in Express then looks at that and picks 409. That way a socket
+handler or the cron job can catch the same error and just read the message,
+and they never see a 409.
+
+After building it: mostly right. The service throws a
+`BorrowLimitReachedError` with the code `BORROW_LIMIT_REACHED` and no status
+in it, and the error handler is the only place that turns it into 409. The
+difference from my guess is that the error handler doesn't look at the code
+string, it checks the class (`instanceof ConflictError`). The code is still
+there for the client and the logs.

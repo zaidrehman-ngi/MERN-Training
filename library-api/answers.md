@@ -769,3 +769,195 @@ running.
    work" for socket events.
 5. **Listening after logout or a role change** keeps working until the
    token expires, at most 15 minutes (accepted in `decisions.md`, Task 3).
+
+
+# Exercise 7 — The four hundred line controller
+
+## Task 1: What the longest handler does
+
+My controllers were already thin after Week 6, so no handler is anywhere
+near 400 lines. The longest is `login` in `auth.controller.js`. Following
+everything that happens for `POST /auth/login`, including what it calls:
+
+| # | What it does | Pile |
+|---|---|---|
+| 1 | Limits failed attempts to 5 per email + IP (`loginRateLimiter`), answers 429 | rules (the limit), HTTP (the 429) |
+| 2 | Checks the body has an email and password (`validate(loginSchema)`), answers 400 | HTTP |
+| 3 | Finds the active member by email, with the password hash | database |
+| 4 | Checks the password with bcrypt, or against a dummy hash if the email doesn't exist, so the timing doesn't show which emails are registered | rules |
+| 5 | Refuses with "Email or password is incorrect." (same message for both cases) | rules |
+| 6 | Signs the access token: what goes in it (`sub`, `role`, a `jti`) and how long it lasts | rules |
+| 7 | Puts the access token in an httpOnly cookie | HTTP |
+| 8 | Makes a random refresh token, works out its expiry (7 days) and hashes it | rules |
+| 9 | Saves the refresh token hash | database |
+| 10 | Puts the refresh token in an httpOnly cookie limited to `/api/v1/auth` | HTTP |
+| 11 | Sends 200 with the access token and only `id`, `name`, `email`, `role` | HTTP |
+
+Most of the piles are already in the right layer: the HTTP ones are in the
+route, middleware and controller, the rules are in `auth.service.js`, and
+the two database ones are in the users and refresh tokens repositories.
+
+The exception is **#6**. Signing the access token is a rule (what a token
+contains and how long it lives) but `createAccessToken` is in the
+controller. Nothing outside HTTP can make a token without copying it.
+`refreshToken` in the same controller already calls it a second time.
+**#1** is also split: the limit itself is a rule, but it's in middleware,
+because it has to run before the body reaches the handler.
+
+## Task 2: The rules for each layer
+
+The rules are in `decisions.md` (Exercise 7, Task 2). In short: the
+controller knows HTTP, the service knows the library's rules, and the
+repository knows the database. **Only the controller may mention `req`,
+`res` or a status code, and only the repository may mention Prisma.**
+
+Checking the code against that test before moving anything:
+
+- **Prisma:** passes. No controller or service imports Prisma; only
+  repositories use it.
+- **`req` / `res`:** passes. They only appear in controllers and middleware.
+- **Status codes:** fails in two places.
+  - `users.repository.js` and `borrowRequests.repository.js` throw
+    `new ApiError(..., 422)` when a branch, member or book doesn't exist.
+    A repository is choosing the HTTP status.
+  - Services call `notFound()`, `conflict()` and `unauthorized()`. The
+    number isn't written in the service, but those helpers build an
+    `ApiError` with 404, 409 or 401 in it, so the service still decides the
+    status. The nightly job would get an error carrying a 404 it has no use
+    for.
+- **Rules in the wrong place:**
+  - `createAccessToken` (what goes in a token, how long it lasts) is in the
+    controller.
+  - `books.repository.js` checks `available === "true"`, which is the query
+    string format leaking into the repository.
+
+## Task 3: Errors without status codes
+
+My guess is in `guesses.md`.
+
+The Week 5 `ApiError` had the problem from Task 2 built in: every
+`notFound()` or `conflict()` in a service created an error with 404 or 409
+inside it. So I added `src/errors/domainErrors.js` for the services:
+
+- `DomainError` has a message, a `code` and `details`, and **no status**
+- `NotFoundError`, `ConflictError` and `AuthenticationError` extend it and
+  say what kind of failure it was
+- `BorrowLimitReachedError` extends `ConflictError`, with the code
+  `BORROW_LIMIT_REACHED` plus the member id and the limit
+
+The rule is in `borrowRequests.service.js`. Before creating a request it
+counts the member's open requests (pending or approved) with a new
+repository method `countOpenForMember`, and throws `BorrowLimitReachedError`
+at 5. All the services now throw these classes instead of the `ApiError`
+helpers, so none of them can produce a status code any more.
+
+The status is picked in one place, `statusForDomainError` in
+`errorHandler.js`: not found → 404, conflict → 409, authentication → 401.
+The response body is the same `{ error, message, details }` as before, so
+nothing changed for the frontend or Postman. `ApiError` stays for the HTTP
+layer only (middleware like `requireRole`). The socket server also stopped
+checking `statusCode === 401` and checks `instanceof AuthenticationError`
+instead.
+
+**Over HTTP:** Sara's 6th open request got
+`409 {"error":"BORROW_LIMIT_REACHED","message":"Members can have at most 5 open borrow requests.", ...}`.
+
+**From a cron job:** I built the services in a plain Node script with no
+Express (what the nightly job will do) and called
+`borrowRequests.create` six times. The 6th threw a
+`BorrowLimitReachedError` with `code: "BORROW_LIMIT_REACHED"`, the message,
+`memberId` and `limit`, and `statusCode: undefined`. The job can catch it
+by class or code, log it and move on to the next member. It never has to
+know about 409.
+
+## Task 4: MVC vs layered
+
+**MVC:**
+
+```
+request ──► Controller ──► Model ──► database
+                │
+                ▼
+              View ──► response
+```
+
+**Layered (what this API is):**
+
+```
+request ──► Route + middleware ──► Controller ──► Service ──► Repository ──► database
+                                       │             ▲
+response ◄─────────────────────────────┘             │
+                                     socket handler ─┤
+                                     nightly job ────┘
+```
+
+**M, V and C in an API with no views:**
+
+- **M (Model):** the data and the code around it. In Express MVC that's
+  usually a Mongoose or Prisma model, with the rules often added to it.
+- **V (View):** no HTML pages, so the view is just the JSON response. In
+  practice it's the `res.json({...})` shape in the controller.
+- **C (Controller):** takes the request, calls the model, and picks the
+  response. In small apps it ends up doing the rules too, which is the 400
+  line controller.
+
+**What the layered version adds:**
+
+MVC only says "keep the data away from the HTTP part". It doesn't say where
+the library's rules go, so they end up in the controller or the model. The
+layered version splits the M into two, and gives each layer one job (rules
+in `decisions.md`):
+
+- a **service** layer for the rules (borrow limit, due dates, who may
+  approve), with no `req`, `res` or status codes
+- a **repository** layer that is the only place that talks to Prisma
+
+Calls only go one way: controller → service → repository. Because the
+rules don't depend on HTTP, the service can be called from more than one
+door. The socket handler and Friday's nightly job call the same
+`borrowRequests.create` the route does, and get the same
+`BorrowLimitReachedError`.
+
+## Task 5: The three worst files
+
+I checked each one by calling the services from a plain Node script, the
+way the nightly job will.
+
+**1. `src/services/borrowRequests.service.js` (with
+`schemas/borrowRequests.schema.js`): the rules are decided by the HTTP
+body.**
+`create` saves whatever it gets. The status, the due date and the fine all
+come from the request body, and the zod schema is the only thing checking
+them. So the rules "a new request starts as pending", "due in N days" and
+"fine comes from the book" are written nowhere.
+What breaks:
+- A member can `POST` `status: "approved"` and skip the librarian. I
+  created one with `dueDate: "2020-01-01"` and `finePerDay: 0`. It saved
+  as approved, but no copy was taken off the shelf (bk-3 stayed at 2),
+  because only `update` does that.
+- The nightly job or a socket handler creating a request has to invent a
+  due date and a fine itself, exactly like a client would.
+
+**2. `src/repositories/books.repository.js`: the repository knows the
+query string format.**
+`findAll` checks `available === "true"`, the string from `?available=true`,
+and sets the paging defaults. That's the HTTP layer's job.
+What breaks: a caller that isn't HTTP passes a real boolean. `available:
+true` isn't `"true"`, so the filter flips and returns the books with **0**
+copies. A nightly job asking for "books on the shelf" gets the opposite
+list, with no error.
+
+**3. `src/repositories/borrowRequests.repository.js`: the repository
+answers in HTTP.**
+When the member or book id doesn't exist, it throws
+`new ApiError("A related record does not exist.", 422, { code:
+"VALIDATION_ERROR", details: [{ field: "userId" }] })`. It picks a status
+code and phrases it as a form field error. (`users.repository.js` does the
+same for a missing branch.)
+What breaks: the nightly job creating a request for a member who was
+deleted gets an `ApiError` with `statusCode: 422` and "field `userId`" for
+a field it never sent. It isn't a `DomainError`, so the job can't tell
+"member doesn't exist" apart from a real validation failure, and the
+service can't catch it as a `NotFoundError` either. The lookup of member
+and book (a rule: "both must exist and be active") is also hidden inside
+`toRow`, a row-mapping helper.

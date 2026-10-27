@@ -1,5 +1,5 @@
 import { hashPassword } from "../utils/password.js";
-import { conflict, notFound } from "../errors/ApiError.js";
+import { ConflictError, NotFoundError } from "../errors/domainErrors.js";
 
 const createUsersService = (usersRepository) => ({
   async list() {
@@ -9,7 +9,7 @@ const createUsersService = (usersRepository) => ({
   async getById(id) {
     const user = await usersRepository.findById(id);
     if (!user) {
-      throw notFound("User not found.");
+      throw new NotFoundError("User not found.");
     }
     return user;
   },
@@ -36,7 +36,7 @@ const createUsersService = (usersRepository) => ({
   async update(id, changes) {
     const user = await usersRepository.findById(id);
     if (!user) {
-      throw notFound("User not found.");
+      throw new NotFoundError("User not found.");
     }
 
     if (changes.email !== undefined) {
@@ -45,12 +45,9 @@ const createUsersService = (usersRepository) => ({
         id,
       );
       if (duplicate) {
-        throw conflict("A user with this email already exists.", [
-          {
-            field: "email",
-            message: "Email must be unique.",
-          },
-        ]);
+        throw new ConflictError("A user with this email already exists.", {
+          details: [{ field: "email", message: "Email must be unique." }],
+        });
       }
     }
 
@@ -65,7 +62,7 @@ const createUsersService = (usersRepository) => ({
   async delete(id) {
     const deleted = await usersRepository.deleteById(id);
     if (!deleted) {
-      throw notFound("User not found.");
+      throw new NotFoundError("User not found.");
     }
   },
 });

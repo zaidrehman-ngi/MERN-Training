@@ -88,3 +88,44 @@ connect, so a demoted librarian stays in `counter` until then. Closing that
 would mean finding a member's sockets on logout or role change and
 disconnecting them. Presence already maps member to sockets, so that's
 possible later.
+
+
+# Exercise 7 — The four hundred line controller
+
+## Task 2: What each layer is allowed to know about
+
+**Controller** (with its routes and middleware), the HTTP layer:
+- knows about `req`, `res`, status codes, headers, cookies, query strings
+  and the response body shape
+- reads what the request asked for, calls **one** service method, and turns
+  the result (or the error) into a response
+- doesn't know library rules, and never touches Prisma or a repository
+
+**Service**, the library's rules:
+- knows the rules: who may borrow, how many, when it's due, when a token
+  is valid, what happens when a copy comes back, which events to announce
+- gets plain values in (ids, objects) and gives plain values back, or
+  throws an error that says *what* went wrong ("book not found", "no copies
+  left")
+- calls repositories and other services, never Prisma directly
+- doesn't know whether it was called by a route, a socket event or the
+  nightly job, so it never sees `req`, `res`, a socket or a status code
+
+**Repository**, the database:
+- knows Prisma, table and column names, and how to turn a row into the
+  API's shape
+- one method is one question or one change to the database
+  (`findByIsbn`, `changeAvailableCopies`); it doesn't decide if that change
+  is allowed
+- knows nothing about HTTP and nothing about the rules
+
+**The test:**
+
+| | `req`, `res`, a status code | Prisma |
+|---|---|---|
+| Controller | **yes**, only here | no |
+| Service | no | no |
+| Repository | no | **yes**, only here |
+
+If a service file needs a status code to compile, or a controller imports
+Prisma, it's in the wrong layer.
