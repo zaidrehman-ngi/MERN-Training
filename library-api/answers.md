@@ -548,3 +548,34 @@ Now:
 
 So there's one place that changes the number and one place that turns it
 into a socket message, whatever caused the change.
+
+## Task 5: The room every socket is already in
+
+A new socket is already in one room, named after its own id
+(`socket.rooms` was `["2JIoutETIDvkuAdIAAAA"]` straight after connecting).
+So sending to one client isn't a separate feature: `io.to(socketId).emit()`
+is just emitting to a room that has one socket in it. Underneath, Socket.IO
+only knows one thing, a map of room name to the set of sockets in it.
+Sending to one person, to everyone watching Dune, or to the `counter` staff
+is all the same operation, just with a bigger or smaller room.
+
+## Task 6: The real-time events for Friday
+
+Rooms used: `book:<bookId>` (anyone on that book's page), `counter` (staff,
+joined by the server), and `member:<memberId>` (every device of one member,
+joined by the server on connect, so a member only gets their own news).
+
+| Event | Triggered by | Who gets it | Room | Payload |
+|---|---|---|---|---|
+| `server:book:availability-changed` | a copy goes out or comes back, a librarian edits the count, the nightly job | anyone looking at that book | `book:<bookId>` | `{ bookId, available }` |
+| `server:borrow-request:created` | a member creates a borrow request | staff at the counter | `counter` | `{ id, bookTitle, memberName, requestedAt }` |
+| `server:borrow-request:status-changed` | a librarian approves or rejects a request | the member who asked, and the counter so others see it's handled | `member:<memberId>` and `counter` | `{ id, status, dueDate }` |
+| `server:queue:position-changed` | someone joins or leaves a book's queue, or the first person is promoted | each member still waiting, about their own place | `member:<memberId>` | `{ bookId, position }` |
+| `server:queue:promoted` | a copy comes back and the first member in the queue gets it held for them | that member, and the counter so they put it on the hold shelf | `member:<memberId>` and `counter` | `{ bookId, bookTitle, holdUntil }` |
+| `server:loan:due-soon` | the nightly job finds loans due tomorrow | that member, if they're online (it's also saved so they see it later) | `member:<memberId>` | `{ loanId, bookTitle, dueDate }` |
+| `server:presence:changed` | a librarian's last socket connects or disconnects | staff at the counter ("librarians online") | `counter` | `{ librariansOnline }` |
+
+Queue positions go to each member separately instead of sending the whole
+queue to the book's room, so nobody sees who else is waiting. Fines aren't
+on the list: they only change once a day, so they're read when the member
+opens their account (Exercise 1).

@@ -2,19 +2,22 @@ import jwt from "jsonwebtoken";
 import { Server } from "socket.io";
 import config from "../config/config.js";
 import logger from "../config/logger.js";
-import EVENTS, { CLIENT_EVENTS, bookRoom } from "./events.js";
+import EVENTS, { CLIENT_EVENTS, COUNTER_ROOM, bookRoom } from "./events.js";
 import createPresence from "./presence.js";
 import { DOMAIN_EVENTS } from "../events/domainEvents.js";
 import { bookWatchSchema, helloSchema } from "./schemas.js";
 
-// The member id from the token the browser sent in the handshake, or null.
-const memberIdFromHandshake = (socket) => {
+const STAFF_ROLES = new Set(["librarian", "admin", "super admin"]);
+
+// The member from the token the browser sent in the handshake, or null.
+const memberFromHandshake = (socket) => {
   const token = socket.handshake.auth?.token;
   if (!token) {
     return null;
   }
   try {
-    return jwt.verify(token, config.jwtSecret).sub;
+    const { sub, role } = jwt.verify(token, config.jwtSecret);
+    return { id: sub, role };
   } catch {
     return null;
   }
@@ -62,8 +65,13 @@ const createSocketServer = (httpServer, domainEvents) => {
   io.on("connection", (socket) => {
     connectedCount += 1;
     // socket -> member
-    socket.data.memberId = memberIdFromHandshake(socket);
+    const member = memberFromHandshake(socket);
+    socket.data.memberId = member?.id ?? null;
     const who = socket.data.memberId ?? "guest";
+
+    if (member && STAFF_ROLES.has(member.role)) {
+      socket.join(COUNTER_ROOM);
+    }
 
     // member -> sockets
     if (socket.data.memberId) {
@@ -149,6 +157,15 @@ const createSocketServer = (httpServer, domainEvents) => {
       });
     },
   );
+
+  domainEvents.on(DOMAIN_EVENTS.BORROW_REQUEST_CREATED, (request) => {
+    io.to(COUNTER_ROOM).emit(EVENTS.SERVER_BORROW_REQUEST_CREATED, {
+      id: request.id,
+      bookTitle: request.book.title,
+      memberName: request.member.name,
+      requestedAt: request.requestedAt,
+    });
+  });
 
   io.presence = presence;
   return io;

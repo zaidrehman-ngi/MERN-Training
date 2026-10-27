@@ -1,6 +1,11 @@
 import { notFound } from "../errors/ApiError.js";
+import { DOMAIN_EVENTS } from "../events/domainEvents.js";
 
-const createBorrowRequestsService = (borrowRequestsRepository, booksService) => ({
+const createBorrowRequestsService = (
+  borrowRequestsRepository,
+  booksService,
+  events,
+) => ({
   list: (query) => borrowRequestsRepository.findAll(query),
 
   async getById(id) {
@@ -11,7 +16,11 @@ const createBorrowRequestsService = (borrowRequestsRepository, booksService) => 
     return borrowRequest;
   },
 
-  create: (requestData) => borrowRequestsRepository.create(requestData),
+  async create(requestData) {
+    const borrowRequest = await borrowRequestsRepository.create(requestData);
+    events.emit(DOMAIN_EVENTS.BORROW_REQUEST_CREATED, borrowRequest);
+    return borrowRequest;
+  },
 
   async update(id, changes) {
     const before = await this.getById(id);

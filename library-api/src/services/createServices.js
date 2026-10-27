@@ -12,6 +12,7 @@ const createServices = (repositories, events) => {
     borrowRequests: createBorrowRequestsService(
       repositories.borrowRequests,
       books,
+      events,
     ),
     auth: createAuthService(
       repositories.users,

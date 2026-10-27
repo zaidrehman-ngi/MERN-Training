@@ -127,3 +127,7 @@ document.getElementById("watch").addEventListener("click", () => {
   watchedBook = bookId;
   watch(bookId);
 });
+
+socket.on("server:borrow-request:created", (request) => {
+  log(`new borrow request: ${JSON.stringify(request)}`);
+});
