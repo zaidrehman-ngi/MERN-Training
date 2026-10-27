@@ -1,27 +1,20 @@
-import jwt from "jsonwebtoken";
 import { Server } from "socket.io";
 import config from "../config/config.js";
 import logger from "../config/logger.js";
 import EVENTS, { CLIENT_EVENTS, COUNTER_ROOM, bookRoom } from "./events.js";
 import createPresence from "./presence.js";
 import { DOMAIN_EVENTS } from "../events/domainEvents.js";
-import { bookWatchSchema, helloSchema } from "./schemas.js";
+import {
+  bookWatchSchema,
+  decideRequestSchema,
+  demoSendSchema,
+  helloSchema,
+} from "./schemas.js";
+import { forbidden } from "../errors/ApiError.js";
 
 const STAFF_ROLES = new Set(["librarian", "admin", "super admin"]);
-
-// The member from the token the browser sent in the handshake, or null.
-const memberFromHandshake = (socket) => {
-  const token = socket.handshake.auth?.token;
-  if (!token) {
-    return null;
-  }
-  try {
-    const { sub, role } = jwt.verify(token, config.jwtSecret);
-    return { id: sub, role };
-  } catch {
-    return null;
-  }
-};
+// same roles as PATCH /borrow-requests/:id
+const DECIDE_ROLES = ["librarian", "admin"];
 
 // Checks a payload against a zod schema. On failure it answers through the
 // ack (if there is one) and returns null, so the handler can just stop.
@@ -43,10 +36,42 @@ const parsePayload = (schema, payload, reply) => {
 
 const ackOf = (ack) => (typeof ack === "function" ? ack : () => {});
 
-const createSocketServer = (httpServer, domainEvents) => {
+const createSocketServer = (httpServer, domainEvents, services) => {
   const io = new Server(httpServer, {
     cors: { origin: config.corsOrigin, credentials: true },
   });
+
+  // Runs once per connection, before "connection". Same token check as
+  // requireAuth; if it fails the socket is never connected.
+  io.use(async (socket, next) => {
+    try {
+      const { member, exp } = await services.auth.verifyAccessToken(
+        socket.handshake.auth?.token,
+      );
+      socket.data.member = member;
+      socket.data.tokenExp = exp;
+      next();
+    } catch (err) {
+      logger.warn(`Socket rejected: ${err.message}`);
+      // the client gets this as a connect_error
+      const error = new Error(err.statusCode === 401 ? err.message : "Server error.");
+      error.data = { code: err.code ?? "INTERNAL_ERROR" };
+      next(error);
+    }
+  });
+
+  // For privileged events: the token is checked again (it may have expired
+  // or been logged out since the handshake) and the role is read again from
+  // the database, so a librarian who was demoted can't keep approving.
+  const authorise = async (socket, roles) => {
+    const { member } = await services.auth.verifyAccessToken(
+      socket.handshake.auth?.token,
+    );
+    if (!roles.includes(member.role)) {
+      throw forbidden("You do not have permission to perform this action.");
+    }
+    return member;
+  };
 
   let connectedCount = 0;
   const presence = createPresence();
@@ -64,32 +89,64 @@ const createSocketServer = (httpServer, domainEvents) => {
 
   io.on("connection", (socket) => {
     connectedCount += 1;
-    // socket -> member
-    const member = memberFromHandshake(socket);
-    socket.data.memberId = member?.id ?? null;
-    const who = socket.data.memberId ?? "guest";
+    // every socket here got through io.use, so it has a member
+    const { member } = socket.data;
 
-    if (member && STAFF_ROLES.has(member.role)) {
+    if (STAFF_ROLES.has(member.role)) {
       socket.join(COUNTER_ROOM);
     }
 
     // member -> sockets
-    if (socket.data.memberId) {
-      presence.add(socket.data.memberId, socket.id);
-    }
-    logger.info(`Socket connected: ${socket.id} as ${who} (${counts()})`);
+    presence.add(member.id, socket.id);
+    logger.info(`Socket connected: ${socket.id} as ${member.id} (${counts()})`);
     broadcastPresence();
 
+    // the token stops being valid at exp, so the socket does too; the client
+    // refreshes its token and reconnects (see decisions.md)
+    const expiryTimer = setTimeout(() => {
+      logger.info(`Socket ${socket.id} token expired, disconnecting`);
+      socket.emit(EVENTS.SERVER_SESSION_EXPIRED);
+      socket.disconnect(true);
+    }, socket.data.tokenExp * 1000 - Date.now());
+
     socket.on("disconnect", (reason) => {
+      clearTimeout(expiryTimer);
       connectedCount -= 1;
-      if (socket.data.memberId) {
-        presence.remove(socket.data.memberId, socket.id);
-      }
+      presence.remove(member.id, socket.id);
       logger.info(
-        `Socket disconnected: ${socket.id} as ${who}, ${reason} (${counts()})`,
+        `Socket disconnected: ${socket.id} as ${member.id}, ${reason} (${counts()})`,
       );
       broadcastPresence();
     });
+
+    // Socket events have no errorHandler behind them like routes do: a throw
+    // in a handler would be an uncaughtException and stop the whole API. So
+    // every handler goes through here, and errors become a failed ack.
+    const on = (eventName, handler) => {
+      socket.on(eventName, async (payload, ack) => {
+        const reply = ackOf(ack);
+        try {
+          await handler(payload, reply);
+        } catch (err) {
+          const known = err.isOperational === true;
+          if (known) {
+            logger.warn(`Socket ${socket.id} ${eventName} refused: ${err.message}`);
+          } else {
+            logger.error(`Socket ${socket.id} ${eventName} failed: ${err.stack}`);
+          }
+          reply({
+            ok: false,
+            error: err.code ?? "INTERNAL_ERROR",
+            message: known ? err.message : "Something went wrong.",
+          });
+          // the token is no good any more, the client has to reconnect with a new one
+          if (err.statusCode === 401) {
+            socket.emit(EVENTS.SERVER_SESSION_EXPIRED);
+            socket.disconnect(true);
+          }
+        }
+      });
+    };
 
     // a misspelled event from a client would otherwise be ignored silently
     socket.onAny((eventName) => {
@@ -99,7 +156,10 @@ const createSocketServer = (httpServer, domainEvents) => {
     });
 
     // the three ways to send: only this socket, everyone, everyone else
-    socket.on(EVENTS.CLIENT_DEMO_SEND, ({ mode }) => {
+    on(EVENTS.CLIENT_DEMO_SEND, (payload, reply) => {
+      const data = parsePayload(demoSendSchema, payload, reply);
+      if (!data) return;
+      const { mode } = data;
       const message = { mode, from: socket.id };
       if (mode === "only-me") {
         socket.emit(EVENTS.SERVER_DEMO_MESSAGE, message);
@@ -110,8 +170,7 @@ const createSocketServer = (httpServer, domainEvents) => {
       }
     });
 
-    socket.on(EVENTS.CLIENT_BOOK_WATCH, (payload, ack) => {
-      const reply = ackOf(ack);
+    on(EVENTS.CLIENT_BOOK_WATCH, (payload, reply) => {
       const data = parsePayload(bookWatchSchema, payload, reply);
       if (!data) return;
       socket.join(bookRoom(data.bookId));
@@ -119,8 +178,7 @@ const createSocketServer = (httpServer, domainEvents) => {
       reply({ ok: true });
     });
 
-    socket.on(EVENTS.CLIENT_BOOK_UNWATCH, (payload, ack) => {
-      const reply = ackOf(ack);
+    on(EVENTS.CLIENT_BOOK_UNWATCH, (payload, reply) => {
       const data = parsePayload(bookWatchSchema, payload, reply);
       if (!data) return;
       socket.leave(bookRoom(data.bookId));
@@ -128,8 +186,20 @@ const createSocketServer = (httpServer, domainEvents) => {
       reply({ ok: true });
     });
 
-    socket.on(EVENTS.CLIENT_HELLO, (payload, ack) => {
-      const reply = ackOf(ack);
+    // librarian-only: approve or reject a request from the counter feed
+    on(EVENTS.CLIENT_BORROW_REQUEST_DECIDE, async (payload, reply) => {
+      const data = parsePayload(decideRequestSchema, payload, reply);
+      if (!data) return;
+
+      const staff = await authorise(socket, DECIDE_ROLES);
+      const request = await services.borrowRequests.update(data.id, {
+        status: data.status,
+      });
+      logger.info(`${staff.id} set ${request.id} to ${request.status} by socket`);
+      reply({ ok: true, id: request.id, status: request.status });
+    });
+
+    on(EVENTS.CLIENT_HELLO, (payload, reply) => {
       // no Express middleware runs for socket events, so check it here
       const message = parsePayload(helloSchema, payload, reply);
       if (!message) {

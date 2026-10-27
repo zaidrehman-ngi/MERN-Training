@@ -40,6 +40,12 @@ socket.on("connect", () => {
   log("sent: Hello from the browser");
 });
 
+// refused by the server's io.use (no token, expired, logged out...)
+socket.on("connect_error", (err) => {
+  statusEl.textContent = "rejected";
+  log(`connection rejected: ${err.message}`);
+});
+
 socket.on("server:hello", (message) => {
   log(`received: ${message.text}`);
 });
@@ -130,4 +136,27 @@ document.getElementById("watch").addEventListener("click", () => {
 
 socket.on("server:borrow-request:created", (request) => {
   log(`new borrow request: ${JSON.stringify(request)}`);
+});
+
+document.querySelectorAll(".decide").forEach((button) => {
+  button.addEventListener("click", () => {
+    const id = document.getElementById("request-id").value.trim();
+    socket
+      .timeout(ACK_TIMEOUT_MS)
+      .emit("client:borrow-request:decide", { id, status: button.dataset.status }, logAck);
+  });
+});
+
+// the server disconnects us when the token runs out; Socket.IO doesn't
+// reconnect after a server disconnect, so get a new token and reconnect
+socket.on("server:session:expired", async () => {
+  log("session expired, refreshing the token");
+  const response = await fetch("/api/v1/auth/refresh", { method: "POST" });
+  if (!response.ok) {
+    log("refresh failed, log in again");
+    return;
+  }
+  const body = await response.json();
+  sessionStorage.setItem("token", body.accessToken);
+  socket.connect();
 });

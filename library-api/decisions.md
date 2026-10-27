@@ -42,3 +42,49 @@ file. The cost would be a second connection for every librarian (one for
 the catalogue, one for the feed) and a second copy of the auth and presence
 setup. If the staff side grows into its own admin app, I'd move it to a
 namespace then.
+
+
+# Exercise 6 — The socket nobody authenticated
+
+## Task 3: What happens when a socket's token expires
+
+**Disconnect them when the token expires, and re-check on every privileged
+event.**
+
+- **When the token expires**, the server disconnects the socket. At connect
+  time it reads the token's `exp`, sets a timer for that moment, sends
+  `server:session:expired`, and disconnects. The page gets a new access
+  token from `/auth/refresh` (the refresh cookie) and reconnects, and the
+  handshake checks the new token like any other. With 15-minute tokens a
+  socket is never trusted longer than the token it came with.
+- **On every privileged event** (`client:borrow-request:decide`, librarian
+  or admin only, the same roles as `PATCH /borrow-requests/:id`), the token
+  is checked again with the same `verifyAccessToken` as HTTP. That covers
+  expiry, logout, a deleted account, and a role that changed in the
+  database. A wrong role gets `FORBIDDEN` in the ack. A token that's no
+  longer valid gets `UNAUTHORIZED`, and the socket is disconnected so it has
+  to come back with a new one.
+
+**Why not only one of them:**
+
+- **Accept the risk for the socket's lifetime:** a library tab can stay open
+  all day. A librarian who was removed would keep the counter feed (member
+  names) and could keep approving loans for hours.
+- **Only re-check on each event:** that protects actions, but listening
+  isn't an event. A socket that never sends anything would keep getting the
+  counter feed and book updates long after its token died.
+- **Only disconnect at expiry:** a librarian demoted at 10:01 could still
+  approve until their token runs out at 10:15. Re-checking privileged events
+  closes that.
+
+The re-check is one denylist lookup and one member lookup, the same two
+queries every HTTP request already pays. It's only done for privileged
+events, not for `watch` or `hello`.
+
+**Risk I'm accepting:** after a logout, or a role change, a socket that only
+listens can keep receiving events until its token's expiry, at most 15
+minutes. That includes the counter feed: room membership is decided at
+connect, so a demoted librarian stays in `counter` until then. Closing that
+would mean finding a member's sockets on logout or role change and
+disconnecting them. Presence already maps member to sockets, so that's
+possible later.

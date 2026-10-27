@@ -10,6 +10,8 @@ const EVENTS = Object.freeze({
   CLIENT_BOOK_UNWATCH: "client:book:unwatch",
   CLIENT_DEMO_SEND: "client:demo:send",
   SERVER_DEMO_MESSAGE: "server:demo:message",
+  CLIENT_BORROW_REQUEST_DECIDE: "client:borrow-request:decide",
+  SERVER_SESSION_EXPIRED: "server:session:expired",
 });
 
 export const bookRoom = (bookId) => `book:${bookId}`;

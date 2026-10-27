@@ -28,6 +28,12 @@
       <button class="demo" data-mode="everyone">Send to everyone</button>
       <button class="demo" data-mode="everyone-else">Send to everyone else</button>
     </p>
+    <p>
+      Borrow request (staff only):
+      <input id="request-id" placeholder="br-100" />
+      <button class="decide" data-status="approved">Approve</button>
+      <button class="decide" data-status="rejected">Reject</button>
+    </p>
     <ul id="log"></ul>
 
     <script src="/socket.io/socket.io.js"></script>

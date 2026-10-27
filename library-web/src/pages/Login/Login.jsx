@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { loginUser } from "../../api/auth";
+import socket from "../../api/socket";
 import styles from "../Register/Register.module.css";
 
 function Login() {
@@ -20,7 +21,10 @@ function Login() {
     setSubmission({ status: "loading", message: "" });
 
     try {
-      await loginUser(form);
+      const { data } = await loginUser(form);
+      // the socket handshake needs the token, so reconnect with it
+      sessionStorage.setItem("token", data.accessToken);
+      socket.disconnect().connect();
       setSubmission({
         status: "succeeded",
         message: "Login successful.",

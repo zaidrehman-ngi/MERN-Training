@@ -579,3 +579,193 @@ Queue positions go to each member separately instead of sending the whole
 queue to the book's room, so nobody sees who else is waiting. Fines aren't
 on the list: they only change once a day, so they're read when the member
 opens their account (Exercise 1).
+
+# Exercise 6 — The socket nobody authenticated
+
+## Task 1: Proving the hole
+
+`public/no-token.html` has no login and no token. Its script
+(`public/no-token.js`) is four lines:
+
+```js
+const socket = io();
+socket.emit("client:book:watch", { bookId: "bk-1" });
+socket.onAny((event, data) => {
+  document.getElementById("log").textContent += `${event} ${JSON.stringify(data)}\n`;
+});
+```
+
+I opened it, changed Dune's copies from another client, and the page showed:
+
+```
+server:presence:changed {"members":0,"sockets":1}
+server:book:availability-changed {"bookId":"bk-1","available":2}
+```
+
+The server log said `Socket connected: ... as guest` and `Socket ... is
+watching bk-1`. So the server accepted the connection and put the socket in a
+room without knowing who it was. The page could send any other client event
+too.
+
+The `counter` room is the only thing it couldn't get into. The server only
+joins a socket to it when the token is valid and has a staff role, and there's
+no client event to join it.
+
+None of my middleware stopped this because none of it ever ran. `requireAuth`,
+`validate` and the rate limiter are mounted on the Express app, so they only
+run for requests Express handles. Socket.IO is attached to the same HTTP
+server, but it takes every request to `/socket.io/` before Express sees it.
+The WebSocket upgrade is a separate `upgrade` event on the HTTP server that
+Express doesn't listen to at all. After that, events are just messages on the
+open connection, not HTTP requests, so there's nothing for a middleware to
+run on.
+
+## Task 2: Authenticating the connection
+
+The token check used to live inside `requireAuth`. I moved it into the auth
+service as `verifyAccessToken(token)`. It verifies the JWT, checks it
+against the logout denylist, and loads the member from the database, so the
+role comes from the database and not from the token. It throws a 401 if any
+of that fails. Now there's one copy and two callers:
+
+- `requireAuth` takes the token from the `Authorization` header, calls it,
+  and sets `req.user`.
+- The socket server takes the token from `socket.handshake.auth.token` and
+  calls it in `io.use()`, which runs once per connection before
+  `connection`. If it passes, the member goes on `socket.data.member`. If
+  not, `next(error)` refuses the socket and the browser gets a
+  `connect_error` with the message.
+
+My old `memberFromHandshake` (a second `jwt.verify` in the socket server)
+is gone. It also didn't check the denylist or the database, so a logged-out
+token still got in. Because every connected socket now has a member, the
+"guest" cases are gone from the connection handler too.
+
+Now `no-token.html` is rejected with `Authentication required.` and gets no
+events. A changed or logged-out token is rejected too, and a logged-in page
+connects as before.
+
+## Task 3: Per-event authorisation and the expiring token
+
+The privileged event is `client:borrow-request:decide` (`{ id, status }`,
+approve or reject from the counter feed). It calls the same
+`borrowRequests.update` as `PATCH /borrow-requests/:id`, so approving still
+takes a copy off the shelf and announces availability. Before doing anything
+the handler checks the payload with zod, then calls `authorise(socket,
+["librarian", "admin"])`. That runs `verifyAccessToken` again on the
+handshake token and checks the role it gets back from the database.
+
+- A member (Sara) got `FORBIDDEN`.
+- The admin got `{ ok: true, status: "rejected" }`.
+- After the admin's token was logged out, the same event got
+  `UNAUTHORIZED: This token has been logged out.` and the socket was
+  disconnected.
+
+For expiry I chose to disconnect at the token's `exp` and let the page
+refresh and reconnect. I ran the API with `JWT_EXPIRES_IN=10s`: after 10
+seconds the page logged `session expired`, got a new token and reconnected,
+and the next approve worked. The reasoning is in `decisions.md`.
+
+## Task 4: CORS for sockets
+
+Socket.IO doesn't use the Express `cors()` middleware. It has its own `cors`
+option on `new Server(...)`. Both read the same `CORS_ORIGIN` from `.env`, so
+they can't drift apart.
+
+**Working:** in `library-web` I added `src/api/socket.js` (connects to the
+API's origin with the token from `sessionStorage`), saved the token on login,
+and show the connection state in the header. With the origin set to
+`http://localhost:5173` the header showed `Live: connected`, the server
+logged `Socket connected ... as m-2001`, and the polling responses had
+`Access-Control-Allow-Origin: http://localhost:5173`.
+
+**Wrong origin:** I set only the socket server's origin to
+`http://localhost:5999`. Login still worked (Express CORS was right) but the
+header said `Live: error: xhr poll error`. The console had:
+
+```
+Access to XMLHttpRequest at 'http://localhost:3200/socket.io/?EIO=4&transport=polling&t=...'
+from origin 'http://localhost:5173' has been blocked by CORS policy:
+The 'Access-Control-Allow-Origin' header has a value 'http://localhost:5999'
+```
+
+**How it differs from the Week 5 HTTP CORS error:**
+
+- In Week 5 the blocked request was one of mine, like
+  `GET /api/v1/books`. The error came out of my own axios call, at the line
+  that made it, and happened once per click.
+- Here the error my code gets is `connect_error: xhr poll error`, with no
+  mention of CORS. The CORS message is only in the console, and the request
+  it names is an `XMLHttpRequest` to `/socket.io/?EIO=4&transport=polling`
+  that I never wrote. Socket.IO makes it internally.
+- In the Network tab the requests show `200`. The server answered fine; the
+  browser threw the response away.
+- The server logged nothing. The request never reached `io.use`, so there's
+  no "Socket rejected" line like a bad token gives.
+- Socket.IO keeps retrying in the background, so the console fills with the
+  same error every few seconds. That looks like the server is down or the
+  network is flaky.
+
+So it reads like a connection problem, not a configuration problem, and the
+only place that says "CORS" is a console line about a request I don't
+recognise.
+
+One more thing I found: with the origin still wrong, a client that skips
+polling (`transports: ["websocket"]`) connected fine. Browsers don't apply
+CORS to WebSockets, so Socket.IO's `cors` option only protects the polling
+requests. It isn't a security check. The token check in `io.use` is what
+actually stops strangers.
+
+## Task 5: HTTP guards vs socket guards
+
+Everything an HTTP request goes through (`app.js` and the routers), and what
+the socket path has instead:
+
+| HTTP guard | Socket equivalent | What I did |
+|---|---|---|
+| `requireAuth` (token, denylist, member still exists) | `io.use()` calls the same `verifyAccessToken` | Task 2 |
+| Token expiry (every request is checked) | timer disconnects the socket at the token's `exp` | Task 3 |
+| `requireRole` | `authorise(socket, roles)` on `client:borrow-request:decide`; `counter` room only joined by staff at connect | Task 3, Ex 5 |
+| `validate` (zod) | `parsePayload` with a zod schema in every client event | `client:demo:send` had none, added today |
+| `errorHandler` | **nothing**, until today | see below |
+| `cors()` | Socket.IO's own `cors` option, same `CORS_ORIGIN` | only covers polling; a WebSocket-only client ignores it (Task 4) |
+| `apiRateLimiter`, `loginRateLimiter`, `bookSearchRateLimiter` | **nothing** | finding |
+| `express.json()` body limit (100 kb) | Socket.IO's `maxHttpBufferSize`, default 1 MB | left at the default, finding |
+| `requestId` + `requestLog` / morgan (every request logged with id, status, time) | connect, disconnect, rejections and some events are logged with the socket id; no per-event log | finding |
+| 404 for unknown routes | `onAny` warns about unknown events, the client just gets an ack timeout | good enough |
+| `helmet()` | not needed: its headers protect pages the browser renders, socket messages aren't pages | none |
+| `cookieParser` | not needed: the socket token comes in `handshake.auth` | none |
+
+**The `errorHandler` gap was a real bug.** Express catches anything a route
+throws and turns it into a response. Nothing does that for socket handlers.
+`client:demo:send` destructured its payload without checking it, so one line
+in the console from any logged-in user, `socket.emit("client:demo:send")`,
+threw a `TypeError`, hit `uncaughtException`, and stopped the whole API. I
+fixed it now instead of leaving it for Friday:
+
+- every handler is registered through one `on()` wrapper in
+  `socketServer.js`, which catches errors and answers with a failed ack
+  (`Something went wrong.` for unexpected ones, logged with the stack)
+- the 401 handling (disconnect so the client reconnects with a new token)
+  moved into the same wrapper, so it works for any event
+- `client:demo:send` now has a zod schema
+
+After the fix the same emit gets a `VALIDATION_ERROR` ack and the API keeps
+running.
+
+**Findings for the Friday review:**
+
+1. **No rate limiting on socket events.** A logged-in client can send
+   `client:borrow-request:decide` or `client:hello` as fast as it likes. The
+   HTTP limiters never see it because it's one long connection, not
+   requests.
+2. **No origin check for WebSocket connections.** The `cors` option only
+   covers polling. The token stops strangers, but a page on another site
+   could still connect with a stolen token. `allowRequest` could check
+   `Origin`.
+3. **Payloads can be 10× bigger than HTTP bodies** (1 MB vs 100 kb).
+4. **No per-event access log.** There's nothing like morgan's line for
+   every request, so the log can't answer "who sent what, when, and did it
+   work" for socket events.
+5. **Listening after logout or a role change** keeps working until the
+   token expires, at most 15 minutes (accepted in `decisions.md`, Task 3).

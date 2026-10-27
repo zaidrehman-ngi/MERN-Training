@@ -13,7 +13,7 @@ const { default: createSocketServer } = await import(
 
 // Express and Socket.IO share one HTTP server, so they share one port
 const httpServer = http.createServer(app);
-createSocketServer(httpServer, domainEvents);
+createSocketServer(httpServer, domainEvents, app.locals.services);
 
 httpServer.listen(config.port, () => {
   logger.info(`Server listening on port ${config.port}`);
