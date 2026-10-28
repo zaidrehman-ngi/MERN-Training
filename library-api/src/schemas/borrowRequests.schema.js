@@ -10,15 +10,13 @@ const borrowRequestQuerySchema = z.object({
   userId: z.string().optional(),
   bookId: z.string().optional(),
   status: z.enum(["pending", "approved", "rejected", "returned"]).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().default(10),
 });
 
+// the member comes from the token, everything else is set by the service
 const createBorrowRequestSchema = z.object({
-  userId: z.string().min(1),
   bookId: z.string().min(1),
-  status: borrowRequestStatusSchema,
-  requestedAt: z.string().min(1),
-  dueDate: z.string().min(1),
-  finePerDay: z.number().int().nonnegative(),
 });
 
 const updateBorrowRequestSchema = z.object({

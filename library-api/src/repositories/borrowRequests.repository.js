@@ -1,4 +1,5 @@
-import { ApiError } from "../errors/ApiError.js";
+import { NotFoundError } from "../errors/domainErrors.js";
+import translateDbError from "./dbErrors.js";
 
 // Only fetch the columns we actually send back.
 const requestColumns = {
@@ -59,9 +60,9 @@ const toListItem = (row) => ({
   bookTitle: row.books.title,
 });
 
+// no status code here, the error handler decides that
 const notFoundField = (field) =>
-  new ApiError("A related record does not exist.", 422, {
-    code: "VALIDATION_ERROR",
+  new NotFoundError("A related record does not exist.", {
     details: [{ field, message: "No record found with this id." }],
   });
 
@@ -103,7 +104,7 @@ const toRow = async (prisma, request) => {
 };
 
 const createBorrowRequestsRepository = (prisma) => ({
-  async findAll({ userId, bookId, status }) {
+  async findAll({ userId, bookId, status, page, limit }) {
     const where = {};
 
     if (userId) {
@@ -122,6 +123,9 @@ const createBorrowRequestsRepository = (prisma) => ({
       where,
       select: listSelect,
       orderBy: { api_id: "asc" },
+      // no page given: the whole list, like before
+      skip: page ? (page - 1) * limit : undefined,
+      take: page ? limit : undefined,
     });
     return rows.map(toListItem);
   },
@@ -135,11 +139,16 @@ const createBorrowRequestsRepository = (prisma) => ({
   },
 
   async create(requestData) {
-    const row = await prisma.book_requests.create({
-      data: await toRow(prisma, requestData),
-      select: detailSelect,
-    });
-    return toBorrowRequest(row);
+    const data = await toRow(prisma, requestData);
+    try {
+      const row = await prisma.book_requests.create({
+        data,
+        select: detailSelect,
+      });
+      return toBorrowRequest(row);
+    } catch (err) {
+      throw translateDbError(err);
+    }
   },
 
   async updateById(id, changes) {
@@ -151,20 +160,24 @@ const createBorrowRequestsRepository = (prisma) => ({
       return null;
     }
 
-    const row = await prisma.book_requests.update({
-      where: { request_id: existing.request_id },
-      data: await toRow(prisma, changes),
-      select: detailSelect,
-    });
-    return toBorrowRequest(row);
+    const data = await toRow(prisma, changes);
+    try {
+      const row = await prisma.book_requests.update({
+        where: { request_id: existing.request_id },
+        data,
+        select: detailSelect,
+      });
+      return toBorrowRequest(row);
+    } catch (err) {
+      throw translateDbError(err);
+    }
   },
 
-  // Requests that still count against the member: waiting or out on loan.
-  countOpenForMember(memberId) {
+  countForMember(memberId, statuses) {
     return prisma.book_requests.count({
       where: {
         members: { api_id: memberId },
-        status: { in: ["pending", "approved"] },
+        status: { in: statuses },
       },
     });
   },

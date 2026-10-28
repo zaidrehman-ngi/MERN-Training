@@ -32,7 +32,11 @@ const task2Schema = z.object({
 const booksQuerySchema = z.object({
   author: z.string().optional(),
   title: z.string().optional(),
-  available: z.enum(["true", "false"]).optional(),
+  // "true"/"false" from the URL become a real boolean before the repository
+  available: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true")
+    .optional(),
   sort: z.enum(["title", "author", "year"]).optional(),
   order: z.enum(["asc", "desc"]).default("asc"),
   page: z.coerce.number().int().positive().default(1),

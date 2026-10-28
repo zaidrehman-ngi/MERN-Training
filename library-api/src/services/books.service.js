@@ -1,10 +1,11 @@
-import { ConflictError, NotFoundError } from "../errors/domainErrors.js";
+import {
+  ConflictError,
+  IsbnTakenError,
+  NotFoundError,
+} from "../errors/domainErrors.js";
 import { DOMAIN_EVENTS } from "../events/domainEvents.js";
 
-const isbnTaken = () =>
-  new ConflictError("A book with this ISBN already exists.", {
-    details: [{ field: "isbn", message: "ISBN must be unique." }],
-  });
+const PAGE_SIZE = 10;
 
 const createBooksService = (booksRepository, events) => {
   // the only place that announces an availability change
@@ -16,7 +17,8 @@ const createBooksService = (booksRepository, events) => {
   };
 
   return {
-    list: (query) => booksRepository.findAll(query),
+    list: ({ page = 1, limit = PAGE_SIZE, ...filters } = {}) =>
+      booksRepository.findAll({ ...filters, page, limit }),
 
     async getById(id) {
       const book = await booksRepository.findById(id);
@@ -29,7 +31,7 @@ const createBooksService = (booksRepository, events) => {
     async create(bookData) {
       const existingBook = await booksRepository.findByIsbn(bookData.isbn);
       if (existingBook) {
-        throw isbnTaken();
+        throw new IsbnTakenError();
       }
       return booksRepository.create(bookData);
     },
@@ -42,7 +44,7 @@ const createBooksService = (booksRepository, events) => {
       if (changes.isbn !== undefined) {
         const duplicate = await booksRepository.findByIsbn(changes.isbn);
         if (duplicate && duplicate.id !== id) {
-          throw isbnTaken();
+          throw new IsbnTakenError();
         }
       }
 

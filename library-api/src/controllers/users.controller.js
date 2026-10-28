@@ -1,5 +1,5 @@
 const getUsers = async (req, res) => {
-  const users = await req.app.locals.services.users.list();
+  const users = await req.app.locals.services.users.list(req.query);
   res.status(200).json({
     data: users,
   });

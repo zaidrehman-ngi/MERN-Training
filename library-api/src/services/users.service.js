@@ -1,10 +1,8 @@
 import { hashPassword } from "../utils/password.js";
-import { ConflictError, NotFoundError } from "../errors/domainErrors.js";
+import { EmailTakenError, NotFoundError } from "../errors/domainErrors.js";
 
 const createUsersService = (usersRepository) => ({
-  async list() {
-    return usersRepository.findAll();
-  },
+  list: (query) => usersRepository.findAll(query),
 
   async getById(id) {
     const user = await usersRepository.findById(id);
@@ -26,11 +24,19 @@ const createUsersService = (usersRepository) => ({
       return null;
     }
 
-    return usersRepository.create({
-      ...userData,
-      password: passwordHash,
-      role: "user",
-    });
+    try {
+      return await usersRepository.create({
+        ...userData,
+        password: passwordHash,
+        role: "user",
+      });
+    } catch (err) {
+      // two sign-ups with the same email at once: same answer as above
+      if (err instanceof EmailTakenError) {
+        return null;
+      }
+      throw err;
+    }
   },
 
   async update(id, changes) {
@@ -40,14 +46,9 @@ const createUsersService = (usersRepository) => ({
     }
 
     if (changes.email !== undefined) {
-      const duplicate = await usersRepository.findByEmailExcludingId(
-        changes.email,
-        id,
-      );
-      if (duplicate) {
-        throw new ConflictError("A user with this email already exists.", {
-          details: [{ field: "email", message: "Email must be unique." }],
-        });
+      const duplicate = await usersRepository.findByEmail(changes.email);
+      if (duplicate && duplicate.id !== id) {
+        throw new EmailTakenError();
       }
     }
 

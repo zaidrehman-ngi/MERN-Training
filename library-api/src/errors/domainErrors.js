@@ -34,6 +34,29 @@ class AuthenticationError extends DomainError {
   }
 }
 
+// a value breaks a rule the data has to follow (more on the shelf than owned)
+class InvalidValueError extends DomainError {
+  constructor(message = "One of the values is not allowed.", options = {}) {
+    super(message, { code: "VALIDATION_ERROR", ...options });
+  }
+}
+
+class IsbnTakenError extends ConflictError {
+  constructor() {
+    super("A book with this ISBN already exists.", {
+      details: [{ field: "isbn", message: "ISBN must be unique." }],
+    });
+  }
+}
+
+class EmailTakenError extends ConflictError {
+  constructor() {
+    super("A user with this email already exists.", {
+      details: [{ field: "email", message: "Email must be unique." }],
+    });
+  }
+}
+
 class BorrowLimitReachedError extends ConflictError {
   constructor(memberId, limit) {
     super(`Members can have at most ${limit} open borrow requests.`, {
@@ -52,5 +75,8 @@ export {
   NotFoundError,
   ConflictError,
   AuthenticationError,
+  InvalidValueError,
+  IsbnTakenError,
+  EmailTakenError,
   BorrowLimitReachedError,
 };

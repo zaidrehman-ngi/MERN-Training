@@ -1,10 +1,10 @@
 import { inspect } from "node:util";
 import { ApiError } from "../errors/ApiError.js";
-import translatePrismaError from "../errors/prismaErrors.js";
 import {
   AuthenticationError,
   ConflictError,
   DomainError,
+  InvalidValueError,
   NotFoundError,
 } from "../errors/domainErrors.js";
 import config from "../config/config.js";
@@ -16,12 +16,13 @@ const statusForDomainError = (err) => {
   if (err instanceof NotFoundError) return 404;
   if (err instanceof ConflictError) return 409;
   if (err instanceof AuthenticationError) return 401;
+  if (err instanceof InvalidValueError) return 422;
   return 400;
 };
 
 const errorHandler = (originalErr, req, res, next) => {
-  // database errors from Prisma become our own ApiError (409, 400, ...)
-  const err = translatePrismaError(originalErr);
+  // the repositories already turned database errors into our own errors
+  const err = originalErr;
   const isErrorObject = err !== null && typeof err === "object";
   const isMalformedJson = isErrorObject && err.type === "entity.parse.failed";
   const isDomainError = err instanceof DomainError;

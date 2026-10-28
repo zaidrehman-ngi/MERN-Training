@@ -13,13 +13,20 @@ import {
   createUserSchema,
   updateUserSchema,
   userIdSchema,
+  userQuerySchema,
 } from "../schemas/users.schema.js";
 
 const router = express.Router();
 
 router.post("/", validate(createUserSchema, "body"), createUser);
 
-router.get("/", requireAuth, requireRole("librarian", "admin"), getUsers);
+router.get(
+  "/",
+  requireAuth,
+  requireRole("librarian", "admin"),
+  validate(userQuerySchema, "query"),
+  getUsers,
+);
 
 router.get(
   "/:id",

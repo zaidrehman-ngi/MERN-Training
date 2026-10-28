@@ -4,6 +4,7 @@ import {
   getBorrowRequestById,
   createBorrowRequest,
   updateBorrowRequest,
+  approveBorrowRequest,
   returnBorrowedBook,
 } from "../controllers/borrowRequests.controller.js";
 import requireAuth from "../middleware/requireAuth.js";
@@ -18,18 +19,12 @@ import {
 
 const router = express.Router();
 
-const approveHandler = (req, res) => {
-  res.status(200).json({
-    message: "Borrow request approved",
-  });
-};
-
 router.post(
   "/:id/approve",
   requireAuth,
-  requireRole("librarian"),
+  requireRole("librarian", "admin"),
   validate(borrowRequestIdSchema, "params"),
-  approveHandler,
+  approveBorrowRequest,
 );
 
 router.get(

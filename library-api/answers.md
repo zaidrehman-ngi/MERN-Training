@@ -961,3 +961,187 @@ a field it never sent. It isn't a `DomainError`, so the job can't tell
 service can't catch it as a `NotFoundError` either. The lookup of member
 and book (a rule: "both must exist and be active") is also hidden inside
 `toRow`, a row-mapping helper.
+
+# Exercise 8 — Controllers, services, repositories
+
+## Task 1: Books
+
+The three files were already there from Exercise 7, so I checked them
+against the rules instead of starting over:
+
+- **Controller** (`books.controller.js`): only reads `req` and sends
+  `res`. Nothing to change.
+- **Service** (`books.service.js`): ISBN must be unique, copies can't go
+  below zero, announce availability changes. Fine, but the paging default
+  (10 per page) was hiding in the repository. I moved it into the service
+  so a caller that isn't HTTP gets the same default.
+- **Repository** (`books.repository.js`): the one that still leaked.
+  Prisma errors (duplicate ISBN, the `available_copies >= 0` CHECK)
+  escaped it, and `errorHandler` had to read Prisma error codes to turn
+  them into a 409 or 422. So the ORM was being touched outside the
+  repository. Now the repository catches them and throws our own
+  `IsbnTakenError` and `InvalidValueError`. The ISBN entry is gone from
+  `prismaErrors.js`, which only handles users and borrow requests now.
+
+Same responses as before: a duplicate ISBN is still 409 with the same
+message and details, and the CHECK is still 422 `VALIDATION_ERROR`.
+
+Postman after (API started with `JWT_EXPIRES_IN=10s` for the expiry
+step): 41 requests, 69 assertions, 0 failures. All green, nothing changed.
+
+## Task 2: Borrow requests
+
+`borrowRequests.service.create(memberId, bookId)` now takes just the two
+ids. Everything else is a rule, so the service decides it:
+
+- the member and the book must exist (`NotFoundError` if not). This check
+  used to be hidden in the repository's `toRow`; now the service asks the
+  users and books services.
+- a member can have at most 5 open requests (`BorrowLimitReachedError`)
+- a new request is always `pending`, due in 14 days, with the fine copied
+  from the book
+
+It returns the new request or throws one of our domain errors. There's no
+`req`, `res`, status code, `ApiError` or Prisma anywhere in the file. The
+controller just passes `req.user.sub` and `req.body.bookId` in.
+
+**Evidence:** `db/create-borrow-request.js`. It builds the repositories
+and services straight from Prisma, with no Express and no server running,
+and calls the service:
+
+```
+request 1: created br-1118 (pending, due 2026-11-11, fine 25/day)
+...
+request 5: created br-1122 (pending, due 2026-11-11, fine 25/day)
+request 6: limit reached -> BorrowLimitReachedError BORROW_LIMIT_REACHED: Members can have at most 5 open borrow requests.
+missing book: not found -> NotFoundError NOT_FOUND: Book not found.
+missing member: not found -> NotFoundError NOT_FOUND: User not found.
+cleaned up: rejected 5 requests
+```
+
+The script tells the errors apart with `instanceof`, not a status code,
+which is how the nightly job will do it.
+
+Postman after: 41 requests, 69 assertions, 0 failures. All green.
+
+## Task 3: What the repository is for
+
+The three answers: swap the database later, a seam for tests, or
+translate between the database's shape and the app's.
+
+**Mine is the third.** Prisma already hides SQL. The repository hides
+our database's layout: column names (`available_copies` -> `onShelf`),
+`bk-1` ids vs the UUIDs tables join on, `is_active` soft delete, and
+Prisma errors turned into our own errors.
+
+**Switching database** (e.g. MySQL): only the database layer changes. The
+Prisma provider and migrations, the `adapter-pg` adapter, the Postgres
+error codes we read, and the partial unique index on ISBN (MySQL has no
+partial indexes). Services, controllers and routes stay the same.
+
+**Which methods earn it:**
+- Earn it: `books.findAll` (filters, sort, paging), books writes (error
+  translation, atomic `increment`), the `deleteById`s (soft delete), the
+  borrow request writes (`bk-1` -> UUID lookups),
+  `users.findCredentialsByEmail` (only place the password hash is read),
+  `refreshTokens.findValidByHash` and `revoke` (valid / use once).
+- Just forwarding: the `revokedTokens` methods and the simple user
+  finds. `findByEmail` and `findByEmailExcludingId` are nearly the same
+  query.
+
+## Task 4: Who owns the transaction
+
+**The service owns it.** Approving is one action for the library ("lend
+a copy"), but two writes: take a copy off the shelf, then save the
+request as approved. Only the service knows those two belong together.
+
+How: `createRepositories` has a `transaction(work)` that gives repositories
+sharing one Prisma transaction. `borrowRequests.service` `update` and
+`returnBook` run inside it. The service never sees Prisma, just
+`transaction(...)`. Events wait until it commits, so a rolled back change
+is never announced to sockets.
+
+Proof (`db/approve-rollback.js`, second write fails with `finePerDay: -1`):
+
+```
+Before: bk-3 on shelf = 2, request is pending, availability events = 0
+Second write failed: InvalidValueError VALIDATION_ERROR: One of the values is not allowed.
+After: bk-3 on shelf = 2, request is pending, availability events = 0
+Normal approve: bk-3 on shelf = 1, request is approved, availability events = 1
+```
+
+The copy taken in the first write was put back.
+
+**Why not the others:**
+- Controller: it would have to know the two writes exist, which is a rule,
+  and the nightly job or a socket calling the service would get no
+  transaction at all.
+- Repository: each one only knows its own table. A transaction across
+  books and book_requests would mean one repository writing to the
+  other's table, or deciding what "approve" means.
+
+## Task 5: Moving the socket emit
+
+**What I did:** the service doesn't emit to the socket, it announces what
+happened. `books.service` calls
+`events.emit("book.availability-changed", { bookId, available })` on a
+plain Node `EventEmitter` (`src/events/domainEvents.js`). The socket server
+is the one that listens and turns it into a socket message to the book's
+room. The service only imports the event names, never Socket.IO.
+
+So the Task 2 script still runs with no server: the event fires and
+nobody is listening. With the server up, approving and returning bk-3 sent
+`available: 1` and then `available: 2` to a socket watching it.
+
+**What I rejected:**
+- Importing `io` into the service: the coupling the task is about. The
+  script would need a socket server just to create a request.
+- Passing `io` (or a "notifier") into the service: no import, but the
+  service still talks in sockets and rooms.
+- Emitting from the controller after the service returns: a socket
+  handler or the nightly job changing availability would never announce
+  it.
+- Redis pub/sub or an outbox table: needed once there's more than one
+  server, too much for one process today.
+
+## Task 6: Members, and the three side by side
+
+Members already had the three files. The leak was the same as books in
+Task 1: a duplicate email came back from Prisma and `errorHandler` had to
+translate it. Now all three repositories use one helper
+(`repositories/dbErrors.js`) and `prismaErrors.js` is gone.
+
+| | Books | Members | Borrow requests |
+|---|---|---|---|
+| list | `list(query)`, paged | had no query | filters, no paging |
+| create | `create(data)` | `create(data)` | `create(memberId, bookId)` |
+| create response | 201, `{ data }`, Location | 201, a message | 201, `{ data }`, no Location |
+| delete | soft delete | soft delete | none |
+| other actions | change availability | none | approve, return |
+| duplicate check | `findByIsbn` + id | `findByEmailExcludingId` | none |
+| DB errors | repository | `errorHandler` | `errorHandler` |
+
+**Real differences (kept):**
+- Members create answers with a message, not the user, so nobody can find
+  out which emails are registered.
+- Borrow requests are created from two ids, because the rules set the
+  rest (Task 2).
+- Borrow requests can't be deleted, they're history. They get rejected
+  or returned instead.
+- Approve and return are actions on a request, books have no such thing.
+
+**Leftovers (fixed):**
+- DB errors outside the repository for members and borrow requests.
+- `findByEmailExcludingId`: now `findByEmail` + an id check, like books.
+- Members and borrow requests lists took no paging. Now `list(query)` for
+  all three, with optional `page`/`limit` (no page = whole list, same as
+  before).
+- Borrow request create had no `Location` header.
+- `POST /borrow-requests/:id/approve` said "approved" but did nothing,
+  and only allowed librarians while `PATCH` allows admins too. It now
+  really approves, for both.
+- Member update accepted any string as an email. Create checked it.
+- A sign-up race on the same email gave a 409, which tells you the email
+  exists. It now gets the same message as any other sign-up.
+
+Postman after: 41 requests, 69 assertions, 0 failures.

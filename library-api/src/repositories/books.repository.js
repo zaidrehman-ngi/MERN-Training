@@ -1,3 +1,6 @@
+import { IsbnTakenError } from "../errors/domainErrors.js";
+import translateDbError from "./dbErrors.js";
+
 // Turns a row from the books table into the same book shape the API
 // returned when the data came from db.json.
 const toBook = (row) => ({
@@ -26,6 +29,11 @@ const toRow = (book) => ({
   status: book.status,
 });
 
+const translateWriteError = (err) =>
+  translateDbError(err, {
+    books_active_isbn_unique: () => new IsbnTakenError(),
+  });
+
 const sortColumns = {
   title: "title",
   author: "author",
@@ -39,8 +47,8 @@ const createBooksRepository = (prisma) => ({
     available,
     sort,
     order,
-    page = 1,
-    limit = 10,
+    page,
+    limit,
   }) {
     const where = { is_active: true };
 
@@ -53,7 +61,7 @@ const createBooksRepository = (prisma) => ({
     }
 
     if (available !== undefined) {
-      where.available_copies = available === "true" ? { gt: 0 } : 0;
+      where.available_copies = available ? { gt: 0 } : 0;
     }
 
     // author and year can be empty, keep those books at the end of the list
@@ -89,8 +97,12 @@ const createBooksRepository = (prisma) => ({
   },
 
   async create(bookData) {
-    const row = await prisma.books.create({ data: toRow(bookData) });
-    return toBook(row);
+    try {
+      const row = await prisma.books.create({ data: toRow(bookData) });
+      return toBook(row);
+    } catch (err) {
+      throw translateWriteError(err);
+    }
   },
 
   async updateById(id, changes) {
@@ -101,11 +113,15 @@ const createBooksRepository = (prisma) => ({
       return null;
     }
 
-    const row = await prisma.books.update({
-      where: { book_id: existing.book_id },
-      data: toRow(changes),
-    });
-    return toBook(row);
+    try {
+      const row = await prisma.books.update({
+        where: { book_id: existing.book_id },
+        data: toRow(changes),
+      });
+      return toBook(row);
+    } catch (err) {
+      throw translateWriteError(err);
+    }
   },
 
   // Adds (or with a negative number, takes away) available copies.
@@ -119,11 +135,15 @@ const createBooksRepository = (prisma) => ({
       return null;
     }
 
-    const row = await prisma.books.update({
-      where: { book_id: existing.book_id },
-      data: { available_copies: { increment: change } },
-    });
-    return toBook(row);
+    try {
+      const row = await prisma.books.update({
+        where: { book_id: existing.book_id },
+        data: { available_copies: { increment: change } },
+      });
+      return toBook(row);
+    } catch (err) {
+      throw translateWriteError(err);
+    }
   },
 
   // Soft delete: a book with loan history can't be removed from the table,

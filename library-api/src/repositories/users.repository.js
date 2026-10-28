@@ -1,4 +1,10 @@
-import { ApiError } from "../errors/ApiError.js";
+import { EmailTakenError, NotFoundError } from "../errors/domainErrors.js";
+import translateDbError from "./dbErrors.js";
+
+const translateWriteError = (err) =>
+  translateDbError(err, {
+    members_active_email_unique: () => new EmailTakenError(),
+  });
 
 // The columns a user is allowed to have in a response. password_hash is
 // left out on purpose, so it never leaves the database by accident.
@@ -35,9 +41,9 @@ const toRow = async (prisma, user) => {
     const branch = await prisma.branches.findFirst({
       where: { name: user.branch },
     });
+    // no status code here, the error handler decides that
     if (!branch) {
-      throw new ApiError("Branch not found.", 422, {
-        code: "VALIDATION_ERROR",
+      throw new NotFoundError("Branch not found.", {
         details: [{ field: "branch", message: "No branch with this name." }],
       });
     }
@@ -48,11 +54,14 @@ const toRow = async (prisma, user) => {
 };
 
 const createUsersRepository = (prisma) => ({
-  async findAll() {
+  async findAll({ page, limit } = {}) {
     const rows = await prisma.members.findMany({
       where: { is_active: true },
       select: publicSelect,
       orderBy: { api_id: "asc" },
+      // no page given: the whole list, like before
+      skip: page ? (page - 1) * limit : undefined,
+      take: page ? limit : undefined,
     });
     return rows.map(toUser);
   },
@@ -92,20 +101,14 @@ const createUsersRepository = (prisma) => ({
     return row ? { ...toUser(row), passwordHash: row.password_hash } : null;
   },
 
-  async findByEmailExcludingId(email, id) {
-    const row = await prisma.members.findFirst({
-      where: { email, is_active: true, api_id: { not: id } },
-      select: publicSelect,
-    });
-    return row ? toUser(row) : null;
-  },
-
   async create(userData) {
-    const row = await prisma.members.create({
-      data: await toRow(prisma, userData),
-      select: publicSelect,
-    });
-    return toUser(row);
+    const data = await toRow(prisma, userData);
+    try {
+      const row = await prisma.members.create({ data, select: publicSelect });
+      return toUser(row);
+    } catch (err) {
+      throw translateWriteError(err);
+    }
   },
 
   async updateById(id, changes) {
@@ -117,12 +120,17 @@ const createUsersRepository = (prisma) => ({
       return null;
     }
 
-    const row = await prisma.members.update({
-      where: { member_id: existing.member_id },
-      data: await toRow(prisma, changes),
-      select: publicSelect,
-    });
-    return toUser(row);
+    const data = await toRow(prisma, changes);
+    try {
+      const row = await prisma.members.update({
+        where: { member_id: existing.member_id },
+        data,
+        select: publicSelect,
+      });
+      return toUser(row);
+    } catch (err) {
+      throw translateWriteError(err);
+    }
   },
 
   // Soft delete, like on Tuesday: members with loans or requests can't be

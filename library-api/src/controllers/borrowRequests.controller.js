@@ -14,12 +14,16 @@ const getBorrowRequestById = async (req, res) => {
 
 const createBorrowRequest = async (req, res) => {
   const newBorrowRequest = await req.app.locals.services.borrowRequests.create(
-    req.body,
+    req.user.sub,
+    req.body.bookId,
   );
 
-  res.status(201).json({
-    data: newBorrowRequest,
-  });
+  res
+    .status(201)
+    .location(`/api/v1/borrow-requests/${newBorrowRequest.id}`)
+    .json({
+      data: newBorrowRequest,
+    });
 };
 
 const updateBorrowRequest = async (req, res) => {
@@ -29,6 +33,19 @@ const updateBorrowRequest = async (req, res) => {
   );
   res.status(200).json({
     data: borrowRequest,
+  });
+};
+
+const approveBorrowRequest = async (req, res) => {
+  const borrowRequest = await req.app.locals.services.borrowRequests.update(
+    req.params.id,
+    { status: "approved" },
+  );
+
+  res.status(200).json({
+    message: "Borrow request approved",
+    borrowRequestId: borrowRequest.id,
+    status: borrowRequest.status,
   });
 };
 
@@ -49,5 +66,6 @@ export {
   getBorrowRequestById,
   createBorrowRequest,
   updateBorrowRequest,
+  approveBorrowRequest,
   returnBorrowedBook,
 };

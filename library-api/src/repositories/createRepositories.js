@@ -11,6 +11,9 @@ const createRepositories = (prisma) => ({
   borrowRequests: createBorrowRequestsRepository(prisma),
   refreshTokens: createRefreshTokensRepository(prisma),
   revokedTokens: createRevokedTokensRepository(prisma),
+  // runs work with repositories that all share one database transaction
+  transaction: (work) =>
+    prisma.$transaction((tx) => work(createRepositories(tx))),
 });
 
 export default createRepositories;
