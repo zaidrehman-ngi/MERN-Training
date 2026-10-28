@@ -1145,3 +1145,119 @@ translate it. Now all three repositories use one helper
   exists. It now gets the same message as any other sign-up.
 
 Postman after: 41 requests, 69 assertions, 0 failures.
+
+# Exercise 9 — Who creates the dependencies
+
+## Task 1: Find the coupling
+
+My borrow service doesn't import the repository. It already gets it as a
+parameter (`borrowRequests.service.js` line 15,
+`borrowRequestsRepository`), plus the books and users services and
+`transaction`. Its only imports are the error classes and the event
+names.
+
+So the line that makes it need a live database isn't in the service, it's
+where the service gets built:
+
+- `src/app.js` line 34: `const repositories = createRepositories(prisma);`
+  Every service is built on top of this, so `countForMember` on line 38
+  of the service always ends up as a real Prisma query.
+- Because of that, `repositories.transaction(...)` in `createServices.js`
+  line 12 is `prisma.$transaction`, and `update` and `returnBook` (lines
+  64 and 84) go through it.
+
+**For that line not to be a problem:** whoever builds the service has to
+be able to pass something else in. Any object with the same methods
+(`findAll`, `findById`, `create`, `updateById`, `countForMember`) that
+behaves the same way, e.g. returns `null` when nothing is found, and a
+`transaction(work)` that just runs `work`. That's already true:
+`createServices(repositories, events)` takes them as a parameter too, so
+only `app.js` and the `db/` scripts pick Prisma.
+
+## Task 2: Invert it
+
+The services were already factory functions that receive their
+repositories (`createBorrowRequestsService(borrowRequestsRepository, ...)`),
+so that part was done. What was still wrong is where the real ones got
+plugged in: `app.js` imported Prisma at the top, so just importing the app
+meant a real database.
+
+Change (about 15 lines, ignoring the indent):
+- `app.js` is now `createApp(services)`. It doesn't import Prisma, the
+  repositories or the services any more, it just uses what it's given.
+- `server.js`, where the app starts, does the wiring:
+
+```js
+const services = createServices(createRepositories(prisma), domainEvents);
+const app = createApp(services);
+```
+
+and gives the same `services` to the socket server. That's now the only
+place in `src/` that picks the real database.
+
+## Task 3: A fake repository
+
+`test/fakeRepositories.js` has fake books, users and borrow request
+repositories: the same methods as the real ones, but the data is plain
+arrays. `test/borrowRules.test.js` hands them to the real
+`createBorrowRequestsService` (and the real books and users services), so
+the rules being tested are the real ones. Run with `npm test`. I ran it
+with `DATABASE_URL` pointing at nothing and it still passed, because
+nothing touches the database.
+
+The awkward rule: member `m-1` with five `approved` requests tries a
+sixth, and gets `BorrowLimitReachedError` with nothing saved. I also
+checked that four out still lets you borrow, and that returned books
+don't count.
+
+**How long it took:**
+
+| | Fake | Real database |
+|---|---|---|
+| set up 5 books out | one line (5 objects in an array) | create 5 requests and approve each one |
+| run | 2 ms (whole `npm test` 0.3 s) | 0.6 s, plus 2.5 s to reseed after |
+| needs | nothing | Postgres running, seeded data |
+| clean up | none, the array is thrown away | return all 5, or reseed |
+
+In the database it was also fiddly: no single book had 5 copies on the
+shelf (bk-1 only has 3), so I had to spread the five over bk-7 and bk-1,
+and every approve changed the real copy counts. Writing the fakes the
+first time took longer than one database script, but each new case after
+that is a line or two.
+
+## Task 4: What dependency injection actually is
+
+**A piece of code doesn't go and get the things it needs, whoever uses it
+hands them over.**
+
+What I actually saw this afternoon:
+
+1. **The rules ran without the app.** The borrow service ran from a plain
+   script with no Express, and then with no database at all (a dead
+   `DATABASE_URL` and the tests still passed).
+2. **The awkward case was one line.** "Five books out" was five objects in
+   an array, 2 ms, instead of creating and approving five real requests
+   and reseeding afterwards.
+3. **The same service ran inside a transaction without changing it.** For
+   Exercise 8 Task 4, `createServices` just builds the services again with
+   the transaction's repositories and an emitter that holds the events
+   back. The service code didn't know or care.
+
+## Task 5: What I expect a framework to add
+
+Having done it by hand, I expect NestJS to:
+
+**Add:**
+- the wiring done for me. No hand-written `createServices` listing who
+  gets what, it works it out from what each class asks for.
+- one standard way to do it, so every module looks the same
+- an easy way to swap one thing for a fake in tests, like my Task 3 but
+  without building the whole tree by hand
+
+**Cost:**
+- magic: when something is missing I'd get an error about a "provider"
+  instead of seeing the line where it's passed in
+- decorators and TypeScript just to say what a class needs
+- harder to do something unusual, like my transaction trick of building
+  the services again with different repositories
+- more to learn before the first endpoint works
