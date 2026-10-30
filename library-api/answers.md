@@ -1261,3 +1261,212 @@ Having done it by hand, I expect NestJS to:
 - harder to do something unusual, like my transaction trick of building
   the services again with different repositories
 - more to learn before the first endpoint works
+
+# Exercise 10 — The bug the compiler would have caught
+
+## Task 1: Adding TypeScript
+
+I installed `typescript` and `@types/node` as dev dependencies, then ran
+`npx tsc --init` to get a tsconfig.json. I got **TypeScript 7.0.2**.
+
+I turned `strict` on straight away. I also changed a few things in the
+generated file:
+
+- `noEmit` and `allowImportingTsExtensions`, because Node 24 can run `.ts`
+  files itself, so I only need tsc to check the code, not build it. The
+  Prisma client is already a `.ts` file and `prisma.js` imports it with
+  the `.ts` at the end, so this was needed anyway.
+- `erasableSyntaxOnly`, so I don't use anything Node can't strip, like
+  enums.
+- `allowJs` on and `checkJs` off, so my JS files are still part of the
+  project but don't get checked until I convert them.
+- `types: ["node"]` and `include` for `src`, `test` and `db`. I took out
+  the `jsx` option and the source map / declaration settings since this
+  is a backend.
+
+I added `npm run typecheck` (it just runs `tsc`). It passes with 0
+errors, and the tests and the API still work.
+
+To make sure strict was really on, I made a quick `.ts` file with
+`(name) => name.toUpperCase()` and got this, then deleted the file:
+
+```
+error TS7006: Parameter 'name' implicitly has an 'any' type.
+```
+
+## Task 2: Typing the data
+
+I wrote the `Book` type in `src/types/book.ts`, using the fields the API
+sends back. I made `author` `string | null` because in the schema it's
+`author String?` and bk-4 (the 1961 report) has no author. `year`,
+`isbn`, `coverUrl` and `finePerDay` can be null too, so I did the same
+for them.
+
+Then I wrote `surname(book)` in `src/utils/surname.ts` the way it was in
+Week 2:
+
+```ts
+export const surname = (book: Book): string => {
+  const parts = book.author.split(" ");
+  return parts[parts.length - 1];
+};
+```
+
+and ran `npm run typecheck`:
+
+```
+src/utils/surname.ts(4,17): error TS18047: 'book.author' is possibly 'null'.
+src/utils/surname.ts(5,3): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+```
+
+The first error is exactly the Week 2 bug. The second one is because
+the last item of the array might not exist, and I said the function
+always returns a string.
+
+To fix it I made `surname` return `string | null`. If there's no author
+(or it's empty) it returns `null`, otherwise the last word of the name.
+I tried it: "Frank Herbert" gives "Herbert" and bk-4 gives `null`.
+
+What the compiler made me decide is what should happen when a book has
+no author. In JavaScript I just assumed every book has one, and I only
+found out it didn't when the page went blank, and then I fixed that one
+place. Now the return type says there might be no surname, so anywhere
+that uses `surname` has to handle that (like showing "Unknown author")
+or it won't compile.
+
+## Task 3: The basics
+
+**Object type:** a book, from `src/types/book.ts`:
+
+```ts
+type Book = {
+  id: string;
+  title: string;
+  author: string | null;
+  onShelf: number;
+  // ...
+};
+```
+
+**Union:** member roles. The task says four, but our database only allows
+three (`members_role_check`), so:
+
+```ts
+type Role = "user" | "librarian" | "admin";
+```
+
+Anything else, like `"Admin"` or `"guest"`, is a compile error.
+
+**Array:** what `GET /books` sends back in `data`:
+
+```ts
+const books: Book[] = await booksService.list(query);
+```
+
+**Optional field:** the books query. Every filter can be left out, which
+is what `.optional()` means in `booksQuerySchema`:
+
+```ts
+type BookQuery = {
+  author?: string;
+  title?: string;
+  available?: boolean;
+  page?: number;
+  limit?: number;
+};
+```
+
+**Function signature with a typed return:** creating a borrow request
+(Exercise 8 Task 2). Two ids in, a promise of the new request out:
+
+```ts
+create(memberId: string, bookId: string): Promise<BorrowRequest>
+```
+
+And `surname` from Task 2: `(book: Book): string | null`.
+
+**type vs interface**
+
+Both can describe an object, and for that they mostly work the same. The
+real differences:
+
+- An `interface` can be declared again with the same name and the two get
+  merged. A `type` can't be reopened, declaring it twice is an error.
+- A `type` can be a union (`"user" | "librarian" | "admin"`) or a mix of
+  other types. An `interface` can only describe an object shape.
+
+What I'm using:
+
+- `type` for my own data: `Book`, `Role`, `BookQuery`. `Role` has to be a
+  type because it's a union, and I'd rather use one keyword for all of
+  them.
+- `interface` only where I need the merging, which is adding things to
+  other libraries' types. For example, when I convert `requireAuth`,
+  Express's `Request` doesn't know about `req.user`, so I'd add it by
+  reopening Express's `Request` interface.
+
+## Task 4: any, unknown and as Book
+
+Guesses are in guesses.md. What happened with bk-4's JSON
+(`"author": null`, no `onShelf`):
+
+| | Compiler | Runtime |
+|---|---|---|
+| `any` | no errors at all, `asAny.author.split(" ")` compiles | `TypeError: Cannot read properties of null (reading 'split')` |
+| `unknown` | `error TS18046: 'asUnknown' is of type 'unknown'.` even for `.title` | doesn't get that far |
+| `as Book` | `error TS18047: 'asBook.author' is possibly 'null'.`, but `asBook.onShelf.toFixed(0)` compiles | `TypeError: Cannot read properties of undefined (reading 'toFixed')` |
+
+`as Book` also compiled `JSON.parse('{"name":"Aisha Khan"}') as Book`,
+which isn't a book at all, and crashed on `.title.toUpperCase()`.
+
+**Which one checks anything at runtime? None of them.** Types are removed
+before the code runs. `any` turns checking off, `as Book` is me telling
+the compiler "trust me", and `unknown` only forces me to check, it
+doesn't check for me.
+
+That's why zod is still needed. Data from outside (request bodies, query
+strings, JSON files) can be anything, and only real code running at
+runtime can look at it. A zod schema does that check, and with
+`z.infer<typeof schema>` it gives the TypeScript type too, so the check
+and the type can't drift apart. So the safe way is: take it as `unknown`,
+run it through zod, and only then use it as a `Book`. Our `validate`
+middleware already does this for every body and query.
+
+## Task 5: Converting the borrow requests service
+
+Converted `src/services/borrowRequests.service.js` to `.ts`. The types for
+the data are in `src/types/borrowRequest.ts`, and the types for what the
+service receives (repository, books and users services, events,
+transaction) are at the top of the service. No `any`, no `@ts-ignore` and
+no `as`.
+
+20 errors in total:
+
+| | Count |
+|---|---|
+| Real bugs | 1 |
+| Missing types | 17 |
+| Compiler being awkward | 2 |
+
+Missing types (17): just renaming the file gave 17 `TS7006` / `TS7031`
+"implicitly has an 'any' type" errors, one for every parameter.
+
+Real bug (1): `Type 'number | null' is not assignable to type 'number'` on
+`finePerDay: book.finePerDay`. A book's fine can be null (bk-9 has none),
+but a borrow request's `fine_per_day` can't. Borrowing bk-9 really did
+crash with a `PrismaClientValidationError`, so that's a 500. Fixed with
+`book.finePerDay ?? DEFAULT_FINE_PER_DAY` (20, same as the database
+default). bk-9 can now be borrowed with a fine of 20.
+
+Awkward (2):
+- `OPEN_STATUSES` was `string[]` instead of the status union, so it
+  couldn't go into `countForMember`. The values were right, TypeScript
+  just widened them. Fixed by typing the constant.
+- `returnBook` could return `null` because `updateById` can. It can't
+  really happen, `getById` checks it first in the same transaction and
+  requests can't be deleted. Fixed with the same not found check `update`
+  already has.
+
+Tests, both Exercise 8 scripts and Postman (69 assertions, 0 failures)
+still pass.

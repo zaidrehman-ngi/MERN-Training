@@ -1,6 +1,6 @@
 import createBooksService from "./books.service.js";
 import createUsersService from "./users.service.js";
-import createBorrowRequestsService from "./borrowRequests.service.js";
+import createBorrowRequestsService from "./borrowRequests.service.ts";
 import createAuthService from "./auth.service.js";
 
 const createServices = (repositories, events) => {

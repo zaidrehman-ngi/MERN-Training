@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import createBooksService from "../src/services/books.service.js";
 import createUsersService from "../src/services/users.service.js";
-import createBorrowRequestsService from "../src/services/borrowRequests.service.js";
+import createBorrowRequestsService from "../src/services/borrowRequests.service.ts";
 import { BorrowLimitReachedError } from "../src/errors/domainErrors.js";
 import {
   createFakeBooksRepository,

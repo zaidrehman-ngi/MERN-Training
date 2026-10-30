@@ -3,21 +3,73 @@ import {
   NotFoundError,
 } from "../errors/domainErrors.js";
 import { DOMAIN_EVENTS } from "../events/domainEvents.js";
+import type { Book } from "../types/book.ts";
+import type {
+  BorrowRequest,
+  BorrowRequestChanges,
+  BorrowRequestListItem,
+  BorrowRequestQuery,
+  BorrowRequestStatus,
+  NewBorrowRequest,
+} from "../types/borrowRequest.ts";
+
+type BorrowRequestsRepository = {
+  findAll(query: BorrowRequestQuery): Promise<BorrowRequestListItem[]>;
+  findById(id: string): Promise<BorrowRequest | null>;
+  create(data: NewBorrowRequest): Promise<BorrowRequest>;
+  updateById(
+    id: string,
+    changes: BorrowRequestChanges,
+  ): Promise<BorrowRequest | null>;
+  countForMember(
+    memberId: string,
+    statuses: BorrowRequestStatus[],
+  ): Promise<number>;
+};
+
+type BooksService = {
+  getById(id: string): Promise<Book>;
+  changeAvailability(id: string, change: number): Promise<Book>;
+};
+
+type UsersService = {
+  getById(id: string): Promise<unknown>;
+};
+
+type Events = {
+  emit(eventName: string, payload: unknown): unknown;
+};
+
+type Transaction = <T>(
+  work: (tx: {
+    services: { books: BooksService; borrowRequests: BorrowRequestsService };
+    repositories: { borrowRequests: BorrowRequestsRepository };
+  }) => Promise<T>,
+) => Promise<T>;
+
+export type BorrowRequestsService = {
+  list(query: BorrowRequestQuery): Promise<BorrowRequestListItem[]>;
+  getById(id: string): Promise<BorrowRequest>;
+  create(memberId: string, bookId: string): Promise<BorrowRequest>;
+  update(id: string, changes: BorrowRequestChanges): Promise<BorrowRequest>;
+  returnBook(id: string): Promise<BorrowRequest>;
+};
 
 // requests that count against the limit: waiting or out on loan
-const OPEN_STATUSES = ["pending", "approved"];
+const OPEN_STATUSES: BorrowRequestStatus[] = ["pending", "approved"];
 const BORROW_LIMIT = 5;
 const LOAN_DAYS = 14;
+const DEFAULT_FINE_PER_DAY = 20;
 
-const toDateString = (date) => date.toISOString().slice(0, 10);
+const toDateString = (date: Date): string => date.toISOString().slice(0, 10);
 
 const createBorrowRequestsService = (
-  borrowRequestsRepository,
-  booksService,
-  usersService,
-  events,
-  transaction,
-) => ({
+  borrowRequestsRepository: BorrowRequestsRepository,
+  booksService: BooksService,
+  usersService: UsersService,
+  events: Events,
+  transaction: Transaction,
+): BorrowRequestsService => ({
   list: (query) => borrowRequestsRepository.findAll(query),
 
   async getById(id) {
@@ -53,7 +105,7 @@ const createBorrowRequestsService = (
       status: "pending",
       requestedAt: toDateString(today),
       dueDate: toDateString(due),
-      finePerDay: book.finePerDay,
+      finePerDay: book.finePerDay ?? DEFAULT_FINE_PER_DAY,
     });
     events.emit(DOMAIN_EVENTS.BORROW_REQUEST_CREATED, borrowRequest);
     return borrowRequest;
@@ -89,7 +141,13 @@ const createBorrowRequestsService = (
         await services.books.changeAvailability(before.bookId, 1);
       }
 
-      return repositories.borrowRequests.updateById(id, { status: "returned" });
+      const borrowRequest = await repositories.borrowRequests.updateById(id, {
+        status: "returned",
+      });
+      if (!borrowRequest) {
+        throw new NotFoundError("Borrow request not found.");
+      }
+      return borrowRequest;
     });
   },
 });

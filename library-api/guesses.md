@@ -55,3 +55,25 @@ in it, and the error handler is the only place that turns it into 409. The
 difference from my guess is that the error handler doesn't look at the code
 string, it checks the class (`instanceof ConflictError`). The code is still
 there for the client and the logs.
+
+# Exercise 10 — The bug the compiler would have caught
+
+## Task 4: any, unknown and as Book on a JSON.parse value
+
+- `any`: the compiler won't say anything. I can call `.author.split()` or
+  anything else on it and it compiles.
+- `unknown`: the compiler won't let me use it at all. Even `value.title`
+  should be an error until I check what it is.
+- `as Book`: the compiler treats it as a Book from then on, so it will
+  complain about `author` being possibly null like in Task 2. Maybe it
+  also complains if the JSON doesn't look like a book, not sure.
+
+Runtime: I think none of them check anything when the code runs. They're
+all just types, and the types are gone by then.
+
+After trying: mostly right. `any` compiled with no errors, `unknown`
+stopped even `asUnknown.title`, and `as Book` gave the "possibly null"
+error for `author`. The part I wasn't sure about was wrong: `as Book` on
+`{"name":"Aisha Khan"}` compiled fine. `JSON.parse` returns `any`, so the
+compiler has nothing to compare against. And none of them checked anything
+at runtime.
