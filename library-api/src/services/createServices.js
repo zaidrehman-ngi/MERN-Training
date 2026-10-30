@@ -1,5 +1,5 @@
 import createBooksService from "./books.service.js";
-import createUsersService from "./users.service.js";
+import createUsersService from "./users.service.ts";
 import createBorrowRequestsService from "./borrowRequests.service.ts";
 import createAuthService from "./auth.service.js";
 

@@ -5,7 +5,7 @@ import {
   createBook,
   updateBook,
   deleteBook,
-} from "../controllers/books.controller.js";
+} from "../controllers/books.controller.ts";
 import requireAuth from "../middleware/requireAuth.js";
 import requireRole from "../middleware/requireRole.js";
 import validate from "../middleware/validate.js";
@@ -15,7 +15,7 @@ import {
   booksQuerySchema,
   createBookSchema,
   updateBookSchema,
-} from "../schemas/books.schema.js";
+} from "../schemas/books.schema.ts";
 
 const router = express.Router();
 

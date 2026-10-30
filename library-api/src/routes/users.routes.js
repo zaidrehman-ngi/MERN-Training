@@ -5,7 +5,7 @@ import {
   createUser,
   updateUser,
   deleteUser,
-} from "../controllers/users.controller.js";
+} from "../controllers/users.controller.ts";
 import requireAuth from "../middleware/requireAuth.js";
 import requireRole from "../middleware/requireRole.js";
 import validate from "../middleware/validate.js";
@@ -14,7 +14,7 @@ import {
   updateUserSchema,
   userIdSchema,
   userQuerySchema,
-} from "../schemas/users.schema.js";
+} from "../schemas/users.schema.ts";
 
 const router = express.Router();
 

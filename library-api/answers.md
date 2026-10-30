@@ -1470,3 +1470,261 @@ Awkward (2):
 
 Tests, both Exercise 8 scripts and Postman (69 assertions, 0 failures)
 still pass.
+
+# Exercise 11 — Typing the layers
+
+## Task 1: Typing the controllers
+
+Installed `@types/express` (and `@types/jsonwebtoken`, since the auth
+controller uses it). Renamed the four controllers to `.ts` and typed every
+handler as `(req: Request, res: Response)`. None of them use `next`,
+Express 5 passes async errors on by itself.
+
+What doesn't work:
+
+- `req.body` has the type `any`. The type is
+  `Request<ParamsDictionary, any, any, ParsedQs>` and the third one is the
+  body. So `req.body.bookId` compiles even though nothing tells the
+  compiler that `validate(createBorrowRequestSchema)` already ran.
+- `req.user` and `req.token` don't exist for the compiler:
+
+```
+src/controllers/borrowRequests.controller.ts(18,9): error TS2339: Property 'user' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/controllers/auth.controller.ts(80,9): error TS2339: Property 'token' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+```
+
+Fix for `req.user`: `src/types/express.d.ts` adds the two fields to
+Express's own `Request` interface:
+
+```ts
+declare global {
+  namespace Express {
+    interface Request {
+      user?: { sub: string; role: Role; name: string };
+      token?: { jti: string; exp: number };
+    }
+  }
+}
+```
+
+This is called **declaration merging** (here it's module augmentation, you
+add to a type that belongs to another package). It only works because
+Express's `Request` is an `interface`, the thing from Exercise 10 Task 3.
+
+They're optional because they only exist after `requireAuth` runs. So
+`createBorrowRequest` now has to check `req.user` before using it
+(`TS18048: 'req.user' is possibly 'undefined'`), and throws an
+`AuthenticationError` if it's missing.
+
+Also had to fix `expiresIn` for `jwt.sign`: its types don't accept any
+string, only things like `"15m"`, so I pass the number of seconds from
+`config.jwtExpiresInMs` instead. Same expiry as before.
+
+`tsc` is at 0 errors, and tests and Postman (69 assertions, 0 failures)
+still pass.
+
+## Task 2: zod and TypeScript together
+
+zod gives the type with `z.infer<typeof schema>`. Renamed the four schema
+files to `.ts` and exported a type for each body schema, e.g.:
+
+```ts
+export type CreateBorrowRequestBody = z.infer<typeof createBorrowRequestSchema>;
+// { bookId: string }
+```
+
+`src/types/http.ts` has a small helper so the body type goes into
+Express's `Request`:
+
+```ts
+export type RequestWithBody<Body> = Request<Record<string, string>, unknown, Body>;
+```
+
+and the controllers use it, e.g.
+`createBorrowRequest = async (req: RequestWithBody<CreateBorrowRequestBody>, res: Response)`.
+Same for create/update book, create/update user, register and login.
+
+Now `req.body` isn't `any` any more. Changing `req.body.bookId` to
+`req.body.bookID` gives:
+
+```
+error TS2551: Property 'bookID' does not exist on type '{ bookId: string; }'. Did you mean 'bookId'?
+```
+
+**Why this is better than writing the type by hand:** the schema is the
+only definition. If I add or change a field in the schema, the type
+changes with it. With a hand-written type next to it, I could change one
+and forget the other, and the compiler would happily trust the type while
+zod checks something else. That's the same as `as Book` from Exercise 10:
+a type that nobody checks against the real data. Here the type comes from
+the thing that does the checking, so they can't drift apart. It also
+picks up what zod does to the value, e.g. `available` in the books query
+comes out as a `boolean`, not the `"true"` string from the URL.
+
+`tsc` 0 errors, tests and Postman (69 assertions, 0 failures) pass.
+
+## Task 3: Typing the layer boundaries
+
+Converted the members repository and service to TypeScript
+(`users.repository.ts`, `users.service.ts`), with the types in
+`src/types/member.ts`.
+
+- Repository: the rows are Prisma's own types,
+  `Prisma.membersGetPayload<{ select: typeof publicSelect }>`, so they match
+  the schema. Each method returns a typed result, e.g.
+  `findById(id: string): Promise<PublicMember | null>`.
+- Service: typed input and output, e.g.
+  `create(signUp: SignUp): Promise<PublicMember | null>` and
+  `update(id: string, changes: MemberChanges): Promise<PublicMember>`. The
+  plain password goes in, but only `passwordHash` goes to the repository.
+
+**Should the repository's type be the same as what the controller sends?**
+No. The two types:
+
+```ts
+type PublicMember = {
+  id: string;
+  name: string;
+  email: string | null;
+  role: Role;
+  branch: string;
+  joined: string | null;
+};
+
+type MemberRecord = PublicMember & { passwordHash: string | null };
+```
+
+- `MemberRecord` is what the repository gives back for logging in
+  (`findCredentialsByEmail`), with the hash, so `auth.service` can check
+  the password. It should never leave the server.
+- `PublicMember` is what the client gets. Everything the service hands to
+  a controller is this type.
+
+One thing I found while trying it: TypeScript doesn't remove fields. A
+`MemberRecord` can be assigned to a `PublicMember` without any error,
+because it has all the fields it needs, and `JSON.stringify` still printed
+the hash. So the type alone doesn't protect anything. What actually keeps
+the hash out is the repository only selecting `password_hash` in
+`findCredentialsByEmail`, and `authenticate` removing it before returning.
+The two types make that visible: anywhere `MemberRecord` shows up, it's
+the one that has the hash.
+
+Also: the role comes from the database as a plain string, so `toRole`
+checks it's one of the three before calling it a `Role`.
+
+`tsc` 0 errors, tests and Postman (69 assertions, 0 failures) pass, and
+changing a member's password then logging in with it still works.
+
+## Task 4: Narrowing
+
+**Book or null** (`src/utils/shelfLabel.ts`). First version used `book`
+straight away and got `error TS18047: 'book' is possibly 'null'.` three
+times. Fixed with a plain check, no `as` and no `!`:
+
+```ts
+export const shelfLabel = (book: Book | null): string => {
+  if (book === null) {
+    return "Not in the catalogue";
+  }
+  return `${book.title}: ${book.onShelf} of ${book.totalCopies} on the shelf`;
+};
+```
+
+After the `if`, TypeScript knows `book` is a `Book`, so the second return
+compiles.
+
+**Roles** (`src/utils/roles.ts`). We have three roles in the database, not
+four: `user`, `librarian`, `admin`. `homePageFor(role)` returns a
+different page for each. With the `admin` case left out:
+
+```
+error TS2366: Function lacks ending return statement and return type does not include 'undefined'.
+```
+
+That works, but only because the function returns a string. A function
+that returns nothing wouldn't complain, so it isn't reliable.
+
+**Making it exhaustive:** a `default` that assigns the role to `never`:
+
+```ts
+default: {
+  const unhandled: never = role;
+  throw new Error(`No home page for role: ${unhandled}`);
+}
+```
+
+When every role has a case, nothing is left for `default`, so `role` is
+`never` there and it compiles. To test it I added `"super admin"` to the
+`Role` union (it already appears in the logout route):
+
+```
+src/utils/roles.ts(12,13): error TS2322: Type '"super admin"' is not assignable to type 'never'.
+```
+
+So a new role is a compile error that names the missing one, instead of
+quietly falling through. The `throw` is only there in case a role that
+isn't in the type comes in at runtime.
+
+## Task 5: Finding the any
+
+There was no `any` written in the `.ts` files, so I looked for the ones
+that come in from libraries:
+
+| Where | What I did |
+|---|---|
+| `req.app.locals.services`: Express types `locals` as `Record<string, any>`, and every controller used it | Removed. `servicesFor(req)` in `controllers/services.ts` reads it once and returns a real `Services` type. That one line keeps a comment saying why. |
+| `req.cookies` is `any` in Express's types | Removed. `refreshTokenCookie(req)` takes it as `unknown` and only returns it if it's a string. |
+| `hashPassword` returned `any`, because bcrypt had no types | Removed by installing `@types/bcrypt`. It now returns `string`. |
+| `res.json(body: any)` | Stays. It's Express's default for what we send, nothing in our code reads it back. |
+| The files still in JS (books and auth services, middleware, other repositories) | Stay for now. Their parameters are `any` until they're converted. |
+
+Taking the `any` off `services` straight away showed 8 errors that had
+been hidden:
+- 7 times `req.params.id` is `string | string[] | undefined` in Express 5,
+  but the services want a `string`. Fixed with an `IdParams` type for the
+  `:id` routes.
+- logout passed `req.token`, which might be missing. Added the same check
+  as `req.user` in Task 1.
+
+Then 2 more on the update bodies: zod's `.optional()` gives
+`name?: string | undefined`, but the service types said `name?: string`,
+and with `exactOptionalPropertyTypes` those are different. Fixed by letting
+the change types take `undefined` (the repositories already skip it).
+
+**What `any` does to the checking.** It's not just "this value isn't
+checked". With `services` as `any`, this all compiled:
+
+```ts
+const book = await req.app.locals.services.books.getByIdd(req.params.id);
+const copies: number = book.title;
+surname(book.titel);
+return book.anything.at.all();
+```
+
+- Everything you get from an `any` is also `any`: its properties, what
+  its methods return, and so on. So one `any` at the top spreads through
+  the whole function.
+- `any` can be assigned to every type. So `book.titel` went into
+  `surname(book: Book)` with no error, and the checking inside typed code
+  (like `surname`) was fooled too. The `Book` type there was a lie and
+  nothing said so.
+
+So it doesn't just switch checking off for one value, it lets unchecked
+values leak into the code that is checked. After the change, the same
+`getByIdd` mistake gives `Property 'getByIdd' does not exist ... Did you
+mean 'getById'?`.
+
+`tsc` 0 errors, tests and Postman (69 assertions, 0 failures) pass.
+
+## Task 6: Why both
+
+TypeScript checks the code we write before it runs, and zod checks the
+data that arrives while it runs, so each one covers a place the other
+can't see. Only zod catches a client sending `{ "bookId": 123 }` or no
+`bookId` at all to `POST /borrow-requests`, because that JSON doesn't
+exist until the request comes in and the types are gone by then. Only
+TypeScript catches the code writing `req.body.bookID` instead of
+`req.body.bookId`, or the borrow service putting bk-9's `null` fine into
+a field that can't be null, because zod never looks at our code. With
+`z.infer` the schema is written once and gives both the runtime check
+and the type, so having both costs almost nothing extra.

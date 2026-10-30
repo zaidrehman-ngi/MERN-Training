@@ -69,3 +69,6 @@ export {
   bookIdSchema,
   updateBookSchema,
 };
+
+export type CreateBookBody = z.infer<typeof createBookSchema>;
+export type UpdateBookBody = z.infer<typeof updateBookSchema>;

@@ -34,3 +34,6 @@ export {
   createBorrowRequestSchema,
   updateBorrowRequestSchema,
 };
+
+export type CreateBorrowRequestBody = z.infer<typeof createBorrowRequestSchema>;
+export type UpdateBorrowRequestBody = z.infer<typeof updateBorrowRequestSchema>;

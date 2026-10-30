@@ -6,7 +6,7 @@ import {
   updateBorrowRequest,
   approveBorrowRequest,
   returnBorrowedBook,
-} from "../controllers/borrowRequests.controller.js";
+} from "../controllers/borrowRequests.controller.ts";
 import requireAuth from "../middleware/requireAuth.js";
 import requireRole from "../middleware/requireRole.js";
 import validate from "../middleware/validate.js";
@@ -15,7 +15,7 @@ import {
   borrowRequestQuerySchema,
   createBorrowRequestSchema,
   updateBorrowRequestSchema,
-} from "../schemas/borrowRequests.schema.js";
+} from "../schemas/borrowRequests.schema.ts";
 
 const router = express.Router();
 

@@ -1,8 +1,7 @@
+import type { Changes } from "./changes.ts";
+
 export type BorrowRequestStatus =
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "returned";
+  "pending" | "approved" | "rejected" | "returned";
 
 export type BorrowRequest = {
   id: string;
@@ -30,7 +29,7 @@ export type NewBorrowRequest = {
   finePerDay: number;
 };
 
-export type BorrowRequestChanges = Partial<NewBorrowRequest>;
+export type BorrowRequestChanges = Changes<NewBorrowRequest>;
 
 export type BorrowRequestQuery = {
   userId?: string;

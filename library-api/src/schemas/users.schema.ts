@@ -30,3 +30,6 @@ const updateUserSchema = z.object({
 });
 
 export { userIdSchema, userQuerySchema, createUserSchema, updateUserSchema };
+
+export type CreateUserBody = z.infer<typeof createUserSchema>;
+export type UpdateUserBody = z.infer<typeof updateUserSchema>;
