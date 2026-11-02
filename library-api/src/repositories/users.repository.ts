@@ -1,6 +1,7 @@
 import type { Prisma } from "../generated/prisma/client.ts";
 import { EmailTakenError, NotFoundError } from "../errors/domainErrors.js";
 import translateDbError from "./dbErrors.js";
+import type { DeletableRepository } from "./repository.ts";
 import type {
   AuthMember,
   MemberQuery,
@@ -12,6 +13,16 @@ import type {
 } from "../types/member.ts";
 
 type Db = Prisma.TransactionClient;
+
+export interface UsersRepository extends DeletableRepository<
+  PublicMember,
+  NewMemberRow,
+  MemberQuery
+> {
+  findByEmail(email: string): Promise<PublicMember | null>;
+  findForAuth(id: string): Promise<AuthMember | null>;
+  findCredentialsByEmail(email: string): Promise<MemberRecord | null>;
+}
 
 const translateWriteError = (err: unknown) =>
   translateDbError(err, {
@@ -92,7 +103,7 @@ const toRow = async (
   return row;
 };
 
-const createUsersRepository = (prisma: Db) => ({
+const createUsersRepository = (prisma: Db): UsersRepository => ({
   async findAll({ page, limit }: MemberQuery = {}): Promise<PublicMember[]> {
     const rows = await prisma.members.findMany({
       where: { is_active: true },
@@ -183,7 +194,7 @@ const createUsersRepository = (prisma: Db) => ({
     }
   },
 
-  // Soft delete, like on Tuesday: members with loans or requests can't be
+  // Soft delete, members with loans or requests can't be
   // removed from the table, so they are marked inactive instead.
   async deleteById(id: string): Promise<boolean> {
     const result = await prisma.members.updateMany({
@@ -193,7 +204,5 @@ const createUsersRepository = (prisma: Db) => ({
     return result.count > 0;
   },
 });
-
-export type UsersRepository = ReturnType<typeof createUsersRepository>;
 
 export default createUsersRepository;

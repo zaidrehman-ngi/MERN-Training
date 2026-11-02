@@ -11,7 +11,7 @@ export type BorrowRequest = {
   requestedAt: string | null;
   dueDate: string | null;
   finePerDay: number;
-  member: { id: string; name: string; email: string };
+  member: { id: string; name: string; email: string | null };
   book: { id: string; title: string; author: string | null };
 };
 

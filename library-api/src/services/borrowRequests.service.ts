@@ -10,22 +10,8 @@ import type {
   BorrowRequestListItem,
   BorrowRequestQuery,
   BorrowRequestStatus,
-  NewBorrowRequest,
 } from "../types/borrowRequest.ts";
-
-type BorrowRequestsRepository = {
-  findAll(query: BorrowRequestQuery): Promise<BorrowRequestListItem[]>;
-  findById(id: string): Promise<BorrowRequest | null>;
-  create(data: NewBorrowRequest): Promise<BorrowRequest>;
-  updateById(
-    id: string,
-    changes: BorrowRequestChanges,
-  ): Promise<BorrowRequest | null>;
-  countForMember(
-    memberId: string,
-    statuses: BorrowRequestStatus[],
-  ): Promise<number>;
-};
+import type { BorrowRequestsRepository } from "../repositories/borrowRequests.repository.ts";
 
 type BooksService = {
   getById(id: string): Promise<Book>;

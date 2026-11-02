@@ -1022,8 +1022,6 @@ cleaned up: rejected 5 requests
 The script tells the errors apart with `instanceof`, not a status code,
 which is how the nightly job will do it.
 
-Postman after: 41 requests, 69 assertions, 0 failures. All green.
-
 ## Task 3: What the repository is for
 
 The three answers: swap the database later, a seam for tests, or
@@ -1143,8 +1141,6 @@ translate it. Now all three repositories use one helper
 - Member update accepted any string as an email. Create checked it.
 - A sign-up race on the same email gave a 409, which tells you the email
   exists. It now gets the same message as any other sign-up.
-
-Postman after: 41 requests, 69 assertions, 0 failures.
 
 # Exercise 9 — Who creates the dependencies
 
@@ -1284,8 +1280,8 @@ generated file:
   the `jsx` option and the source map / declaration settings since this
   is a backend.
 
-I added `npm run typecheck` (it just runs `tsc`). It passes with 0
-errors, and the tests and the API still work.
+I added `npm run typecheck` (it just runs `tsc`). It compiles with 0
+errors.
 
 To make sure strict was really on, I made a quick `.ts` file with
 `(name) => name.toUpperCase()` and got this, then deleted the file:
@@ -1468,9 +1464,6 @@ Awkward (2):
   requests can't be deleted. Fixed with the same not found check `update`
   already has.
 
-Tests, both Exercise 8 scripts and Postman (69 assertions, 0 failures)
-still pass.
-
 # Exercise 11 — Typing the layers
 
 ## Task 1: Typing the controllers
@@ -1520,9 +1513,6 @@ Also had to fix `expiresIn` for `jwt.sign`: its types don't accept any
 string, only things like `"15m"`, so I pass the number of seconds from
 `config.jwtExpiresInMs` instead. Same expiry as before.
 
-`tsc` is at 0 errors, and tests and Postman (69 assertions, 0 failures)
-still pass.
-
 ## Task 2: zod and TypeScript together
 
 zod gives the type with `z.infer<typeof schema>`. Renamed the four schema
@@ -1560,8 +1550,6 @@ a type that nobody checks against the real data. Here the type comes from
 the thing that does the checking, so they can't drift apart. It also
 picks up what zod does to the value, e.g. `available` in the books query
 comes out as a `boolean`, not the `"true"` string from the URL.
-
-`tsc` 0 errors, tests and Postman (69 assertions, 0 failures) pass.
 
 ## Task 3: Typing the layer boundaries
 
@@ -1611,9 +1599,6 @@ the one that has the hash.
 
 Also: the role comes from the database as a plain string, so `toRole`
 checks it's one of the three before calling it a `Role`.
-
-`tsc` 0 errors, tests and Postman (69 assertions, 0 failures) pass, and
-changing a member's password then logging in with it still works.
 
 ## Task 4: Narrowing
 
@@ -1714,8 +1699,6 @@ values leak into the code that is checked. After the change, the same
 `getByIdd` mistake gives `Property 'getByIdd' does not exist ... Did you
 mean 'getById'?`.
 
-`tsc` 0 errors, tests and Postman (69 assertions, 0 failures) pass.
-
 ## Task 6: Why both
 
 TypeScript checks the code we write before it runs, and zod checks the
@@ -1728,3 +1711,200 @@ TypeScript catches the code writing `req.body.bookID` instead of
 a field that can't be null, because zod never looks at our code. With
 `z.infer` the schema is written once and gives both the runtime check
 and the type, so having both costs almost nothing extra.
+
+# Exercise 12 — One repository, many models
+
+## Task 1: The shape on paper
+
+The five methods as they are now in the three repositories:
+
+| Method | Books | Members | Borrow requests |
+|---|---|---|---|
+| `findAll(query)` | `BookQuery` -> `Book[]` | `MemberQuery` -> `PublicMember[]` | `BorrowRequestQuery` -> `BorrowRequestListItem[]` |
+| `findById(id)` | `string` -> `Book \| null` | `string` -> `PublicMember \| null` | `string` -> `BorrowRequest \| null` |
+| `create(data)` | new book -> `Book` | `NewMemberRow` -> `PublicMember` | `NewBorrowRequest` -> `BorrowRequest` |
+| `updateById(id, changes)` | `string`, book changes -> `Book \| null` | `string`, `MemberRowInput` -> `PublicMember \| null` | `string`, `BorrowRequestChanges` -> `BorrowRequest \| null` |
+| `deleteById(id)` | `string` -> `boolean` | `string` -> `boolean` | none |
+
+What stays the same in all three:
+- the id is always a `string` (`bk-1`, `m-1000`, `br-100`)
+- "not found" is always `null`, never an error
+- delete returns `boolean`, it never returns the model
+
+Where the model type shows up (call it `T`):
+- `findById`, `create` and `updateById` return `T` (or `T | null`)
+- `findAll` returns a list of `T`, except borrow requests, where the list
+  item is smaller than the full request (just the member's name and the
+  book's title)
+- the inputs aren't `T` itself: `create` takes the new data (no `id`, and
+  for members `passwordHash` instead of a password), and `updateById`
+  takes the same fields but all optional
+- each `findAll` has its own query type (books have filters and sort,
+  members only paging)
+
+So the interface needs more than one type parameter:
+
+```
+Repository<T, New, Query, ListItem = T>
+  findAll(query: Query): Promise<ListItem[]>
+  findById(id: string): Promise<T | null>
+  create(data: New): Promise<T>
+  updateById(id: string, changes: Partial<New>): Promise<T | null>
+  deleteById(id: string): Promise<boolean>
+```
+
+Things that don't fit:
+- borrow requests have no `deleteById` (they're history), so delete should be its own piece that books and members add
+- the extra methods (`findByIsbn`, `findByEmail`, `changeAvailableCopies`,
+  `countForMember`, `findForAuth`) stay on each repository, outside the
+  shared interface
+
+## Task 2: The generic interface
+
+`src/repositories/repository.ts`:
+
+```ts
+export interface Repository<T, New, Query, ListItem = T> {
+  findAll(query: Query): Promise<ListItem[]>;
+  findById(id: string): Promise<T | null>;
+  create(data: New): Promise<T>;
+  updateById(id: string, changes: Changes<New>): Promise<T | null>;
+}
+
+export interface DeletableRepository<T, New, Query, ListItem = T>
+  extends Repository<T, New, Query, ListItem> {
+  deleteById(id: string): Promise<boolean>;
+}
+```
+
+Delete is split out because borrow requests don't have one (Task 1).
+
+Applied to both:
+- Books: converted `books.repository.js` to `.ts`.
+  `BooksRepository extends DeletableRepository<Book, NewBook, BookQuery>`
+  and adds `findByIsbn` and `changeAvailableCopies`.
+- Members: `UsersRepository extends DeletableRepository<PublicMember,
+  NewMemberRow, MemberQuery>` and adds `findByEmail`, `findForAuth` and
+  `findCredentialsByEmail`.
+
+Each `create...Repository` function is typed to return its interface, so
+the object has to match it. Both compile. To check it really holds them
+to it, I broke each one on purpose:
+- renamed books' `deleteById` to `removeById`:
+  `'removeById' does not exist in type 'BooksRepository'`
+- made members' `findById` return `Book | null`:
+  `Type 'Book' is missing the following properties from type
+  'PublicMember': name, email, role, branch, joined`
+
+**What the type parameter does:** `T` is a placeholder for the model. The
+interface says "whatever `T` is, `findById` gives back a `T` or null,
+`create` gives back a `T`" and so on, without saying what `T` is. When I
+write `DeletableRepository<Book, ...>`, every `T` in it becomes `Book`, so
+for books it reads as `findById(id: string): Promise<Book | null>`. With
+`PublicMember` it becomes the member version. Same rules, written once,
+filled in per model. `New` and `Query` work the same way for the input and
+the filters, and `ListItem` defaults to `T` unless a repository's list
+returns something smaller.
+
+## Task 3: Where the generic interface stops
+
+To add something for one model, that model gets its own interface that
+extends the generic one. The generic `Repository<T, ...>` doesn't change,
+so the others aren't affected.
+
+Books already had this from Task 2:
+
+```ts
+interface BooksRepository extends DeletableRepository<Book, NewBook, BookQuery> {
+  findByIsbn(isbn: string): Promise<Book | null>;
+  changeAvailableCopies(id: string, change: number): Promise<Book | null>;
+}
+```
+
+For borrow requests I converted the repository to TypeScript and added
+`findOverdue`:
+
+```ts
+interface BorrowRequestsRepository
+  extends Repository<BorrowRequest, NewBorrowRequest, BorrowRequestQuery, BorrowRequestListItem> {
+  countForMember(memberId: string, statuses: BorrowRequestStatus[]): Promise<number>;
+  findOverdue(asOf: Date): Promise<BorrowRequest[]>;
+}
+```
+
+`findOverdue` returns approved requests with a due date before `asOf`.
+It takes the date as a parameter so the nightly job can ask about any
+day. On the seed data it finds br-101 (due 2026-02-21) and nine others.
+
+While converting it, the `BorrowRequest` type turned out to have
+`member.email` as `string`, but the column can be null, so I fixed that.
+
+**When it stops being worth it:** when the shared methods stop being the
+same. Borrow requests already need a different list item, have no delete,
+and their important queries (`countForMember`, `findOverdue`) are outside
+the five. Each difference adds another type parameter or a split
+interface, and at some point `Repository<T, New, Query, ListItem>` is
+harder to read than the repositories themselves. For the five basic
+methods it's worth it. Model-specific queries like `findOverdue` and
+`findByIsbn` should stay in that model's own interface.
+
+## Task 4: Breaking the interface on purpose
+
+Guesses are in guesses.md. I wrote two members repositories typed as
+`DeletableRepository<PublicMember, NewMemberRow, MemberQuery>`.
+
+Missing `updateById`:
+
+```
+error TS2322: Type '{ findAll: ...; findById: ...; create: ...; deleteById: ...; }' is not assignable to type 'MembersRepo'.
+  Property 'updateById' is missing in type '{ ... }' but required in type 'DeletableRepository<PublicMember, NewMemberRow, MemberQuery, PublicMember>'.
+```
+
+`findById` returning a `Book`:
+
+```
+error TS2322: Type 'Promise<Book>' is not assignable to type 'Promise<PublicMember | null>'.
+  Type 'Book' is missing the following properties from type 'PublicMember': name, email, role, branch, joined
+```
+
+Both fail where the repository is written, not where it's used. Nothing
+had to call `updateById` for the first error to show up.
+
+**What an interface is for:** the three repositories that exist today
+already work, so the interface doesn't add much for them. It matters for
+the next one. When someone adds a fourth model next year, the interface
+tells them what it has to have, and the compiler stops them the moment
+they leave a method out or return the wrong thing, before any service
+calls it. It's also what lets code be written against "a repository"
+without knowing which one, like the fakes from Exercise 9: as long as a
+new one fits the interface, the services and tests built on it keep
+working.
+
+## Task 5: The two changes together
+
+On their own each one only does half the job:
+- Passing the repository in lets me swap in a fake, but nothing checks
+  the fake is right. The fakes in `test/fakeRepositories.js` are plain JS.
+  If the real repository changes, or a fake misses a method or returns
+  the wrong shape, the test still runs and either crashes or passes for
+  the wrong reason.
+- Typing the repository checks the real one, but if the service built its
+  own repository there'd be nothing to swap.
+
+Together, any object can be handed to the service, and the compiler makes
+sure it's a real `BorrowRequestsRepository`. A fake has to have the same
+methods and return the same types as the real one, and if the interface
+changes, every fake that no longer fits stops compiling. So the fakes stay
+honest.
+
+The test I could now write in five minutes: **approving a request when
+the book has no copies left**. Typed fakes for the books and borrow
+request repositories, bk-2 with `onShelf: 0` and one pending request for
+it. Call `borrowRequests.update(id, { status: "approved" })` and check it
+throws the `NO_COPIES_AVAILABLE` error and the request is still
+`pending`. If a fake is missing a method or returns the wrong type, it
+won't compile.
+
+On Monday that meant the real database: set a book's copies to 0 by
+hand, create a request for it, approve it, check the copy count and the
+request status, then put the copies back or reseed.

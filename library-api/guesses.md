@@ -77,3 +77,19 @@ error for `author`. The part I wasn't sure about was wrong: `as Book` on
 `{"name":"Aisha Khan"}` compiled fine. `JSON.parse` returns `any`, so the
 compiler has nothing to compare against. And none of them checked anything
 at runtime.
+
+# Exercise 12 — One repository, many models
+
+## Task 4: Breaking the interface on purpose
+
+- Four of five methods: I think it won't compile and the error will name
+  the missing method. Not sure where it shows up though, maybe only when
+  something tries to call the missing method.
+- Wrong model type: if `findById` returns a `Book` where the interface
+  wants a `PublicMember`, I think it says `Book` isn't assignable to
+  `PublicMember`, on that method.
+
+After building them: the error text was right for both, but the place
+was wrong for the missing one. It doesn't wait for a call, it fails right
+where the function says it returns the interface, before anything uses
+it.

@@ -12,3 +12,18 @@ export type Book = {
   finePerDay: number | null;
   status: BookStatus;
 };
+
+export type NewBook = Omit<Book, "id" | "author" | "coverUrl"> & {
+  author?: string | null | undefined;
+  coverUrl?: string | null | undefined;
+};
+
+export type BookQuery = {
+  author?: string | undefined;
+  title?: string | undefined;
+  available?: boolean | undefined;
+  sort?: "title" | "author" | "year" | undefined;
+  order?: "asc" | "desc" | undefined;
+  page: number;
+  limit: number;
+};

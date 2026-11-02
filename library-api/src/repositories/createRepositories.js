@@ -1,6 +1,6 @@
-import createBooksRepository from "./books.repository.js";
+import createBooksRepository from "./books.repository.ts";
 import createUsersRepository from "./users.repository.ts";
-import createBorrowRequestsRepository from "./borrowRequests.repository.js";
+import createBorrowRequestsRepository from "./borrowRequests.repository.ts";
 import createRefreshTokensRepository from "./refreshTokens.repository.js";
 import createRevokedTokensRepository from "./revokedTokens.repository.js";
 
