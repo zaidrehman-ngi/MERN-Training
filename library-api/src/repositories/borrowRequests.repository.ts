@@ -23,7 +23,8 @@ export interface BorrowRequestsRepository extends Repository<
     memberId: string,
     statuses: BorrowRequestStatus[],
   ): Promise<number>;
-  findOverdue(asOf: Date): Promise<BorrowRequest[]>;
+  findOverdue(today: string): Promise<BorrowRequest[]>;
+  findDueOn(date: string): Promise<BorrowRequest[]>;
 }
 
 // Only fetch the columns we actually send back.
@@ -142,7 +143,9 @@ const toUpdateRow = async (
   if (changes.requestedAt !== undefined) {
     row.requested_on = new Date(changes.requestedAt);
   }
-  if (changes.dueDate !== undefined) row.due_on = new Date(changes.dueDate);
+  if (changes.dueDate !== undefined) {
+    row.due_on = changes.dueDate === null ? null : new Date(changes.dueDate);
+  }
   if (changes.finePerDay !== undefined) row.fine_per_day = changes.finePerDay;
   if (changes.userId !== undefined) {
     row.member_id = await findMemberId(prisma, changes.userId);
@@ -195,7 +198,8 @@ const createBorrowRequestsRepository = (
       book_id: await findBookId(prisma, requestData.bookId),
       status: requestData.status,
       requested_on: new Date(requestData.requestedAt),
-      due_on: new Date(requestData.dueDate),
+      due_on:
+        requestData.dueDate === null ? null : new Date(requestData.dueDate),
       fine_per_day: requestData.finePerDay,
     };
     try {
@@ -240,11 +244,20 @@ const createBorrowRequestsRepository = (
     });
   },
 
-  async findOverdue(asOf) {
+  async findOverdue(today) {
     const rows = await prisma.book_requests.findMany({
-      where: { status: "approved", due_on: { lt: asOf } },
+      where: { status: "approved", due_on: { lt: new Date(today) } },
       select: detailSelect,
       orderBy: { due_on: "asc" },
+    });
+    return rows.map(toBorrowRequest);
+  },
+
+  async findDueOn(date) {
+    const rows = await prisma.book_requests.findMany({
+      where: { status: "approved", due_on: new Date(date) },
+      select: detailSelect,
+      orderBy: { api_id: "asc" },
     });
     return rows.map(toBorrowRequest);
   },

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import cron from "node-cron";
 
 const millisecondsByUnit = {
   ms: 1,
@@ -56,6 +57,25 @@ const configSchema = z.object({
   DB_QUERY_LOG: z.enum(["true", "false"]).default("false"),
   // bcrypt cost factor: below 10 is too fast to guess, above 15 makes login very slow
   BCRYPT_COST: z.coerce.number().int().min(10).max(15).default(12),
+  LOAN_PERIOD_DAYS: z.coerce.number().int().positive().default(14),
+  LIBRARY_TIME_ZONE: z
+    .string()
+    .default("Asia/Karachi")
+    .refine((zone) => {
+      try {
+        new Intl.DateTimeFormat("en-CA", { timeZone: zone });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "must be an IANA time zone such as Asia/Karachi"),
+  DUE_REMINDER_SCHEDULE: z
+    .string()
+    .default("0 8 * * *")
+    .refine(
+      (expression) => cron.validate(expression),
+      "must be a cron expression",
+    ),
 });
 
 export default configSchema;

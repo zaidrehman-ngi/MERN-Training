@@ -25,7 +25,7 @@ export type NewBorrowRequest = {
   bookId: string;
   status: BorrowRequestStatus;
   requestedAt: string;
-  dueDate: string;
+  dueDate: string | null;
   finePerDay: number;
 };
 

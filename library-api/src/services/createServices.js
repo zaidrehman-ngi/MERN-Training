@@ -2,6 +2,9 @@ import createBooksService from "./books.service.js";
 import createUsersService from "./users.service.ts";
 import createBorrowRequestsService from "./borrowRequests.service.ts";
 import createAuthService from "./auth.service.js";
+import createRemindersService from "./reminders.service.ts";
+import config from "../config/config.js";
+import logger from "../config/logger.js";
 
 const createServices = (repositories, events) => {
   // Gives work services and repositories that use one transaction. Their
@@ -21,16 +24,30 @@ const createServices = (repositories, events) => {
 
   const books = createBooksService(repositories.books, events);
   const users = createUsersService(repositories.users);
+  const borrowRequests = createBorrowRequestsService(
+    repositories.borrowRequests,
+    books,
+    users,
+    events,
+    transaction,
+    {
+      loanPeriodDays: config.loanPeriodDays,
+      timeZone: config.libraryTimeZone,
+    },
+  );
 
   return {
     books,
     users,
-    borrowRequests: createBorrowRequestsService(
-      repositories.borrowRequests,
-      books,
-      users,
-      events,
-      transaction,
+    borrowRequests,
+    reminders: createRemindersService(
+      borrowRequests,
+      repositories.notifications,
+      {
+        timeZone: config.libraryTimeZone,
+        log: (message) => logger.info(message),
+        logError: (message, err) => logger.error(message, err),
+      },
     ),
     auth: createAuthService(
       repositories.users,

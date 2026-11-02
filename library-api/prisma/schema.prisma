@@ -131,22 +131,24 @@ model members {
   borrow_requests borrow_requests[]
   book_requests   book_requests[]
   refresh_tokens  refresh_tokens[]
+  notifications   notifications[]
   branches        branches          @relation(fields: [branch_id], references: [branch_id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 // A member asking to borrow a book (the API's /borrow-requests).
 // Not the same as borrow_requests, which holds the actual loans of a copy.
 model book_requests {
-  request_id   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  api_id       String    @unique @default(dbgenerated("('br-'::text || nextval('book_requests_api_id_seq'::regclass))"))
-  member_id    String    @db.Uuid
-  book_id      String    @db.Uuid
-  status       String    @default("pending")
-  requested_on DateTime  @default(dbgenerated("CURRENT_DATE")) @db.Date
-  due_on       DateTime? @db.Date
-  fine_per_day Int       @default(20)
-  members      members   @relation(fields: [member_id], references: [member_id], onDelete: NoAction, onUpdate: NoAction)
-  books        books     @relation(fields: [book_id], references: [book_id], onDelete: NoAction, onUpdate: NoAction)
+  request_id    String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  api_id        String          @unique @default(dbgenerated("('br-'::text || nextval('book_requests_api_id_seq'::regclass))"))
+  member_id     String          @db.Uuid
+  book_id       String          @db.Uuid
+  status        String          @default("pending")
+  requested_on  DateTime        @default(dbgenerated("CURRENT_DATE")) @db.Date
+  due_on        DateTime?       @db.Date
+  fine_per_day  Int             @default(20)
+  notifications notifications[]
+  members       members         @relation(fields: [member_id], references: [member_id], onDelete: NoAction, onUpdate: NoAction)
+  books         books           @relation(fields: [book_id], references: [book_id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([member_id])
   @@index([book_id])
@@ -173,4 +175,19 @@ model revoked_tokens {
   expires_at DateTime @db.Timestamptz(6)
 
   @@index([expires_at])
+}
+
+model notifications {
+  notification_id String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  member_id       String         @db.Uuid
+  request_id      String?        @db.Uuid
+  kind            String
+  message         String
+  for_date        DateTime       @db.Date
+  created_at      DateTime       @default(now()) @db.Timestamptz(6)
+  members         members        @relation(fields: [member_id], references: [member_id], onDelete: NoAction, onUpdate: NoAction)
+  book_requests   book_requests? @relation(fields: [request_id], references: [request_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([request_id, kind, for_date])
+  @@index([member_id])
 }

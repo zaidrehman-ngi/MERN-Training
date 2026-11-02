@@ -129,3 +129,25 @@ possible later.
 
 If a service file needs a status code to compile, or a controller imports
 Prisma, it's in the wrong layer.
+
+# Exercise 13 — Due dates and the nightly job
+
+## Task 1: What "due on the 14th" means
+
+**Decision: due on the 14th means by the end of the 14th, Karachi time.**
+The member can bring it back any time on the 14th. It becomes overdue at
+00:00 on the 15th in Karachi, wherever the server is.
+
+- The due date is a plain date (`due_on` is a Postgres `date`), with no
+  time and no time zone. "The 14th" is a day on the library's calendar,
+  not a moment.
+- "Today" is always worked out in `LIBRARY_TIME_ZONE` (Asia/Karachi), never
+  from the server clock's date or from UTC.
+- Overdue: `due_on < today`. So on the 14th it isn't, on the 15th it is.
+- Fines: one fine per full day after the due date. Returned on the 15th
+  is 1 day late, on the 16th is 2 days. Returned on the 14th, no fine.
+
+Why not the start of the day: a book due on the 14th would be overdue the
+moment the 14th starts, which isn't what a member reading "due on the
+14th" expects. Why not an exact time: the library counts days, not hours,
+and an exact time brings the time zone back into every comparison.

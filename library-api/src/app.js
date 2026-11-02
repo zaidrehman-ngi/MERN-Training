@@ -19,6 +19,7 @@ import booksRouter from "./routes/books.routes.js";
 import usersRouter from "./routes/users.routes.js";
 import borrowRequestsRouter from "./routes/borrowRequests.routes.js";
 import authRouter from "./routes/auth.routes.js";
+import jobsRouter from "./routes/jobs.routes.js";
 
 const accessLogStream = logger.isEnabled("info")
   ? fs.createWriteStream(config.accessLogPath, { flags: "a" })
@@ -95,6 +96,8 @@ const createApp = (services) => {
   app.use("/api/v1/borrow-requests", borrowRequestsRouter);
   // 11d. Authentication routes.
   app.use("/api/v1/auth", authRouter);
+  // 11e. Admin-only job routes.
+  app.use("/api/v1/jobs", jobsRouter);
 
   // 12. Return not found only after all routes have had a chance to match.
   app.use((req) => {

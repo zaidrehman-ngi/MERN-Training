@@ -1908,3 +1908,238 @@ won't compile.
 On Monday that meant the real database: set a book's copies to 0 by
 hand, create a request for it, approve it, check the copy count and the
 request status, then put the copies back or reseed.
+
+# Exercise 13 — Due dates and the nightly job
+
+## Task 1: Due dates
+
+The due date is now set when a request is approved, not when it's
+created. A pending request has `dueDate: null`, and approving sets it to
+today + `LOAN_PERIOD_DAYS` (new in config, default 14). Both
+`PATCH /borrow-requests/:id` and `POST /:id/approve` go through the same
+service method, so both do it.
+
+It's stored in `due_on`, which is a Postgres `date`, not a string.
+
+**Time zones.** I checked what the database does:
+- A `date` column has no time and no zone. `2026-11-14` stays
+  `2026-11-14` whatever the session time zone is (I tried it with the
+  session set to UTC).
+- Postgres here runs in `Asia/Karachi`, but `CURRENT_DATE` uses the
+  server's zone, so on a UTC server it would be a day behind between
+  midnight and 5 AM Karachi time.
+
+The real problem was in our code. "Today" came from
+`new Date().toISOString().slice(0, 10)`, which is the UTC date. At 2 AM in
+Karachi on 2 November that gives `2026-11-01`. Now "today" is worked out
+with `Intl.DateTimeFormat` in `LIBRARY_TIME_ZONE` (Asia/Karachi), so it's
+the library's date wherever the server is. There's a test for it: at 2 AM
+Karachi time on 2 November, a request is created on `2026-11-02` and
+approving it gives `2026-11-16`.
+
+**What "due on the 14th" means:** the end of the 14th, Karachi time. The
+reasons are in decisions.md. `findOverdue` now takes the library's date
+and uses `due_on < today`, so br-101 (due 2026-02-21) isn't overdue on the
+21st and is on the 22nd.
+
+## Task 2: Scheduling the job
+
+Installed **node-cron 4.6.0** (it comes with its own types).
+`src/jobs/scheduler.ts` schedules a `due-reminders` job, and `server.js`
+starts it once the server is listening, so scripts and tests never start
+it. For now the job only logs.
+
+The schedule is `DUE_REMINDER_SCHEDULE` in config (default `0 8 * * *`,
+8 AM every day), checked with `cron.validate` at startup. The time zone is
+passed explicitly as `timezone: config.libraryTimeZone` (Asia/Karachi).
+
+To prove it works I ran the server with
+`DUE_REMINDER_SCHEDULE="*/10 * * * * *"`:
+
+```
+[due-reminders] scheduled "*/10 * * * * *" (Asia/Karachi), next run 2026-11-02T07:23:40.000Z
+[due-reminders] ran at 2026-11-02T12:23:40.000+05:00
+[due-reminders] ran at 2026-11-02T12:23:50.000+05:00
+[due-reminders] ran at 2026-11-02T12:24:00.000+05:00
+```
+
+With the real schedule it says the next run is `2026-11-03T03:00:00Z`,
+which is 8 AM in Karachi. With `timezone: "UTC"` the same expression runs
+at 8 AM UTC, which is 1 PM in Karachi. Without a time zone it uses the
+server's, which is only right here because my laptop is in Karachi.
+
+While doing this I found that `config.js` passes each variable to the
+schema by name, and I hadn't added the new ones from Task 1, so
+`LOAN_PERIOD_DAYS` and `LIBRARY_TIME_ZONE` were always their defaults.
+They're added now.
+
+**The five fields** of `0 8 * * *`, left to right:
+
+| Field | Here | Means | Allowed |
+|---|---|---|---|
+| minute | `0` | at minute 0 | 0-59 |
+| hour | `8` | at 8 AM | 0-23 |
+| day of month | `*` | every day of the month | 1-31 |
+| month | `*` | every month | 1-12 or JAN-DEC |
+| day of week | `*` | every day of the week | 0-7 or SUN-SAT (0 and 7 are Sunday) |
+
+`*` means "every", `*/10` means "every 10th", `1-5` is a range and `1,3`
+is a list. So `30 9 * * 1-5` is 9:30 on weekdays. node-cron also allows
+an optional sixth field at the front for seconds, which is what
+`*/10 * * * * *` uses. The usual cron format has only five.
+
+## Task 3: Sending the reminders
+
+The job now calls one service method and nothing else:
+
+```ts
+const { dueOn, sent } = await services.reminders.sendDueReminders();
+```
+
+`services` is the same object `server.js` gives to Express and the socket
+server. There's no Prisma import in `src/jobs/` or in the reminders
+service.
+
+- `reminders.service.ts`: works out today in Karachi, adds 2 days, asks
+  `borrowRequests.findDueOn(dueOn)` for the loans, and for each one saves a
+  notification and logs a line.
+- `borrowRequests.service` got `findDueOn(date)`, and the repository got
+  the query behind it: approved requests whose `due_on` is that date.
+- New `notifications` table (migration `notifications`): member, borrow
+  request, kind (`due-reminder`), message and `created_at`, with its own
+  repository. The seed script clears it like refresh tokens.
+
+To try it I approved two loans for m-test, moved one's due date to
+2026-11-04 (two days from today), left the other at 2026-11-16, and ran
+the job every 10 seconds:
+
+```
+[due-reminders] started at 2026-11-02T12:57:50.000+05:00
+[due-reminders] reminded Test User (m-test) about br-1184: "Hyperion" is due back on 2026-11-04.
+[due-reminders] finished: 1 reminders for loans due 2026-11-04
+```
+
+Only br-1184 got a reminder, and the row is in `notifications`. It ran
+again 10 seconds later and stored the same reminder a second time, so
+running twice isn't safe yet.
+
+## Task 4: When the job goes wrong
+
+Guesses are in guesses.md. What actually happens:
+
+1. **Restarted at 8:59.** Fine if it's back before 9:00. node-cron sets
+   the schedule again on startup and runs at 9:00. If startup takes past
+   9:00, that day is missed (same as case 2).
+2. **Down all morning, back at 11.** The 9:00 run never happens. node-cron
+   only lives in memory, so when the server starts at 11 the next run it
+   shows is tomorrow at 9:00. Members due in two days get no reminder,
+   and nothing says so. **Real problem.**
+3. **Still running when the next one is due.** I tried it with a job that
+   takes 2.5 s on a 1 s schedule. With `noOverlap: true` (what we use) the
+   next run is skipped. Without it, they run at the same time (2, then 3
+   at once). For a daily job this only happens if a run hangs for a day,
+   and then the next day is skipped.
+4. **Two servers.** Both run at 9:00. I ran two servers on a 10-second
+   schedule and got 2 identical reminders for the same loan. **Real
+   problem.**
+
+**Fix for running twice:** the job is now **idempotent**, running it again
+does nothing extra. Every notification has a `for_date` (the due date it
+reminds about), and the table has a unique rule on
+`(request_id, kind, for_date)`. The repository's `createOnce` returns
+`null` when that row already exists, and the service counts it as already
+sent. Because it's the database that refuses the second copy, it also
+covers two servers running at the same moment. With two servers and four
+runs:
+
+```
+server A: reminded Test User (m-test) about br-1188: "Hyperion" is due back on 2026-11-04.
+server A: br-1188 already reminded for 2026-11-04, skipped
+server B: br-1188 already reminded for 2026-11-04, skipped
+server B: br-1188 already reminded for 2026-11-04, skipped
+notification rows: 1
+```
+
+**What I'd do in production:**
+- Missed runs (case 2): save each run in a `job_runs` table. On startup,
+  if today's run is missing and it's past 9:00, run it straight away. That
+  is safe now because the job is idempotent.
+- Two servers (case 4): duplicates can't happen any more, but both still
+  do the work. Better to have one of them run it: a Postgres advisory lock
+  at the start of the job, a `JOBS_ENABLED` setting that's on for only one
+  server, or a separate worker process for jobs.
+- A run that hangs (case 3): a timeout on the run (node-cron has
+  `executeTimeout`), plus logging how long each run took, so a stuck run
+  shows up instead of quietly skipping the next day.
+
+## Task 5: Making the job visible
+
+First I threw an error inside the job with the old code. The server
+survived, but only because node-cron catches it and prints it with its
+own logger. There was a "started" line from us and then nothing: no
+finish, no failure, in a different format. So it was safe by accident,
+depending on a library default.
+
+What I changed:
+- `src/jobs/runJob.ts` wraps every job. It logs `started`, then either
+  `finished in Xms` with the counts, or `FAILED after Xms` with the error.
+  It catches everything and never rethrows, so nothing from a job can
+  reach the process `unhandledRejection` handler, which would exit the
+  server.
+- `sendDueReminders` returns `found`, `sent`, `alreadySent` and `failed`.
+  Each loan has its own try/catch, so one loan that fails is logged and
+  counted, and the rest still get their reminder.
+
+A normal run, with two loans due in two days:
+
+```
+[due-reminders] started
+[due-reminders] reminded Test User (m-test) about br-1190: "Hyperion" is due back on 2026-11-04.
+[due-reminders] reminded Test User (m-test) about br-1191: "The Sea and the Salt" is due back on 2026-11-04.
+[due-reminders] finished in 252ms: dueOn=2026-11-04 found=2 sent=2 alreadySent=0 failed=0
+```
+
+Then I put `throw new Error("deliberate test crash")` at the start of
+`sendDueReminders` and ran it every 10 seconds:
+
+```
+[due-reminders] started
+[due-reminders] FAILED after 1ms: Error: deliberate test crash
+    at Object.sendDueReminders (.../src/services/reminders.service.ts:28:11)
+[due-reminders] started
+[due-reminders] FAILED after 0ms: Error: deliberate test crash
+```
+
+While it kept failing, `GET /api/v1/books` still returned 200, and the
+next run still started on time. Then I took the `throw` out again.
+
+One thing the wrapper can't catch: a promise inside the job that isn't
+awaited. If it rejects, it goes straight to `unhandledRejection` and the
+server exits. So everything inside a job has to be awaited.
+
+## Task 6: Running it by hand
+
+I went with an admin-only route: `POST /api/v1/jobs/due-reminders/run`
+(`requireAuth` + `requireRole("admin")`).
+
+Why a route and not a script:
+- For the demo it's one request from Postman, and the response shows what
+  happened. The panel doesn't need to watch a terminal.
+- Once it's deployed next week I may not have a shell on the server, but
+  I'll always have the API.
+- It runs in the same server as the cron job, through the same `runJob`
+  and `services.reminders.sendDueReminders()`, so the logs look the same.
+  The log line says who ran it.
+
+It's safe to run any time because the job is idempotent (Task 4): running
+it after the 9 AM run, or twice in a row, doesn't send anything twice.
+
+```
+admin, 1st:  200 {"data":{"dueOn":"2026-11-04","found":1,"sent":1,"alreadySent":0,"failed":0}}
+admin, 2nd:  200 {"data":{"dueOn":"2026-11-04","found":1,"sent":0,"alreadySent":1,"failed":0}}
+member:      403 FORBIDDEN
+no login:    401 UNAUTHORIZED
+```
+
+If the job fails, the route returns 500 `JOB_FAILED` and the error is in
+the server log, same as when cron runs it.

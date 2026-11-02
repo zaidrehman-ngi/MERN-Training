@@ -46,6 +46,11 @@ const setUp = (out) => {
     usersService,
     events,
     transaction,
+    {
+      loanPeriodDays: 14,
+      timeZone: "Asia/Karachi",
+      now: () => new Date("2026-11-02T02:00:00+05:00"),
+    },
   );
   return { borrowRequests, requests };
 };
@@ -76,4 +81,17 @@ test("returned books don't count against the limit", async () => {
 
   const request = await borrowRequests.create("m-1", "bk-2");
   assert.equal(request.status, "pending");
+});
+
+test("approving sets the due date from the Karachi date, not UTC", async () => {
+  const { borrowRequests } = setUp(0);
+
+  const request = await borrowRequests.create("m-1", "bk-2");
+  assert.equal(request.dueDate, null);
+
+  const approved = await borrowRequests.update(request.id, {
+    status: "approved",
+  });
+  assert.equal(approved.requestedAt, "2026-11-02");
+  assert.equal(approved.dueDate, "2026-11-16");
 });

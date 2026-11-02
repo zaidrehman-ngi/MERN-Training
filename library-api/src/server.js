@@ -17,6 +17,7 @@ const { default: domainEvents } = await import("./events/domainEvents.js");
 const { default: createSocketServer } = await import(
   "./realtime/socketServer.js"
 );
+const { startJobs } = await import("./jobs/scheduler.ts");
 
 // the one place the real database is chosen
 const services = createServices(createRepositories(prisma), domainEvents);
@@ -28,4 +29,5 @@ createSocketServer(httpServer, domainEvents, services);
 
 httpServer.listen(config.port, () => {
   logger.info(`Server listening on port ${config.port}`);
+  startJobs(services);
 });

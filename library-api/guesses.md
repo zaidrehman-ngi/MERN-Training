@@ -93,3 +93,24 @@ After building them: the error text was right for both, but the place
 was wrong for the missing one. It doesn't wait for a call, it fails right
 where the function says it returns the interface, before anything uses
 it.
+
+# Exercise 13 — Due dates and the nightly job
+
+## Task 4: What happens to the 9am job
+
+1. Restarted at 8:59: the schedule is set up again when the server starts,
+   so as long as it's back before 9:00 it runs normally. If it takes longer
+   than a minute to start, it misses 9:00.
+2. Down all morning, back at 11: I think the 9:00 run is just skipped.
+   Not sure if node-cron notices it missed one and runs it when it comes
+   back, but I don't think it remembers anything between restarts.
+3. Still running when the next one is due: I think the second one waits
+   until the first finishes, then runs.
+4. Two servers: both have the schedule, so both run at 9:00 and every
+   member gets the reminder twice.
+
+After trying: 1 and 4 were right, and 2 was right that it's skipped,
+node-cron keeps nothing between restarts (started in the afternoon, the next run
+it shows is tomorrow 8:00). 3 was wrong. It doesn't wait: with
+`noOverlap: true` the second run is skipped, and without it both run at
+the same time.

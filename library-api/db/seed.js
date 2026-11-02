@@ -51,6 +51,7 @@ const madeByApi = (apiId, start) => {
 //    members and books.
 // Refresh tokens are only test logins, so clear them all (they point at members).
 await prisma.refresh_tokens.deleteMany({});
+await prisma.notifications.deleteMany({});
 
 const requests = await prisma.book_requests.findMany({ select: { request_id: true, api_id: true } });
 await prisma.book_requests.deleteMany({

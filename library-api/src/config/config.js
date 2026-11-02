@@ -30,6 +30,9 @@ const result = configSchema.safeParse({
   LOG_LEVEL: process.env.LOG_LEVEL,
   DB_QUERY_LOG: process.env.DB_QUERY_LOG,
   BCRYPT_COST: process.env.BCRYPT_COST,
+  LOAN_PERIOD_DAYS: process.env.LOAN_PERIOD_DAYS,
+  LIBRARY_TIME_ZONE: process.env.LIBRARY_TIME_ZONE,
+  DUE_REMINDER_SCHEDULE: process.env.DUE_REMINDER_SCHEDULE,
 });
 
 if (!result.success) {
@@ -68,6 +71,9 @@ const config = Object.freeze({
   logLevel: values.LOG_LEVEL,
   dbQueryLog: values.DB_QUERY_LOG === "true",
   bcryptCost: values.BCRYPT_COST,
+  loanPeriodDays: values.LOAN_PERIOD_DAYS,
+  libraryTimeZone: values.LIBRARY_TIME_ZONE,
+  dueReminderSchedule: values.DUE_REMINDER_SCHEDULE,
 });
 
 export default config;
