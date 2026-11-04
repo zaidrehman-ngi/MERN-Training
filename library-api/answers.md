@@ -806,10 +806,41 @@ because it has to run before the body reaches the handler.
 
 ## Task 2: The rules for each layer
 
-The rules are in `decisions.md` (Exercise 7, Task 2). In short: the
-controller knows HTTP, the service knows the library's rules, and the
-repository knows the database. **Only the controller may mention `req`,
-`res` or a status code, and only the repository may mention Prisma.**
+**Controller** (with its routes and middleware), the HTTP layer:
+- knows about `req`, `res`, status codes, headers, cookies, query strings
+  and the response body shape
+- reads what the request asked for, calls **one** service method, and turns
+  the result (or the error) into a response
+- doesn't know library rules, and never touches Prisma or a repository
+
+**Service**, the library's rules:
+- knows the rules: who may borrow, how many, when it's due, when a token
+  is valid, what happens when a copy comes back, which events to announce
+- gets plain values in (ids, objects) and gives plain values back, or
+  throws an error that says *what* went wrong ("book not found", "no copies
+  left")
+- calls repositories and other services, never Prisma directly
+- doesn't know whether it was called by a route, a socket event or the
+  nightly job, so it never sees `req`, `res`, a socket or a status code
+
+**Repository**, the database:
+- knows Prisma, table and column names, and how to turn a row into the
+  API's shape
+- one method is one question or one change to the database
+  (`findByIsbn`, `changeAvailableCopies`); it doesn't decide if that change
+  is allowed
+- knows nothing about HTTP and nothing about the rules
+
+**The test:**
+
+| | `req`, `res`, a status code | Prisma |
+|---|---|---|
+| Controller | **yes**, only here | no |
+| Service | no | no |
+| Repository | no | **yes**, only here |
+
+If a service file needs a status code to compile, or a controller imports
+Prisma, it's in the wrong layer.
 
 Checking the code against that test before moving anything:
 
@@ -905,8 +936,8 @@ response ◄──────────────────────�
 
 MVC only says "keep the data away from the HTTP part". It doesn't say where
 the library's rules go, so they end up in the controller or the model. The
-layered version splits the M into two, and gives each layer one job (rules
-in `decisions.md`):
+layered version splits the M into two, and gives each layer one job (the
+rules from Task 2):
 
 - a **service** layer for the rules (borrow limit, due dates, who may
   approve), with no `req`, `res` or status codes
@@ -1937,10 +1968,28 @@ the library's date wherever the server is. There's a test for it: at 2 AM
 Karachi time on 2 November, a request is created on `2026-11-02` and
 approving it gives `2026-11-16`.
 
-**What "due on the 14th" means:** the end of the 14th, Karachi time. The
-reasons are in decisions.md. `findOverdue` now takes the library's date
-and uses `due_on < today`, so br-101 (due 2026-02-21) isn't overdue on the
-21st and is on the 22nd.
+**What "due on the 14th" means**
+
+**Decision: due on the 14th means by the end of the 14th, Karachi time.**
+The member can bring it back any time on the 14th. It becomes overdue at
+00:00 on the 15th in Karachi, wherever the server is.
+
+- The due date is a plain date (`due_on` is a Postgres `date`), with no
+  time and no time zone. "The 14th" is a day on the library's calendar,
+  not a moment.
+- "Today" is always worked out in `LIBRARY_TIME_ZONE` (Asia/Karachi), never
+  from the server clock's date or from UTC.
+- Overdue: `due_on < today`. So on the 14th it isn't, on the 15th it is.
+- Fines: one fine per full day after the due date. Returned on the 15th
+  is 1 day late, on the 16th is 2 days. Returned on the 14th, no fine.
+
+Why not the start of the day: a book due on the 14th would be overdue the
+moment the 14th starts, which isn't what a member reading "due on the
+14th" expects. Why not an exact time: the library counts days, not hours,
+and an exact time brings the time zone back into every comparison.
+
+`findOverdue` now takes the library's date and uses `due_on < today`, so
+br-101 (due 2026-02-21) isn't overdue on the 21st and is on the 22nd.
 
 ## Task 2: Scheduling the job
 
@@ -2226,8 +2275,23 @@ queue), `held` (a copy is waiting for them until `holdUntil`),
 - **Not collected:** the `expire-holds` job (00:05 every night) expires old
   holds and passes the copy to the next in line.
 
-What "gets it" means and what happens if they don't come is in
-decisions.md: held for 3 days, then it moves to the next member.
+**What "gets it" means**
+
+**Decision: held for a fixed window, 3 days (`HOLD_DAYS`).** When a copy
+comes back it doesn't go on the shelf. It's held for the first member in
+the queue until the end of the third day (Karachi time, the same way due
+dates work), and they get a notification.
+
+- Not held indefinitely: if the member never comes, the copy sits behind
+  the desk forever while everyone else waits.
+- Not just notified first: whoever gets to the library first takes it, so
+  being first in the queue means nothing.
+
+**If they don't come:** a job at 00:05 every night (`HOLD_EXPIRY_SCHEDULE`)
+marks holds that are past their date as `expired`, and the copy goes to
+the next member in the queue, who gets their own 3 days. If the queue is
+empty, it goes back on the shelf. The member who didn't come loses their
+place. They can join again, at the back.
 
 `db/dune-queue.js` runs the whole story through the services:
 
@@ -2384,3 +2448,147 @@ To make it work every time and not just most times:
 - The login rate limiter allows 5 logins per account in 15 minutes, so
   rehearsing many times in a row can lock the demo accounts. Restarting
   the API resets it.
+
+# Exercise 15 — Four roles, and ship it
+
+## Task 1: The permission matrix
+
+"Own" means only their own record. Logged-out visitors can browse the
+catalogue, register and log in, and nothing else.
+
+| # | Operation | User | Librarian | Admin | Super admin |
+|---|---|---|---|---|---|
+| | **Catalogue** | | | | |
+| 1 | Browse and search books | yes | yes | yes | yes |
+| 2 | View one book | yes | yes | yes | yes |
+| 3 | Add a book | no | yes | yes | yes |
+| 4 | Edit a book (details, copy counts) | no | yes | yes | yes |
+| 5 | Remove a book | no | no | yes | yes |
+| | **Borrowing and the queue** | | | | |
+| 6 | Request a book / join its queue | yes | yes | yes | yes |
+| 7 | See borrow requests | own | all | all | all |
+| 8 | See queue position | own | all | all | all |
+| 9 | Leave the queue / cancel a request | own | own | own | own |
+| 10 | Approve or reject a request | no | yes, not own | yes, not own | yes, not own |
+| 11 | Change a request's due date | no | yes | yes | yes |
+| 12 | Mark a book as returned | no | yes | yes | yes |
+| | **Fines** | | | | |
+| 13 | See fines | own | all | all | all |
+| 14 | Waive a fine | no | no | yes | yes |
+| | **Members** | | | | |
+| 15 | See a profile | own | all | all | all |
+| 16 | See the member list | no | yes | yes | yes |
+| 17 | Edit own name, email, password | yes | yes | yes | yes |
+| 18 | Edit another member's details | no | no | yes | yes |
+| 19 | Deactivate a member | no | no | yes | yes |
+| 20 | Make someone a user or librarian | no | no | yes | yes |
+| 21 | Make someone an admin or super admin | no | no | no | yes |
+| 22 | Edit, demote or deactivate an admin or super admin | no | no | no | yes |
+| 23 | Change your own role | no | no | no | no |
+| | **Jobs and live events** | | | | |
+| 24 | Run the reminder job by hand | no | no | yes | yes |
+| 25 | Get live updates for a book | yes | yes | yes | yes |
+| 26 | Get own queue and hold updates | yes | yes | yes | yes |
+| 27 | Get counter updates (new requests, holds) | no | yes | yes | yes |
+| 28 | Approve or reject over the socket | no | yes, not own | yes, not own | yes, not own |
+
+**The three debatable cells:**
+
+1. **Can staff borrow books (row 6)?** Yes. Librarians and admins are
+   library members too, and telling them to keep a second account just to
+   borrow is how shared logins start. But nobody approves their own
+   request (row 10): another member of staff has to. That's the same
+   problem as the self-approve bug from Exercise 7, one level up.
+2. **Can a member mark their own book returned (row 12)?** No. The book
+   isn't back until someone at the desk has it in their hands. If the
+   member can press "returned", the copy goes to the next person in the
+   queue while it's still in the member's bag. The code allows this today.
+3. **Can an admin manage another admin (row 22)?** No, only a super admin
+   can. Otherwise two admins can demote or deactivate each other, and one
+   bad admin account can lock everyone else out. Admins manage members
+   and librarians, the super admin manages admins. Nobody changes their
+   own role (row 23), so the last super admin can't remove themselves by
+   mistake.
+
+**Where the code doesn't match yet** (for Task 2):
+- `super admin` isn't a role: the database CHECK and the `Role` type only
+  have three, and only the logout route mentions it.
+- Members can return books and see every member's borrow requests.
+- Only `user` can create a borrow request, and anyone allowed to approve
+  can approve their own.
+- Editing and deactivating members is admin-only for everyone, so an admin
+  can change another admin or make someone an admin.
+
+## Task 2: Roles and ownership
+
+Every route uses `requireRole` from Week 5, with the four roles from the
+matrix, e.g. `requireRole("librarian", "admin", "super admin")` on
+returning a book. The role it checks comes from the database, not from the
+token: `requireAuth` loads the member on every request
+(`findForAuth`) and puts their current role on `req.user`. So a role
+change takes effect straight away with the same token. With one member
+token, `GET /users` was 403, then 200 after the super admin made them a
+librarian, then 403 again after they were changed back.
+
+`super admin` also had to be added to the database CHECK, the `Role` type
+and the zod schema. The exhaustive `switch` in `homePageFor` (Exercise 11)
+stopped compiling until it had a case for it.
+
+**Ownership.** Two members both have the role `user`, so a role list
+can't tell them apart. `cancel(id, memberId)` in the borrow requests
+service loads the request and compares its `userId` with the member
+asking, and throws a `ForbiddenError` (403) if they're different. Sara
+cancelling m-test's request gets
+`403 "You can only do this to your own request."`, and m-test cancelling
+it works. The other ownership rules from the matrix are done the same way
+in the services: a member only sees their own requests and profile, staff
+can't approve their own request, only a super admin can change an admin,
+and nobody changes their own role.
+
+**Where the check belongs: the service.**
+- Middleware only has the request. To know who owns borrow request
+  br-1203 it would need its own database lookup for every kind of record,
+  and it would be one more place that knows the rules.
+- The controller is HTTP only (Exercise 7). If the check were there, the
+  socket server and the jobs, which call the service directly, would skip
+  it.
+- The service already loads the request to cancel it, so the check is one
+  comparison on data it has. It applies to every caller (HTTP, socket,
+  scripts), and it throws a domain error that the error handler turns
+  into 403.
+
+So the split is: `requireRole` in the route answers "can this role ever do
+this?", and the service answers "can this member do it to this record?".
+
+## Task 3: The matrix on socket events
+
+The socket events compared with the matrix:
+
+| Event | Who | How it's checked |
+|---|---|---|
+| `client:borrow-request:decide` | librarian, admin, super admin, never on your own request (row 28) | `authorise(socket, DECIDE_ROLES)` re-checks the token and reads the role from the database, and the service refuses your own request |
+| `client:book:watch` / `unwatch` | everyone (row 25) | logged in is enough |
+| `client:hello` | everyone | only answers the sender |
+| `client:demo:send` with `everyone` or `everyone-else` | staff only | was open to everyone, now `authorise` with the staff roles |
+| the `counter` room | librarian, admin, super admin (row 27) | joined when the socket connects |
+
+Two gaps that a role list on HTTP routes doesn't have:
+- **Any member could broadcast to every connected socket** with
+  `client:demo:send` `{ mode: "everyone" }`. Now only staff can, and
+  `only-me` stays open.
+- **Rooms are decided once, at connect.** A librarian who was demoted kept
+  their socket in the `counter` room, and still got staff events (member
+  names on new requests) until the token ran out. Now when a member's role
+  changes or their account is deactivated, the users service emits
+  `member.access-changed`, and the socket server sends
+  `server:session:expired` and disconnects every socket in that member's
+  room. They reconnect with the rooms for their new role.
+
+Tested with a user's token, the same script before and after:
+
+| | Before | After |
+|---|---|---|
+| user emits `client:borrow-request:decide` | `FORBIDDEN` | `FORBIDDEN` |
+| user emits `client:demo:send` to everyone | Sara got the message | `FORBIDDEN`, Sara got nothing |
+| librarian emits `client:borrow-request:decide` | approved | approved |
+| librarian demoted while connected | still connected, still got a counter event | disconnected, no counter events |

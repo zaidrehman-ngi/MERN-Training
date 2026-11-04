@@ -53,7 +53,12 @@ type CredentialsRow = Prisma.membersGetPayload<{
 }>;
 
 const toRole = (value: string): Role => {
-  if (value === "user" || value === "librarian" || value === "admin") {
+  if (
+    value === "user" ||
+    value === "librarian" ||
+    value === "admin" ||
+    value === "super admin"
+  ) {
     return value;
   }
   throw new Error(`Unknown role in the database: ${value}`);

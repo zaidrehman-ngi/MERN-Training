@@ -24,7 +24,7 @@ const router = express.Router();
 router.post(
   "/:id/approve",
   requireAuth,
-  requireRole("librarian", "admin"),
+  requireRole("librarian", "admin", "super admin"),
   validate(borrowRequestIdSchema, "params"),
   approveBorrowRequest,
 );
@@ -32,7 +32,7 @@ router.post(
 router.get(
   "/",
   requireAuth,
-  requireRole("user", "librarian", "admin"),
+  requireRole("user", "librarian", "admin", "super admin"),
   validate(borrowRequestQuerySchema, "query"),
   getBorrowRequests,
 );
@@ -40,7 +40,7 @@ router.get(
 router.post(
   "/",
   requireAuth,
-  requireRole("user"),
+  requireRole("user", "librarian", "admin", "super admin"),
   validate(createBorrowRequestSchema, "body"),
   createBorrowRequest,
 );
@@ -48,7 +48,7 @@ router.post(
 router.get(
   "/:id",
   requireAuth,
-  requireRole("user", "librarian", "admin"),
+  requireRole("user", "librarian", "admin", "super admin"),
   validate(borrowRequestIdSchema, "params"),
   getBorrowRequestById,
 );
@@ -56,7 +56,7 @@ router.get(
 router.patch(
   "/:id",
   requireAuth,
-  requireRole("librarian", "admin"),
+  requireRole("librarian", "admin", "super admin"),
   validate(borrowRequestIdSchema, "params"),
   validate(updateBorrowRequestSchema, "body"),
   updateBorrowRequest,
@@ -65,7 +65,7 @@ router.patch(
 router.post(
   "/:id/cancel",
   requireAuth,
-  requireRole("user", "librarian", "admin"),
+  requireRole("user", "librarian", "admin", "super admin"),
   validate(borrowRequestIdSchema, "params"),
   cancelBorrowRequest,
 );
@@ -73,7 +73,7 @@ router.post(
 router.get(
   "/:id/queue",
   requireAuth,
-  requireRole("user", "librarian", "admin"),
+  requireRole("user", "librarian", "admin", "super admin"),
   validate(borrowRequestIdSchema, "params"),
   getQueuePosition,
 );
@@ -81,7 +81,7 @@ router.get(
 router.post(
   "/:id/return",
   requireAuth,
-  requireRole("user", "librarian", "admin"),
+  requireRole("librarian", "admin", "super admin"),
   validate(borrowRequestIdSchema, "params"),
   returnBorrowedBook,
 );

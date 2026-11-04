@@ -15,6 +15,7 @@ import type {
 } from "../types/borrowRequest.ts";
 import type { BorrowRequestsRepository } from "../repositories/borrowRequests.repository.ts";
 import type { NotificationsRepository } from "../repositories/notifications.repository.ts";
+import type { Actor } from "../types/member.ts";
 import { addDays, todayIn } from "../utils/dates.ts";
 
 type BooksService = {
@@ -51,14 +52,22 @@ export type QueuePosition = {
 export type HoldExpiryRun = { checked: number; expired: number };
 
 export type BorrowRequestsService = {
-  list(query: BorrowRequestQuery): Promise<BorrowRequestListItem[]>;
+  list(
+    query: BorrowRequestQuery,
+    viewer?: Actor,
+  ): Promise<BorrowRequestListItem[]>;
+  getVisible(id: string, viewer: Actor): Promise<BorrowRequest>;
   findDueOn(date: string): Promise<BorrowRequest[]>;
   getById(id: string): Promise<BorrowRequest>;
   create(memberId: string, bookId: string): Promise<BorrowRequest>;
-  update(id: string, changes: BorrowRequestChanges): Promise<BorrowRequest>;
+  update(
+    id: string,
+    changes: BorrowRequestChanges,
+    actor?: Actor,
+  ): Promise<BorrowRequest>;
   returnBook(id: string): Promise<BorrowRequest>;
   cancel(id: string, memberId: string): Promise<BorrowRequest>;
-  queuePosition(id: string): Promise<QueuePosition>;
+  queuePosition(id: string, viewer?: Actor): Promise<QueuePosition>;
   expireHolds(): Promise<HoldExpiryRun>;
 };
 
@@ -160,7 +169,20 @@ const createBorrowRequestsService = (
       : { status: "queued" as const, queuedAt: now().toISOString() };
 
   return {
-    list: (query) => borrowRequestsRepository.findAll(query),
+    list: (query, viewer) =>
+      borrowRequestsRepository.findAll(
+        viewer && viewer.role === "user"
+          ? { ...query, userId: viewer.id }
+          : query,
+      ),
+
+    async getVisible(id, viewer) {
+      const borrowRequest = await this.getById(id);
+      if (viewer.role === "user" && borrowRequest.userId !== viewer.id) {
+        throw new ForbiddenError("You can only see your own requests.");
+      }
+      return borrowRequest;
+    },
 
     findDueOn: (date) => borrowRequestsRepository.findDueOn(date),
 
@@ -209,10 +231,17 @@ const createBorrowRequestsService = (
     },
 
     // The copy count and the request are saved together or not at all.
-    update(id, changes) {
+    update(id, changes, actor) {
       return transaction(
         async ({ services, repositories, events: txEvents }) => {
           const before = await services.borrowRequests.getById(id);
+          const deciding =
+            changes.status === "approved" || changes.status === "rejected";
+          if (actor && deciding && before.userId === actor.id) {
+            throw new ForbiddenError(
+              "You can't approve or reject your own request.",
+            );
+          }
           const oldPosition =
             before.status === "queued"
               ? await positionOf(repositories.borrowRequests, before)
@@ -362,8 +391,10 @@ const createBorrowRequestsService = (
       });
     },
 
-    async queuePosition(id) {
-      const request = await this.getById(id);
+    async queuePosition(id, viewer) {
+      const request = viewer
+        ? await this.getVisible(id, viewer)
+        : await this.getById(id);
       if (request.status !== "queued" || request.queuedAt === null) {
         return {
           id: request.id,

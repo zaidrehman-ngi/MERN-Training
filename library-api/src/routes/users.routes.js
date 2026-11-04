@@ -23,7 +23,7 @@ router.post("/", validate(createUserSchema, "body"), createUser);
 router.get(
   "/",
   requireAuth,
-  requireRole("librarian", "admin"),
+  requireRole("librarian", "admin", "super admin"),
   validate(userQuerySchema, "query"),
   getUsers,
 );
@@ -31,7 +31,7 @@ router.get(
 router.get(
   "/:id",
   requireAuth,
-  requireRole("user", "librarian", "admin"),
+  requireRole("user", "librarian", "admin", "super admin"),
   validate(userIdSchema, "params"),
   getUserById,
 );
@@ -39,7 +39,7 @@ router.get(
 router.patch(
   "/:id",
   requireAuth,
-  requireRole("admin"),
+  requireRole("user", "librarian", "admin", "super admin"),
   validate(userIdSchema, "params"),
   validate(updateUserSchema, "body"),
   updateUser,
@@ -48,7 +48,7 @@ router.patch(
 router.delete(
   "/:id",
   requireAuth,
-  requireRole("admin"),
+  requireRole("admin", "super admin"),
   validate(userIdSchema, "params"),
   deleteUser,
 );

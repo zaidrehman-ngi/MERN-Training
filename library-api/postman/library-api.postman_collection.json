@@ -21,8 +21,8 @@
                 "exec": [
                   "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
                   "",
-                  "pm.test(\"Logged in as an admin\", () => {",
-                  "    pm.expect(pm.response.json().user.role).to.eql(\"admin\");",
+                  "pm.test(\"Logged in as the super admin\", () => {",
+                  "    pm.expect(pm.response.json().user.role).to.eql(\"super admin\");",
                   "});",
                   "",
                   "const token = pm.response.json().accessToken;",
@@ -590,9 +590,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/borrow-requests/br-100",
+              "raw": "{{baseUrl}}/api/v1/borrow-requests/{{createdBorrowRequestId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "borrow-requests", "br-100"]
+              "path": ["api", "v1", "borrow-requests", "{{createdBorrowRequestId}}"]
             }
           },
           "response": []
@@ -654,6 +654,16 @@
             }
           ],
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
             "method": "POST",
             "header": [],
             "url": {

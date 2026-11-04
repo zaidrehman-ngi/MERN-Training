@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { servicesFor } from "./services.ts";
+import { actorOf } from "./actor.ts";
 import type { IdParams, RequestWithBody } from "../types/http.ts";
 import type {
   CreateUserBody,
@@ -14,7 +15,10 @@ const getUsers = async (req: Request, res: Response) => {
 };
 
 const getUserById = async (req: Request<IdParams>, res: Response) => {
-  const user = await servicesFor(req).users.getById(req.params.id);
+  const user = await servicesFor(req).users.getVisible(
+    req.params.id,
+    actorOf(req),
+  );
   res.status(200).json(user);
 };
 
@@ -39,6 +43,7 @@ const updateUser = async (
   const updatedUser = await servicesFor(req).users.update(
     req.params.id,
     req.body,
+    actorOf(req),
   );
   res.status(200).json({
     data: updatedUser,
@@ -46,7 +51,7 @@ const updateUser = async (
 };
 
 const deleteUser = async (req: Request<IdParams>, res: Response) => {
-  await servicesFor(req).users.delete(req.params.id);
+  await servicesFor(req).users.delete(req.params.id, actorOf(req));
   res.status(204).send();
 };
 

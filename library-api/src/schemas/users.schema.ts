@@ -4,7 +4,7 @@ const userIdSchema = z.object({
   id: z.string().min(1),
 });
 
-const userRoleSchema = z.enum(["user", "librarian", "admin"]);
+const userRoleSchema = z.enum(["user", "librarian", "admin", "super admin"]);
 
 const userQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),

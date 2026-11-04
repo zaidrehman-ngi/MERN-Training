@@ -13,7 +13,7 @@ export type FineInput = {
 };
 
 // The fine is counted in whole days on the library's calendar (Karachi),
-// the same way "due on the 14th" is defined in decisions.md:
+// the same way "due on the 14th" was decided in Exercise 13:
 // - The due day itself doesn't count. Due on the 14th means it can come
 //   back any time on the 14th for nothing.
 // - Weekends count. The rule is "per day late", and the book is out on

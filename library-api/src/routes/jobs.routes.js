@@ -8,7 +8,7 @@ const router = express.Router();
 router.post(
   "/due-reminders/run",
   requireAuth,
-  requireRole("admin"),
+  requireRole("admin", "super admin"),
   runDueReminders,
 );
 

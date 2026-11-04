@@ -1,15 +1,31 @@
 import { hashPassword } from "../utils/password.js";
-import { EmailTakenError, NotFoundError } from "../errors/domainErrors.js";
+import {
+  EmailTakenError,
+  ForbiddenError,
+  NotFoundError,
+} from "../errors/domainErrors.js";
 import type { UsersRepository } from "../repositories/users.repository.ts";
+import { DOMAIN_EVENTS } from "../events/domainEvents.js";
 import type {
+  Actor,
   MemberChanges,
   MemberQuery,
   MemberRowInput,
   PublicMember,
+  Role,
   SignUp,
 } from "../types/member.ts";
 
-const createUsersService = (usersRepository: UsersRepository) => ({
+const isAdmin = (role: Role) => role === "admin" || role === "super admin";
+
+type Events = { emit(eventName: string, payload: unknown): unknown };
+
+const noEvents: Events = { emit: () => false };
+
+const createUsersService = (
+  usersRepository: UsersRepository,
+  events: Events = noEvents,
+) => ({
   list: (query: MemberQuery): Promise<PublicMember[]> =>
     usersRepository.findAll(query),
 
@@ -19,6 +35,13 @@ const createUsersService = (usersRepository: UsersRepository) => ({
       throw new NotFoundError("User not found.");
     }
     return user;
+  },
+
+  async getVisible(id: string, viewer: Actor): Promise<PublicMember> {
+    if (viewer.role === "user" && viewer.id !== id) {
+      throw new ForbiddenError("You can only see your own profile.");
+    }
+    return this.getById(id);
   },
 
   // Registration. It doesn't say if the email is already taken (see
@@ -51,10 +74,32 @@ const createUsersService = (usersRepository: UsersRepository) => ({
     }
   },
 
-  async update(id: string, changes: MemberChanges): Promise<PublicMember> {
+  async update(
+    id: string,
+    changes: MemberChanges,
+    actor: Actor,
+  ): Promise<PublicMember> {
     const user = await usersRepository.findById(id);
     if (!user) {
       throw new NotFoundError("User not found.");
+    }
+
+    const self = actor.id === id;
+    if (!self && !isAdmin(actor.role)) {
+      throw new ForbiddenError("You can only edit your own profile.");
+    }
+    if (changes.role !== undefined && changes.role !== user.role) {
+      if (self) {
+        throw new ForbiddenError("You can't change your own role.");
+      }
+      if (isAdmin(changes.role) && actor.role !== "super admin") {
+        throw new ForbiddenError(
+          "Only a super admin can make someone an admin.",
+        );
+      }
+    }
+    if (!self && isAdmin(user.role) && actor.role !== "super admin") {
+      throw new ForbiddenError("Only a super admin can change an admin.");
     }
 
     if (changes.email !== undefined) {
@@ -74,14 +119,28 @@ const createUsersService = (usersRepository: UsersRepository) => ({
     if (!updated) {
       throw new NotFoundError("User not found.");
     }
+    if (updated.role !== user.role) {
+      events.emit(DOMAIN_EVENTS.MEMBER_ACCESS_CHANGED, { memberId: id });
+    }
     return updated;
   },
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, actor: Actor): Promise<void> {
+    if (actor.id === id) {
+      throw new ForbiddenError("You can't deactivate your own account.");
+    }
+    const user = await usersRepository.findById(id);
+    if (!user) {
+      throw new NotFoundError("User not found.");
+    }
+    if (isAdmin(user.role) && actor.role !== "super admin") {
+      throw new ForbiddenError("Only a super admin can deactivate an admin.");
+    }
     const deleted = await usersRepository.deleteById(id);
     if (!deleted) {
       throw new NotFoundError("User not found.");
     }
+    events.emit(DOMAIN_EVENTS.MEMBER_ACCESS_CHANGED, { memberId: id });
   },
 });
 

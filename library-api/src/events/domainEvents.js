@@ -7,6 +7,7 @@ export const DOMAIN_EVENTS = Object.freeze({
   BORROW_REQUEST_CREATED: "borrow-request.created",
   QUEUE_POSITION_CHANGED: "queue.position-changed",
   QUEUE_PROMOTED: "queue.promoted",
+  MEMBER_ACCESS_CHANGED: "member.access-changed",
 });
 
 const domainEvents = new EventEmitter();

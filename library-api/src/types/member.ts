@@ -1,6 +1,8 @@
 import type { Changes } from "./changes.ts";
 
-export type Role = "user" | "librarian" | "admin";
+export type Role = "user" | "librarian" | "admin" | "super admin";
+
+export type Actor = { id: string; role: Role };
 
 export type PublicMember = {
   id: string;

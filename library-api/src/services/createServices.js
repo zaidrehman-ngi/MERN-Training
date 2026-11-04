@@ -24,7 +24,7 @@ const createServices = (repositories, events) => {
   };
 
   const books = createBooksService(repositories.books, events);
-  const users = createUsersService(repositories.users);
+  const users = createUsersService(repositories.users, events);
   const borrowRequests = createBorrowRequestsService(
     repositories.borrowRequests,
     books,

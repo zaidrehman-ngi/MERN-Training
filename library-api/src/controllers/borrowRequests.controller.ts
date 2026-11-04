@@ -6,17 +6,22 @@ import type {
   UpdateBorrowRequestBody,
 } from "../schemas/borrowRequests.schema.ts";
 import { AuthenticationError } from "../errors/domainErrors.js";
+import { actorOf } from "./actor.ts";
 
 const getBorrowRequests = async (req: Request, res: Response) => {
-  const result = await servicesFor(req).borrowRequests.list(req.query);
+  const result = await servicesFor(req).borrowRequests.list(
+    req.query,
+    actorOf(req),
+  );
   res.status(200).json({
     data: result,
   });
 };
 
 const getBorrowRequestById = async (req: Request<IdParams>, res: Response) => {
-  const borrowRequest = await servicesFor(req).borrowRequests.getById(
+  const borrowRequest = await servicesFor(req).borrowRequests.getVisible(
     req.params.id,
+    actorOf(req),
   );
   res.status(200).json(borrowRequest);
 };
@@ -48,6 +53,7 @@ const updateBorrowRequest = async (
   const borrowRequest = await servicesFor(req).borrowRequests.update(
     req.params.id,
     req.body,
+    actorOf(req),
   );
   res.status(200).json({
     data: borrowRequest,
@@ -58,6 +64,7 @@ const approveBorrowRequest = async (req: Request<IdParams>, res: Response) => {
   const borrowRequest = await servicesFor(req).borrowRequests.update(
     req.params.id,
     { status: "approved" },
+    actorOf(req),
   );
 
   res.status(200).json({
@@ -81,6 +88,7 @@ const cancelBorrowRequest = async (req: Request<IdParams>, res: Response) => {
 const getQueuePosition = async (req: Request<IdParams>, res: Response) => {
   const position = await servicesFor(req).borrowRequests.queuePosition(
     req.params.id,
+    actorOf(req),
   );
   res.status(200).json({ data: position });
 };

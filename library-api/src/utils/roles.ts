@@ -7,6 +7,7 @@ export const homePageFor = (role: Role): string => {
     case "librarian":
       return "/borrow-requests";
     case "admin":
+    case "super admin":
       return "/users";
     default: {
       const unhandled: never = role;

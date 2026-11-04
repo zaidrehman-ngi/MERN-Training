@@ -20,7 +20,7 @@ import { AuthenticationError } from "../errors/domainErrors.js";
 
 const STAFF_ROLES = new Set(["librarian", "admin", "super admin"]);
 // same roles as PATCH /borrow-requests/:id
-const DECIDE_ROLES = ["librarian", "admin"];
+const DECIDE_ROLES = ["librarian", "admin", "super admin"];
 
 // Checks a payload against a zod schema. On failure it answers through the
 // ack (if there is one) and returns null, so the handler can just stop.
@@ -172,10 +172,13 @@ const createSocketServer = (httpServer, domainEvents, services) => {
     });
 
     // the three ways to send: only this socket, everyone, everyone else
-    on(EVENTS.CLIENT_DEMO_SEND, (payload, reply) => {
+    on(EVENTS.CLIENT_DEMO_SEND, async (payload, reply) => {
       const data = parsePayload(demoSendSchema, payload, reply);
       if (!data) return;
       const { mode } = data;
+      if (mode !== "only-me") {
+        await authorise(socket, [...STAFF_ROLES]);
+      }
       const message = { mode, from: socket.id };
       if (mode === "only-me") {
         socket.emit(EVENTS.SERVER_DEMO_MESSAGE, message);
@@ -184,6 +187,7 @@ const createSocketServer = (httpServer, domainEvents, services) => {
       } else if (mode === "everyone-else") {
         socket.broadcast.emit(EVENTS.SERVER_DEMO_MESSAGE, message);
       }
+      reply({ ok: true });
     });
 
     on(EVENTS.CLIENT_BOOK_WATCH, (payload, reply) => {
@@ -208,9 +212,11 @@ const createSocketServer = (httpServer, domainEvents, services) => {
       if (!data) return;
 
       const staff = await authorise(socket, DECIDE_ROLES);
-      const request = await services.borrowRequests.update(data.id, {
-        status: data.status,
-      });
+      const request = await services.borrowRequests.update(
+        data.id,
+        { status: data.status },
+        { id: staff.id, role: staff.role },
+      );
       logger.info(
         `${staff.id} set ${request.id} to ${request.status} by socket`,
       );
@@ -276,6 +282,14 @@ const createSocketServer = (httpServer, domainEvents, services) => {
       );
     },
   );
+
+  domainEvents.on(DOMAIN_EVENTS.MEMBER_ACCESS_CHANGED, ({ memberId }) => {
+    io.to(memberRoom(memberId)).emit(EVENTS.SERVER_SESSION_EXPIRED);
+    io.in(memberRoom(memberId)).disconnectSockets(true);
+    logger.info(
+      `Sockets of ${memberId} disconnected: their role or account changed`,
+    );
+  });
 
   io.presence = presence;
   return io;

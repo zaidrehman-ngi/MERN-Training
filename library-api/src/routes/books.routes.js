@@ -29,7 +29,7 @@ router.get(
 router.post(
   "/",
   requireAuth,
-  requireRole("librarian", "admin"),
+  requireRole("librarian", "admin", "super admin"),
   validate(createBookSchema, "body"),
   createBook,
 );
@@ -39,7 +39,7 @@ router.get("/:id", validate(bookIdSchema, "params"), getBookById);
 router.patch(
   "/:id",
   requireAuth,
-  requireRole("librarian", "admin"),
+  requireRole("librarian", "admin", "super admin"),
   validate(bookIdSchema, "params"),
   validate(updateBookSchema, "body"),
   updateBook,
@@ -48,7 +48,7 @@ router.patch(
 router.delete(
   "/:id",
   requireAuth,
-  requireRole("admin"),
+  requireRole("admin", "super admin"),
   validate(bookIdSchema, "params"),
   deleteBook,
 );

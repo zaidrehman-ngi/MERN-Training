@@ -29,10 +29,11 @@ const members = [
   { id: "m-1002", name: "Zainab Qureshi", email: "zainab2@lib.pk", role: "librarian", branch: "Gulshan Branch", joined: "2020-03-15" },
   { id: "m-1003", name: "Bilal Memon", email: "bilal3@lib.pk", role: "librarian", branch: "Clifton Branch", joined: "2021-04-15" },
   { id: "m-test", name: "Test User", email: "test@lib.pk", password: "test123", role: "user", branch: "Clifton Branch", joined: "2026-09-30" },
-  { id: "m-admin-test", name: "Postman Test Admin", email: "admin-test@lib.pk", password: "LibraryAdminTest2026!", role: "admin", branch: "Clifton Branch", joined: "2026-10-08" },
+  { id: "m-admin-test", name: "Postman Test Admin", email: "admin-test@lib.pk", password: "LibraryAdminTest2026!", role: "super admin", branch: "Clifton Branch", joined: "2026-10-08" },
   // Exercise 7 Task 3: two members with the same password, to show the hashes differ
   { id: "m-2001", name: "Sara Malik", email: "sara.malik@lib.pk", password: "Library@2026", role: "user", branch: "Clifton Branch", joined: "2026-10-20" },
   { id: "m-2002", name: "Usman Tariq", email: "usman.tariq@lib.pk", password: "Library@2026", role: "user", branch: "Clifton Branch", joined: "2026-10-20" },
+  { id: "m-admin-demo", name: "Demo Admin", email: "admin@lib.pk", password: "Admin@2026", role: "admin", branch: "Clifton Branch", joined: "2026-11-04" },
   { id: "m-librarian-test", name: "Demo Librarian", email: "librarian@lib.pk", password: "Librarian@2026", role: "librarian", branch: "Clifton Branch", joined: "2026-11-04" },
 ];
 

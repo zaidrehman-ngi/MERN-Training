@@ -21,7 +21,6 @@ Socket.IO never complains about a wrong event name, so:
 
 `client:hello` and `server:hello` are only the test events from Task 2.
 
-
 # Exercise 5 — A room for every book
 
 ## Task 4: The librarian counter feed: namespace or room?
@@ -42,7 +41,6 @@ file. The cost would be a second connection for every librarian (one for
 the catalogue, one for the feed) and a second copy of the auth and presence
 setup. If the staff side grows into its own admin app, I'd move it to a
 namespace then.
-
 
 # Exercise 6 — The socket nobody authenticated
 
@@ -89,69 +87,6 @@ would mean finding a member's sockets on logout or role change and
 disconnecting them. Presence already maps member to sockets, so that's
 possible later.
 
-
-# Exercise 7 — The four hundred line controller
-
-## Task 2: What each layer is allowed to know about
-
-**Controller** (with its routes and middleware), the HTTP layer:
-- knows about `req`, `res`, status codes, headers, cookies, query strings
-  and the response body shape
-- reads what the request asked for, calls **one** service method, and turns
-  the result (or the error) into a response
-- doesn't know library rules, and never touches Prisma or a repository
-
-**Service**, the library's rules:
-- knows the rules: who may borrow, how many, when it's due, when a token
-  is valid, what happens when a copy comes back, which events to announce
-- gets plain values in (ids, objects) and gives plain values back, or
-  throws an error that says *what* went wrong ("book not found", "no copies
-  left")
-- calls repositories and other services, never Prisma directly
-- doesn't know whether it was called by a route, a socket event or the
-  nightly job, so it never sees `req`, `res`, a socket or a status code
-
-**Repository**, the database:
-- knows Prisma, table and column names, and how to turn a row into the
-  API's shape
-- one method is one question or one change to the database
-  (`findByIsbn`, `changeAvailableCopies`); it doesn't decide if that change
-  is allowed
-- knows nothing about HTTP and nothing about the rules
-
-**The test:**
-
-| | `req`, `res`, a status code | Prisma |
-|---|---|---|
-| Controller | **yes**, only here | no |
-| Service | no | no |
-| Repository | no | **yes**, only here |
-
-If a service file needs a status code to compile, or a controller imports
-Prisma, it's in the wrong layer.
-
-# Exercise 13 — Due dates and the nightly job
-
-## Task 1: What "due on the 14th" means
-
-**Decision: due on the 14th means by the end of the 14th, Karachi time.**
-The member can bring it back any time on the 14th. It becomes overdue at
-00:00 on the 15th in Karachi, wherever the server is.
-
-- The due date is a plain date (`due_on` is a Postgres `date`), with no
-  time and no time zone. "The 14th" is a day on the library's calendar,
-  not a moment.
-- "Today" is always worked out in `LIBRARY_TIME_ZONE` (Asia/Karachi), never
-  from the server clock's date or from UTC.
-- Overdue: `due_on < today`. So on the 14th it isn't, on the 15th it is.
-- Fines: one fine per full day after the due date. Returned on the 15th
-  is 1 day late, on the 16th is 2 days. Returned on the 14th, no fine.
-
-Why not the start of the day: a book due on the 14th would be overdue the
-moment the 14th starts, which isn't what a member reading "due on the
-14th" expects. Why not an exact time: the library counts days, not hours,
-and an exact time brings the time zone back into every comparison.
-
 # Exercise 14 — Fines, and the queue for Dune
 
 ## Task 2: Store the fine or compute it on read?
@@ -187,21 +122,3 @@ looked at on 23 Nov at 8 AM:
 |---|---|---|
 | Book still out | "Fine: Rs 160". That's yesterday's number until the 9 AM run, and older if a run was missed. | "Rs 180 so far, 9 days late, Rs 20 more each day". Always the current amount. |
 | Book returned on 23 Nov | Whatever the job last wrote, unless the return code also sets it. Two places writing the same column. | "Rs 180, returned 23 Nov", stored at return and never changes. |
-
-## Task 3: What "gets it" means for the first in the queue
-
-**Decision: held for a fixed window, 3 days (`HOLD_DAYS`).** When a copy
-comes back it doesn't go on the shelf. It's held for the first member in
-the queue until the end of the third day (Karachi time, the same way due
-dates work), and they get a notification.
-
-- Not held indefinitely: if the member never comes, the copy sits behind
-  the desk forever while everyone else waits.
-- Not just notified first: whoever gets to the library first takes it, so
-  being first in the queue means nothing.
-
-**If they don't come:** a job at 00:05 every night (`HOLD_EXPIRY_SCHEDULE`)
-marks holds that are past their date as `expired`, and the copy goes to
-the next member in the queue, who gets their own 3 days. If the queue is
-empty, it goes back on the shelf. The member who didn't come loses their
-place. They can join again, at the back.
