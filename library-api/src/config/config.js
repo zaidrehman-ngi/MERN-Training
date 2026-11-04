@@ -31,6 +31,10 @@ const result = configSchema.safeParse({
   DB_QUERY_LOG: process.env.DB_QUERY_LOG,
   BCRYPT_COST: process.env.BCRYPT_COST,
   LOAN_PERIOD_DAYS: process.env.LOAN_PERIOD_DAYS,
+  FINE_PER_DAY: process.env.FINE_PER_DAY,
+  FINE_MAX_DAYS: process.env.FINE_MAX_DAYS,
+  HOLD_DAYS: process.env.HOLD_DAYS,
+  HOLD_EXPIRY_SCHEDULE: process.env.HOLD_EXPIRY_SCHEDULE,
   LIBRARY_TIME_ZONE: process.env.LIBRARY_TIME_ZONE,
   DUE_REMINDER_SCHEDULE: process.env.DUE_REMINDER_SCHEDULE,
 });
@@ -72,6 +76,10 @@ const config = Object.freeze({
   dbQueryLog: values.DB_QUERY_LOG === "true",
   bcryptCost: values.BCRYPT_COST,
   loanPeriodDays: values.LOAN_PERIOD_DAYS,
+  finePerDay: values.FINE_PER_DAY,
+  fineMaxDays: values.FINE_MAX_DAYS,
+  holdDays: values.HOLD_DAYS,
+  holdExpirySchedule: values.HOLD_EXPIRY_SCHEDULE,
   libraryTimeZone: values.LIBRARY_TIME_ZONE,
   dueReminderSchedule: values.DUE_REMINDER_SCHEDULE,
 });

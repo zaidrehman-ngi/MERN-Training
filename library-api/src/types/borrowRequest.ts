@@ -1,7 +1,14 @@
 import type { Changes } from "./changes.ts";
 
 export type BorrowRequestStatus =
-  "pending" | "approved" | "rejected" | "returned";
+  | "pending"
+  | "queued"
+  | "held"
+  | "approved"
+  | "rejected"
+  | "cancelled"
+  | "expired"
+  | "returned";
 
 export type BorrowRequest = {
   id: string;
@@ -10,6 +17,8 @@ export type BorrowRequest = {
   status: BorrowRequestStatus;
   requestedAt: string | null;
   dueDate: string | null;
+  queuedAt: string | null;
+  holdUntil: string | null;
   finePerDay: number;
   member: { id: string; name: string; email: string | null };
   book: { id: string; title: string; author: string | null };
@@ -26,6 +35,8 @@ export type NewBorrowRequest = {
   status: BorrowRequestStatus;
   requestedAt: string;
   dueDate: string | null;
+  queuedAt: string | null;
+  holdUntil: string | null;
   finePerDay: number;
 };
 

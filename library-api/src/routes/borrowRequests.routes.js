@@ -5,6 +5,8 @@ import {
   createBorrowRequest,
   updateBorrowRequest,
   approveBorrowRequest,
+  cancelBorrowRequest,
+  getQueuePosition,
   returnBorrowedBook,
 } from "../controllers/borrowRequests.controller.ts";
 import requireAuth from "../middleware/requireAuth.js";
@@ -58,6 +60,22 @@ router.patch(
   validate(borrowRequestIdSchema, "params"),
   validate(updateBorrowRequestSchema, "body"),
   updateBorrowRequest,
+);
+
+router.post(
+  "/:id/cancel",
+  requireAuth,
+  requireRole("user", "librarian", "admin"),
+  validate(borrowRequestIdSchema, "params"),
+  cancelBorrowRequest,
+);
+
+router.get(
+  "/:id/queue",
+  requireAuth,
+  requireRole("user", "librarian", "admin"),
+  validate(borrowRequestIdSchema, "params"),
+  getQueuePosition,
 );
 
 router.post(

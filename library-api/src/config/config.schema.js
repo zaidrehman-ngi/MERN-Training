@@ -58,6 +58,9 @@ const configSchema = z.object({
   // bcrypt cost factor: below 10 is too fast to guess, above 15 makes login very slow
   BCRYPT_COST: z.coerce.number().int().min(10).max(15).default(12),
   LOAN_PERIOD_DAYS: z.coerce.number().int().positive().default(14),
+  FINE_PER_DAY: z.coerce.number().int().nonnegative().default(20),
+  FINE_MAX_DAYS: z.coerce.number().int().positive().default(30),
+  HOLD_DAYS: z.coerce.number().int().positive().default(3),
   LIBRARY_TIME_ZONE: z
     .string()
     .default("Asia/Karachi")
@@ -69,6 +72,13 @@ const configSchema = z.object({
         return false;
       }
     }, "must be an IANA time zone such as Asia/Karachi"),
+  HOLD_EXPIRY_SCHEDULE: z
+    .string()
+    .default("5 0 * * *")
+    .refine(
+      (expression) => cron.validate(expression),
+      "must be a cron expression",
+    ),
   DUE_REMINDER_SCHEDULE: z
     .string()
     .default("0 8 * * *")

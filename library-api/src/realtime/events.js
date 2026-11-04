@@ -6,6 +6,8 @@ const EVENTS = Object.freeze({
   SERVER_PRESENCE_CHANGED: "server:presence:changed",
   SERVER_BOOK_AVAILABILITY_CHANGED: "server:book:availability-changed",
   SERVER_BORROW_REQUEST_CREATED: "server:borrow-request:created",
+  SERVER_QUEUE_POSITION_CHANGED: "server:queue:position-changed",
+  SERVER_QUEUE_PROMOTED: "server:queue:promoted",
   CLIENT_BOOK_WATCH: "client:book:watch",
   CLIENT_BOOK_UNWATCH: "client:book:unwatch",
   CLIENT_DEMO_SEND: "client:demo:send",
@@ -15,6 +17,8 @@ const EVENTS = Object.freeze({
 });
 
 export const bookRoom = (bookId) => `book:${bookId}`;
+
+export const memberRoom = (memberId) => `member:${memberId}`;
 
 // staff only: the server puts librarians and admins in here, clients cannot join
 export const COUNTER_ROOM = "counter";

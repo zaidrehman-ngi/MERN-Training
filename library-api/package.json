@@ -8,6 +8,7 @@
     "dev": "nodemon src/server.js",
     "benchmark:overdue": "node db/benchmark-overdue.mjs",
     "db:seed": "node db/seed.js",
+    "demo:queue": "node db/seed.js && node db/demo-queue-setup.js",
     "test": "node --test \"test/*.test.js\"",
     "typecheck": "tsc"
   },

@@ -21,8 +21,26 @@ export const startJobs = (services: Services): ScheduledTask[] => {
     },
   );
 
+  const expireHolds = cron.schedule(
+    config.holdExpirySchedule,
+    () =>
+      runJob(
+        "expire-holds",
+        () => services.borrowRequests.expireHolds(),
+        logger,
+      ),
+    {
+      name: "expire-holds",
+      timezone: config.libraryTimeZone,
+      noOverlap: true,
+    },
+  );
+
+  logger.info(
+    `[expire-holds] scheduled "${config.holdExpirySchedule}" (${config.libraryTimeZone}), next run ${expireHolds.getNextRun()?.toISOString()}`,
+  );
   logger.info(
     `[due-reminders] scheduled "${config.dueReminderSchedule}" (${config.libraryTimeZone}), next run ${dueReminders.getNextRun()?.toISOString()}`,
   );
-  return [dueReminders];
+  return [dueReminders, expireHolds];
 };

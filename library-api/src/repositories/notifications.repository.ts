@@ -26,14 +26,11 @@ type NotificationRow = Prisma.notificationsGetPayload<{
 }>;
 
 const toKind = (value: string): NotificationKind => {
-  if (value === "due-reminder") {
+  if (value === "due-reminder" || value === "hold-ready") {
     return value;
   }
   throw new Error(`Unknown notification kind in the database: ${value}`);
 };
-
-const isAlreadySent = (err: unknown): boolean =>
-  err instanceof Error && "code" in err && err.code === "P2002";
 
 const toNotification = (row: NotificationRow): Notification => ({
   id: row.notification_id,
@@ -49,30 +46,23 @@ const createNotificationsRepository = (
   prisma: Db,
 ): NotificationsRepository => ({
   async createOnce(notification) {
-    try {
-      const row = await prisma.notifications.create({
-        data: {
-          kind: notification.kind,
-          message: notification.message,
-          for_date: new Date(notification.forDate),
-          members: { connect: { api_id: notification.memberId } },
-          ...(notification.borrowRequestId
-            ? {
-                book_requests: {
-                  connect: { api_id: notification.borrowRequestId },
-                },
-              }
-            : {}),
-        },
-        select: notificationSelect,
-      });
-      return toNotification(row);
-    } catch (err) {
-      if (isAlreadySent(err)) {
-        return null;
-      }
-      throw err;
+    const rows = await prisma.$queryRaw<{ notification_id: string }[]>`
+      INSERT INTO notifications (member_id, request_id, kind, message, for_date)
+      SELECT m.member_id, r.request_id, ${notification.kind}, ${notification.message}, ${notification.forDate}::date
+      FROM members m
+      LEFT JOIN book_requests r ON r.api_id = ${notification.borrowRequestId}
+      WHERE m.api_id = ${notification.memberId}
+      ON CONFLICT (request_id, kind, for_date) DO NOTHING
+      RETURNING notification_id`;
+    const inserted = rows[0];
+    if (!inserted) {
+      return null;
     }
+    const row = await prisma.notifications.findUniqueOrThrow({
+      where: { notification_id: inserted.notification_id },
+      select: notificationSelect,
+    });
+    return toNotification(row);
   },
 });
 

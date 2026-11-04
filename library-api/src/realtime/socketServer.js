@@ -1,7 +1,12 @@
 import { Server } from "socket.io";
 import config from "../config/config.js";
 import logger from "../config/logger.js";
-import EVENTS, { CLIENT_EVENTS, COUNTER_ROOM, bookRoom } from "./events.js";
+import EVENTS, {
+  CLIENT_EVENTS,
+  COUNTER_ROOM,
+  bookRoom,
+  memberRoom,
+} from "./events.js";
 import createPresence from "./presence.js";
 import { DOMAIN_EVENTS } from "../events/domainEvents.js";
 import {
@@ -95,6 +100,7 @@ const createSocketServer = (httpServer, domainEvents, services) => {
     // every socket here got through io.use, so it has a member
     const { member } = socket.data;
 
+    socket.join(memberRoom(member.id));
     if (STAFF_ROLES.has(member.role)) {
       socket.join(COUNTER_ROOM);
     }
@@ -106,11 +112,14 @@ const createSocketServer = (httpServer, domainEvents, services) => {
 
     // the token stops being valid at exp, so the socket does too; the client
     // refreshes its token and reconnects (see decisions.md)
-    const expiryTimer = setTimeout(() => {
-      logger.info(`Socket ${socket.id} token expired, disconnecting`);
-      socket.emit(EVENTS.SERVER_SESSION_EXPIRED);
-      socket.disconnect(true);
-    }, socket.data.tokenExp * 1000 - Date.now());
+    const expiryTimer = setTimeout(
+      () => {
+        logger.info(`Socket ${socket.id} token expired, disconnecting`);
+        socket.emit(EVENTS.SERVER_SESSION_EXPIRED);
+        socket.disconnect(true);
+      },
+      socket.data.tokenExp * 1000 - Date.now(),
+    );
 
     socket.on("disconnect", (reason) => {
       clearTimeout(expiryTimer);
@@ -133,9 +142,13 @@ const createSocketServer = (httpServer, domainEvents, services) => {
         } catch (err) {
           const known = err.isOperational === true;
           if (known) {
-            logger.warn(`Socket ${socket.id} ${eventName} refused: ${err.message}`);
+            logger.warn(
+              `Socket ${socket.id} ${eventName} refused: ${err.message}`,
+            );
           } else {
-            logger.error(`Socket ${socket.id} ${eventName} failed: ${err.stack}`);
+            logger.error(
+              `Socket ${socket.id} ${eventName} failed: ${err.stack}`,
+            );
           }
           reply({
             ok: false,
@@ -198,7 +211,9 @@ const createSocketServer = (httpServer, domainEvents, services) => {
       const request = await services.borrowRequests.update(data.id, {
         status: data.status,
       });
-      logger.info(`${staff.id} set ${request.id} to ${request.status} by socket`);
+      logger.info(
+        `${staff.id} set ${request.id} to ${request.status} by socket`,
+      );
       reply({ ok: true, id: request.id, status: request.status });
     });
 
@@ -206,7 +221,9 @@ const createSocketServer = (httpServer, domainEvents, services) => {
       // no Express middleware runs for socket events, so check it here
       const message = parsePayload(helloSchema, payload, reply);
       if (!message) {
-        logger.warn(`Socket ${socket.id} sent an invalid ${EVENTS.CLIENT_HELLO}`);
+        logger.warn(
+          `Socket ${socket.id} sent an invalid ${EVENTS.CLIENT_HELLO}`,
+        );
         return;
       }
 
@@ -239,6 +256,26 @@ const createSocketServer = (httpServer, domainEvents, services) => {
       requestedAt: request.requestedAt,
     });
   });
+
+  domainEvents.on(
+    DOMAIN_EVENTS.QUEUE_POSITION_CHANGED,
+    ({ memberId, bookId, position }) => {
+      io.to(memberRoom(memberId)).emit(EVENTS.SERVER_QUEUE_POSITION_CHANGED, {
+        bookId,
+        position,
+      });
+    },
+  );
+
+  domainEvents.on(
+    DOMAIN_EVENTS.QUEUE_PROMOTED,
+    ({ memberId, bookId, bookTitle, holdUntil }) => {
+      io.to([memberRoom(memberId), COUNTER_ROOM]).emit(
+        EVENTS.SERVER_QUEUE_PROMOTED,
+        { bookId, bookTitle, holdUntil },
+      );
+    },
+  );
 
   io.presence = presence;
   return io;

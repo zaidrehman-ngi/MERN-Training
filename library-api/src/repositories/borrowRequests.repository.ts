@@ -25,6 +25,19 @@ export interface BorrowRequestsRepository extends Repository<
   ): Promise<number>;
   findOverdue(today: string): Promise<BorrowRequest[]>;
   findDueOn(date: string): Promise<BorrowRequest[]>;
+  findNextInQueue(bookId: string): Promise<BorrowRequest | null>;
+  findQueue(bookId: string): Promise<BorrowRequest[]>;
+  updateIfStatus(
+    id: string,
+    from: BorrowRequestStatus[],
+    changes: BorrowRequestChanges,
+  ): Promise<BorrowRequest | null>;
+  claimNextInQueue(
+    bookId: string,
+    holdUntil: string,
+  ): Promise<BorrowRequest | null>;
+  countAheadInQueue(bookId: string, queuedAt: string): Promise<number>;
+  findExpiredHolds(today: string): Promise<BorrowRequest[]>;
 }
 
 // Only fetch the columns we actually send back.
@@ -33,6 +46,8 @@ const requestColumns = {
   status: true,
   requested_on: true,
   due_on: true,
+  queued_at: true,
+  hold_until: true,
   fine_per_day: true,
 } satisfies Prisma.book_requestsSelect;
 
@@ -58,14 +73,21 @@ type DetailRow = Prisma.book_requestsGetPayload<{
 const toDate = (date: Date | null): string | null =>
   date ? date.toISOString().slice(0, 10) : null;
 
+const statuses: BorrowRequestStatus[] = [
+  "pending",
+  "queued",
+  "held",
+  "approved",
+  "rejected",
+  "cancelled",
+  "expired",
+  "returned",
+];
+
 const toStatus = (value: string): BorrowRequestStatus => {
-  if (
-    value === "pending" ||
-    value === "approved" ||
-    value === "rejected" ||
-    value === "returned"
-  ) {
-    return value;
+  const status = statuses.find((known) => known === value);
+  if (status) {
+    return status;
   }
   throw new Error(`Unknown borrow request status in the database: ${value}`);
 };
@@ -78,6 +100,8 @@ const toBorrowRequest = (row: DetailRow): BorrowRequest => ({
   status: toStatus(row.status),
   requestedAt: toDate(row.requested_on),
   dueDate: toDate(row.due_on),
+  queuedAt: row.queued_at ? row.queued_at.toISOString() : null,
+  holdUntil: toDate(row.hold_until),
   finePerDay: row.fine_per_day,
   member: {
     id: row.members.api_id,
@@ -99,6 +123,8 @@ const toListItem = (row: ListRow): BorrowRequestListItem => ({
   status: toStatus(row.status),
   requestedAt: toDate(row.requested_on),
   dueDate: toDate(row.due_on),
+  queuedAt: row.queued_at ? row.queued_at.toISOString() : null,
+  holdUntil: toDate(row.hold_until),
   finePerDay: row.fine_per_day,
   memberName: row.members.name,
   bookTitle: row.books.title,
@@ -142,6 +168,14 @@ const toUpdateRow = async (
   if (changes.status !== undefined) row.status = changes.status;
   if (changes.requestedAt !== undefined) {
     row.requested_on = new Date(changes.requestedAt);
+  }
+  if (changes.queuedAt !== undefined) {
+    row.queued_at =
+      changes.queuedAt === null ? null : new Date(changes.queuedAt);
+  }
+  if (changes.holdUntil !== undefined) {
+    row.hold_until =
+      changes.holdUntil === null ? null : new Date(changes.holdUntil);
   }
   if (changes.dueDate !== undefined) {
     row.due_on = changes.dueDate === null ? null : new Date(changes.dueDate);
@@ -200,6 +234,10 @@ const createBorrowRequestsRepository = (
       requested_on: new Date(requestData.requestedAt),
       due_on:
         requestData.dueDate === null ? null : new Date(requestData.dueDate),
+      queued_at:
+        requestData.queuedAt === null ? null : new Date(requestData.queuedAt),
+      hold_until:
+        requestData.holdUntil === null ? null : new Date(requestData.holdUntil),
       fine_per_day: requestData.finePerDay,
     };
     try {
@@ -258,6 +296,77 @@ const createBorrowRequestsRepository = (
       where: { status: "approved", due_on: new Date(date) },
       select: detailSelect,
       orderBy: { api_id: "asc" },
+    });
+    return rows.map(toBorrowRequest);
+  },
+
+  async updateIfStatus(id, from, changes) {
+    const data = await toUpdateRow(prisma, changes);
+    try {
+      const result = await prisma.book_requests.updateMany({
+        where: { api_id: id, status: { in: from } },
+        data,
+      });
+      if (result.count === 0) {
+        return null;
+      }
+    } catch (err) {
+      throw translateDbError(err);
+    }
+    return this.findById(id);
+  },
+
+  async claimNextInQueue(bookId, holdUntil) {
+    const rows = await prisma.$queryRaw<{ api_id: string }[]>`
+      UPDATE book_requests
+      SET status = 'held', hold_until = ${holdUntil}::date
+      WHERE request_id = (
+        SELECT r.request_id
+        FROM book_requests r
+        JOIN books b ON b.book_id = r.book_id
+        WHERE b.api_id = ${bookId} AND r.status = 'queued'
+        ORDER BY r.queued_at, r.api_id
+        LIMIT 1
+        FOR UPDATE OF r SKIP LOCKED
+      )
+      RETURNING api_id`;
+    const claimed = rows[0];
+    return claimed ? this.findById(claimed.api_id) : null;
+  },
+
+  async findQueue(bookId) {
+    const rows = await prisma.book_requests.findMany({
+      where: { status: "queued", books: { api_id: bookId } },
+      select: detailSelect,
+      orderBy: [{ queued_at: "asc" }, { api_id: "asc" }],
+    });
+    return rows.map(toBorrowRequest);
+  },
+
+  async findNextInQueue(bookId) {
+    const row = await prisma.book_requests.findFirst({
+      where: { status: "queued", books: { api_id: bookId } },
+      select: detailSelect,
+      orderBy: [{ queued_at: "asc" }, { api_id: "asc" }],
+    });
+    return row ? toBorrowRequest(row) : null;
+  },
+
+  countAheadInQueue(bookId, queuedAt) {
+    return prisma.book_requests.count({
+      where: {
+        status: "queued",
+        books: { api_id: bookId },
+        queued_at: { lt: new Date(queuedAt) },
+      },
+    });
+  },
+
+  async findExpiredHolds(today) {
+    const rows = await prisma.book_requests.findMany({
+      where: { status: "held", hold_until: { lt: new Date(today) } },
+      select: detailSelect,
+      orderBy: { hold_until: "asc" },
     });
     return rows.map(toBorrowRequest);
   },

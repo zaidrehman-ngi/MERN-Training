@@ -48,6 +48,8 @@ const setUp = (out) => {
     transaction,
     {
       loanPeriodDays: 14,
+      holdDays: 3,
+      defaultFinePerDay: 20,
       timeZone: "Asia/Karachi",
       now: () => new Date("2026-11-02T02:00:00+05:00"),
     },

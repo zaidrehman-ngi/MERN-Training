@@ -4,6 +4,7 @@ import {
   AuthenticationError,
   ConflictError,
   DomainError,
+  ForbiddenError,
   InvalidValueError,
   NotFoundError,
 } from "../errors/domainErrors.js";
@@ -16,6 +17,7 @@ const statusForDomainError = (err) => {
   if (err instanceof NotFoundError) return 404;
   if (err instanceof ConflictError) return 409;
   if (err instanceof AuthenticationError) return 401;
+  if (err instanceof ForbiddenError) return 403;
   if (err instanceof InvalidValueError) return 422;
   return 400;
 };

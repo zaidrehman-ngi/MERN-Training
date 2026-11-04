@@ -67,6 +67,24 @@ const approveBorrowRequest = async (req: Request<IdParams>, res: Response) => {
   });
 };
 
+const cancelBorrowRequest = async (req: Request<IdParams>, res: Response) => {
+  if (!req.user) {
+    throw new AuthenticationError();
+  }
+  const borrowRequest = await servicesFor(req).borrowRequests.cancel(
+    req.params.id,
+    req.user.sub,
+  );
+  res.status(200).json({ data: borrowRequest });
+};
+
+const getQueuePosition = async (req: Request<IdParams>, res: Response) => {
+  const position = await servicesFor(req).borrowRequests.queuePosition(
+    req.params.id,
+  );
+  res.status(200).json({ data: position });
+};
+
 const returnBorrowedBook = async (req: Request<IdParams>, res: Response) => {
   const borrowRequest = await servicesFor(req).borrowRequests.returnBook(
     req.params.id,
@@ -85,5 +103,7 @@ export {
   createBorrowRequest,
   updateBorrowRequest,
   approveBorrowRequest,
+  cancelBorrowRequest,
+  getQueuePosition,
   returnBorrowedBook,
 };

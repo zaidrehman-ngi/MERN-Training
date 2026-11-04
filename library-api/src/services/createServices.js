@@ -16,6 +16,7 @@ const createServices = (repositories, events) => {
       work({
         services: createServices(txRepositories, heldEvents),
         repositories: txRepositories,
+        events: heldEvents,
       }),
     );
     held.forEach((args) => events.emit(...args));
@@ -32,6 +33,8 @@ const createServices = (repositories, events) => {
     transaction,
     {
       loanPeriodDays: config.loanPeriodDays,
+      holdDays: config.holdDays,
+      defaultFinePerDay: config.finePerDay,
       timeZone: config.libraryTimeZone,
     },
   );

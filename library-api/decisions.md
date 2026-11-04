@@ -151,3 +151,57 @@ Why not the start of the day: a book due on the 14th would be overdue the
 moment the 14th starts, which isn't what a member reading "due on the
 14th" expects. Why not an exact time: the library counts days, not hours,
 and an exact time brings the time zone back into every comparison.
+
+# Exercise 14 — Fines, and the queue for Dune
+
+## Task 2: Store the fine or compute it on read?
+
+**Decision: compute it on read while the book is out. Store it once, when
+the book comes back.**
+
+In Week 6 (Exercise 3 Task 5) I had the same choice for the available-copy
+count. I said a stored number can drift away from the real data, that
+the trigger was the dangerous option because nothing in the code shows it
+exists, and I went with computing it on read. A stored fine that the
+nightly job updates has both problems:
+- It drifts. It's only right just after the job runs. From midnight to
+  9 AM it's a day behind, and if the job misses a morning (Exercise 13
+  Task 4, server down until 11) it's wrong all day with nothing saying so.
+- It's the same hidden-update problem as the trigger. Someone reading the
+  return code sees a fine column and doesn't know a job somewhere is
+  changing it every night.
+
+While the book is out the fine is `calculateFine(due date, not returned,
+now)`. It's a small calculation on data we already load, so there's
+nothing to keep in sync.
+
+Once the book is returned the fine stops changing, so I store it then, in
+the same transaction as the return. That number is a record of what the
+member owes. If the rate in config changes next year, old returns keep
+the fine they were charged.
+
+**What the member's screen shows** for a book due 14 Nov, Rs 20 a day,
+looked at on 23 Nov at 8 AM:
+
+| | Stored, nightly job | Computed on read |
+|---|---|---|
+| Book still out | "Fine: Rs 160". That's yesterday's number until the 9 AM run, and older if a run was missed. | "Rs 180 so far, 9 days late, Rs 20 more each day". Always the current amount. |
+| Book returned on 23 Nov | Whatever the job last wrote, unless the return code also sets it. Two places writing the same column. | "Rs 180, returned 23 Nov", stored at return and never changes. |
+
+## Task 3: What "gets it" means for the first in the queue
+
+**Decision: held for a fixed window, 3 days (`HOLD_DAYS`).** When a copy
+comes back it doesn't go on the shelf. It's held for the first member in
+the queue until the end of the third day (Karachi time, the same way due
+dates work), and they get a notification.
+
+- Not held indefinitely: if the member never comes, the copy sits behind
+  the desk forever while everyone else waits.
+- Not just notified first: whoever gets to the library first takes it, so
+  being first in the queue means nothing.
+
+**If they don't come:** a job at 00:05 every night (`HOLD_EXPIRY_SCHEDULE`)
+marks holds that are past their date as `expired`, and the copy goes to
+the next member in the queue, who gets their own 3 days. If the queue is
+empty, it goes back on the shelf. The member who didn't come loses their
+place. They can join again, at the back.

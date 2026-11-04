@@ -9,7 +9,18 @@ const borrowRequestStatusSchema = z.enum(["pending", "approved", "rejected"]);
 const borrowRequestQuerySchema = z.object({
   userId: z.string().optional(),
   bookId: z.string().optional(),
-  status: z.enum(["pending", "approved", "rejected", "returned"]).optional(),
+  status: z
+    .enum([
+      "pending",
+      "queued",
+      "held",
+      "approved",
+      "rejected",
+      "cancelled",
+      "expired",
+      "returned",
+    ])
+    .optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().default(10),
 });

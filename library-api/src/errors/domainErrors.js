@@ -34,6 +34,13 @@ class AuthenticationError extends DomainError {
   }
 }
 
+// the caller is known but isn't allowed to do this to this record
+class ForbiddenError extends DomainError {
+  constructor(message = "You can only do this to your own request.", options = {}) {
+    super(message, { code: "FORBIDDEN", ...options });
+  }
+}
+
 // a value breaks a rule the data has to follow (more on the shelf than owned)
 class InvalidValueError extends DomainError {
   constructor(message = "One of the values is not allowed.", options = {}) {
@@ -75,6 +82,7 @@ export {
   NotFoundError,
   ConflictError,
   AuthenticationError,
+  ForbiddenError,
   InvalidValueError,
   IsbnTakenError,
   EmailTakenError,

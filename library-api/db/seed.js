@@ -33,6 +33,7 @@ const members = [
   // Exercise 7 Task 3: two members with the same password, to show the hashes differ
   { id: "m-2001", name: "Sara Malik", email: "sara.malik@lib.pk", password: "Library@2026", role: "user", branch: "Clifton Branch", joined: "2026-10-20" },
   { id: "m-2002", name: "Usman Tariq", email: "usman.tariq@lib.pk", password: "Library@2026", role: "user", branch: "Clifton Branch", joined: "2026-10-20" },
+  { id: "m-librarian-test", name: "Demo Librarian", email: "librarian@lib.pk", password: "Librarian@2026", role: "librarian", branch: "Clifton Branch", joined: "2026-11-04" },
 ];
 
 const borrowRequests = [

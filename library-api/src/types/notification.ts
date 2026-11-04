@@ -1,4 +1,4 @@
-export type NotificationKind = "due-reminder";
+export type NotificationKind = "due-reminder" | "hold-ready";
 
 export type Notification = {
   id: string;

@@ -38,6 +38,15 @@ const createFakeBorrowRequestsRepository = (requests) => ({
     return request;
   },
 
+  async updateIfStatus(id, from, changes) {
+    const request = requests.find((r) => r.id === id);
+    if (!request || !from.includes(request.status)) {
+      return null;
+    }
+    Object.assign(request, changes);
+    return request;
+  },
+
   countForMember: async (memberId, statuses) =>
     requests.filter(
       (r) => r.userId === memberId && statuses.includes(r.status),

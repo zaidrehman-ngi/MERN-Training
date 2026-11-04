@@ -2143,3 +2143,244 @@ no login:    401 UNAUTHORIZED
 
 If the job fails, the route returns 500 `JOB_FAILED` and the error is in
 the server log, same as when cron runs it.
+
+# Exercise 14 — Fines, and the queue for Dune
+
+## Task 1: The fine calculation
+
+`calculateFine` in `src/services/fines.ts` is a pure function. It takes
+the due date, when the book came back (or `null`), an `asOf` time, and
+the rules (rate, max days, time zone), and returns a number. It doesn't
+read the clock or the database.
+
+The rate comes from the loan's `finePerDay`, which is the book's own rate,
+or `FINE_PER_DAY` from config (20) if the book has none. That replaces
+the hard-coded 20 in the borrow service. The max is `FINE_MAX_DAYS` (30).
+
+What I decided for the questions the rule doesn't answer (also written as
+comments above the function):
+- **The due day doesn't count.** Due on the 14th means it can come back
+  any time on the 14th, same as the decision in Exercise 13.
+- **Weekends count.** The rule is per day late, and the book is out on
+  Saturday and Sunday too.
+- **There's a maximum:** 30 days of the rate, so a lost book doesn't grow
+  forever.
+- **Two hours late is one day.** Days are counted on the Karachi
+  calendar, so any time on the 15th is the first late day.
+- **Never returned:** counted up to `asOf`, so the caller can ask what it
+  comes to today.
+
+The return time is turned into a Karachi date first, which is what makes
+the midnight cases work.
+
+Test table (`test/fines.test.js`), due Saturday 2026-11-14, Rs 20 a day:
+
+| Case | Returned | Fine |
+|---|---|---|
+| early | 10 Nov | 0 |
+| on the due day | 14 Nov 12:00 | 0 |
+| last minute of the due day | 14 Nov 23:59 | 0 |
+| one minute past midnight | 15 Nov 00:01 | 20 |
+| two hours late | 15 Nov 02:00 | 20 |
+| 00:01 Karachi, but still the 14th in UTC | 14 Nov 19:01 UTC | 20 |
+| weekend: due Saturday, back Monday | 16 Nov | 40 |
+| nine days late | 23 Nov | 180 |
+| very late | 1 Feb 2027 | 600 (capped) |
+| never returned, asked on 20 Nov | not returned | 120 |
+| never returned, asked before it's due | not returned | 0 |
+| never returned, asked a year later | not returned | 600 (capped) |
+
+All 12 pass.
+
+## Task 2: Store the fine or compute it on read
+
+The decision is in decisions.md: compute it on read while the book is
+out, and store it once when it comes back. It's the same reasoning as the
+Week 6 available-copy count: a stored number that something else keeps
+updating can drift, and nobody reading the code knows it's being changed.
+The member's screen for both designs is in the table there.
+
+## Task 3: The queue
+
+The queue is part of borrow requests, with new statuses: `queued` (in the
+queue), `held` (a copy is waiting for them until `holdUntil`),
+`cancelled` (left the queue) and `expired` (didn't collect). New columns
+`queued_at` (the exact time, because `requested_on` is only a date) and
+`hold_until`, and the status CHECK allows the new values.
+
+- **Joining:** creating a request for a book with no copy on the shelf
+  makes it `queued` instead of `pending`. Approving a pending request when
+  the copies have run out also puts it in the queue instead of failing
+  with `NO_COPIES_AVAILABLE`.
+- **Leaving:** `POST /borrow-requests/:id/cancel`. Only your own request
+  (403 otherwise), and only while it's pending, queued or held (409
+  otherwise).
+- **Position:** `GET /borrow-requests/:id/queue` counts the queued requests
+  for the same book that joined earlier, plus one.
+- **A copy comes back:** `returnBook` gives it to the first in the queue,
+  ordered by `queued_at`. That request becomes `held` for `HOLD_DAYS` (3)
+  and a `hold-ready` notification is stored, in the same transaction. The
+  shelf count only goes up if nobody is waiting. Approving a `held`
+  request doesn't take another copy, because it already has one.
+  Approving a request that's still `queued` is a 409 `REQUEST_QUEUED`.
+- **Not collected:** the `expire-holds` job (00:05 every night) expires old
+  holds and passes the copy to the next in line.
+
+What "gets it" means and what happens if they don't come is in
+decisions.md: held for 3 days, then it moves to the next member.
+
+`db/dune-queue.js` runs the whole story through the services:
+
+```
+1. all copies out: 3 more loans, Dune on shelf = 0
+2. four join: Sara queued #1, Usman queued #2, Test queued #3, Aisha queued #4
+3. Usman leaves: Sara queued #1, Usman cancelled, Test queued #2, Aisha queued #3
+4. approving Test while queued: REQUEST_QUEUED
+5. a copy comes back: Sara held until 2026-11-07, Dune on shelf = 0
+   notification: A copy of "Dune" is held for you until 2026-11-07.
+6. Sara doesn't come (hold set to end 2026-11-03), expire job: {"checked":1,"expired":1}
+   now: Sara expired, Usman cancelled, Test held, Aisha queued #1
+7. Test collects it: approved, due 2026-11-18, Dune on shelf = 0
+```
+
+Queued and held requests count towards the 5-request limit, since they're
+still open requests.
+
+## Task 4: The race condition
+
+**On paper.** Sara is first, Test is second, and one copy is returned. The
+return is clicked twice, or two librarians scan it at once, so two
+returns run at the same moment, each in its own transaction:
+
+| | Return 1 | Return 2 |
+|---|---|---|
+| 1 | reads the loan: `approved` | reads the loan: `approved` |
+| 2 | finds the next in the queue: Sara | finds the next in the queue: Sara (return 1 hasn't committed) |
+| 3 | sets Sara to `held` | sets Sara to `held` |
+| 4 | marks the loan `returned`, commits | marks the loan `returned`, commits |
+
+Both "worked". If the second one reads the queue just after the first one
+commits, it skips Sara and holds Test too: two holds for one copy. With
+nobody queued, both add 1 to the shelf. And when two different copies come
+back at the same moment, both pick Sara, so Sara is held twice and the
+second copy disappears.
+
+I tried the last case on the old code (`db/queue-race.js`, two returns
+with `Promise.all`):
+
+```
+B. two copies back at once, Sara and Test queued: ok / P2039 (25P02 current transaction is aborted, commands ignored until end of transaction block) -> Sara held, Test queued, Dune on shelf = 0
+```
+
+Both returns picked Sara. The second one only failed because the
+`hold-ready` notification for Sara already existed. The unique rule from
+Exercise 13 stopped the insert, and in Postgres an error inside a
+transaction aborts the whole transaction. Without that rule, Sara would
+have been held twice and the copy would have been lost with no error.
+
+**What stops it** is the same tool as Week 6 (Exercise 5): make the
+database decide, inside the transaction, instead of reading first and
+writing after.
+- **Each loan is returned once.** The return is a conditional update:
+  `UPDATE ... SET status = 'returned' WHERE api_id = ? AND status = 'approved'`.
+  If two run at once, Postgres locks the row, the second waits, and when
+  it runs, the status isn't `approved` any more, so it updates 0 rows and
+  gets `409 ALREADY_RETURNED`. Only the one that won releases the copy.
+  All status changes (approve, cancel, expire) work this way now
+  (`updateIfStatus`), and a lost race is `409 REQUEST_CHANGED`.
+- **Each copy goes to a different person.** Picking the next in the queue
+  and holding them is one statement, with `FOR UPDATE SKIP LOCKED`:
+
+```sql
+UPDATE book_requests SET status = 'held', hold_until = $2
+WHERE request_id = (
+  SELECT r.request_id FROM book_requests r JOIN books b ON b.book_id = r.book_id
+  WHERE b.api_id = $1 AND r.status = 'queued'
+  ORDER BY r.queued_at, r.api_id
+  LIMIT 1
+  FOR UPDATE OF r SKIP LOCKED
+)
+RETURNING api_id
+```
+
+  The first transaction locks Sara's row. The second skips it and takes
+  Test.
+- The notification insert is `ON CONFLICT DO NOTHING` now, so a duplicate
+  doesn't abort the transaction.
+
+After the fix, three runs in a row:
+
+```
+A. same loan returned twice at once, nobody queued: ok / ALREADY_RETURNED -> Dune on shelf = 1
+B. two copies back at once, Sara and Test queued: ok / ok -> Sara held, Test held, Dune on shelf = 0
+```
+
+## Task 5: Real-time events for the queue
+
+These follow the table from Exercise 5 Task 6. The service emits domain
+events and the socket server turns them into socket messages, so a change
+made by the nightly job or a script goes out the same way as one made over
+HTTP. Events emitted inside a transaction only go out after it commits
+(the held events from Exercise 8), so a rolled back promotion is never
+announced.
+
+| Event | When the service emits it | Room | Payload |
+|---|---|---|---|
+| `server:queue:position-changed` | someone joins (just them), leaves or is promoted (everyone behind them) | `member:<memberId>` | `{ bookId, position }` |
+| `server:queue:promoted` | a copy comes back, or a hold is given up or expires, and the next member gets it held | `member:<memberId>` and `counter` | `{ bookId, bookTitle, holdUntil }` |
+| `server:book:availability-changed` | a copy goes back on the shelf because nobody is waiting | `book:<bookId>` | `{ bookId, available }` |
+
+The `member:<memberId>` room from the table didn't exist yet, so every
+socket now joins its own member room on connect. Positions go to each
+member separately, so nobody sees who else is in the queue. A copy that
+gets held doesn't send an availability event, because the shelf count
+doesn't change.
+
+I connected Sara, Test, Usman (watching Dune) and the admin, and ran the
+queue over HTTP:
+
+```
+--- Sara joins
+sara  got server:queue:position-changed {"bookId":"bk-1","position":1}
+--- Test joins
+test  got server:queue:position-changed {"bookId":"bk-1","position":2}
+--- Sara leaves
+test  got server:queue:position-changed {"bookId":"bk-1","position":1}
+--- Sara joins again
+sara  got server:queue:position-changed {"bookId":"bk-1","position":2}
+--- a copy comes back
+test  got server:queue:promoted {"bookId":"bk-1","bookTitle":"Dune","holdUntil":"2026-11-07"}
+admin got server:queue:promoted {"bookId":"bk-1","bookTitle":"Dune","holdUntil":"2026-11-07"}
+sara  got server:queue:position-changed {"bookId":"bk-1","position":1}
+--- Test gives up the hold
+sara  got server:queue:promoted {"bookId":"bk-1","bookTitle":"Dune","holdUntil":"2026-11-07"}
+admin got server:queue:promoted {"bookId":"bk-1","bookTitle":"Dune","holdUntil":"2026-11-07"}
+--- Sara gives up the hold too, nobody left
+usman got server:book:availability-changed {"bookId":"bk-1","available":1}
+```
+
+Each member only got their own events, and Usman, who was only watching
+the book, only heard about it when a copy actually went back on the
+shelf.
+
+Fines have no event of their own. The table already left them out: a fine
+is worked out when the member opens their account (Task 2), so there is
+nothing to push.
+
+## Task 6: The demo, end to end
+
+The demo page is `public/queue-demo.html`. A member sees their place in
+the queue for Dune with Join and Leave buttons, and a banner when a copy
+is held for them. A librarian sees the copies that are out with a Return
+button, the queue and the hold shelf. `npm run demo:queue` resets the data
+and lends out every copy of Dune.
+
+To make it work every time and not just most times:
+- The page doesn't rely on events alone. Every event and every socket
+  reconnect makes it ask the API for the current state, so a missed or
+  late event can't leave the screen wrong.
+- After logging in, the page only draws once, when the socket connects.
+  Drawing twice could replace the Return button just as it was clicked.
+- The login rate limiter allows 5 logins per account in 15 minutes, so
+  rehearsing many times in a row can lock the demo accounts. Restarting
+  the API resets it.
