@@ -16,6 +16,7 @@ import type {
 import type { BorrowRequestsRepository } from "../repositories/borrowRequests.repository.ts";
 import type { NotificationsRepository } from "../repositories/notifications.repository.ts";
 import type { Actor } from "../types/member.ts";
+import type { Events } from "../types/events.ts";
 import { addDays, todayIn } from "../utils/dates.ts";
 
 type BooksService = {
@@ -27,11 +28,7 @@ type UsersService = {
   getById(id: string): Promise<unknown>;
 };
 
-type Events = {
-  emit(eventName: string, payload: unknown): unknown;
-};
-
-type Tx = {
+export type Tx = {
   services: { books: BooksService; borrowRequests: BorrowRequestsService };
   repositories: {
     borrowRequests: BorrowRequestsRepository;
@@ -40,7 +37,7 @@ type Tx = {
   events: Events;
 };
 
-type Transaction = <T>(work: (tx: Tx) => Promise<T>) => Promise<T>;
+export type Transaction = <T>(work: (tx: Tx) => Promise<T>) => Promise<T>;
 
 export type QueuePosition = {
   id: string;
@@ -79,7 +76,7 @@ export type LoanPolicy = {
   now?: () => Date;
 };
 
-// requests that count against the limit: waiting, in the queue, held or out on loan
+// requests that count against the borrow limit
 const OPEN_STATUSES: BorrowRequestStatus[] = [
   "pending",
   "queued",
@@ -194,10 +191,8 @@ const createBorrowRequestsService = (
       return borrowRequest;
     },
 
-    // The caller only says who and which book. Status, dates and fine are the
-    // library's rules, so they're set here and never taken from the caller.
+    // status, dates and fine are set here, never taken from the caller
     async create(memberId, bookId) {
-      // both throw NotFoundError if they don't exist (or were deleted)
       await usersService.getById(memberId);
       const book = await booksService.getById(bookId);
 
@@ -230,7 +225,6 @@ const createBorrowRequestsService = (
       return borrowRequest;
     },
 
-    // The copy count and the request are saved together or not at all.
     update(id, changes, actor) {
       return transaction(
         async ({ services, repositories, events: txEvents }) => {
@@ -337,8 +331,7 @@ const createBorrowRequestsService = (
               : requestChanged();
           }
 
-          // only an approved request has a copy out to bring back, and it goes
-          // to the first in the queue before it goes back on the shelf
+          // the returned copy goes to the queue first, then the shelf
           if (before.status === "approved") {
             await releaseCopy(
               { services, repositories, events: txEvents },

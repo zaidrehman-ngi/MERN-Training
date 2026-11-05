@@ -6,6 +6,7 @@ import {
 } from "../errors/domainErrors.js";
 import type { UsersRepository } from "../repositories/users.repository.ts";
 import { DOMAIN_EVENTS } from "../events/domainEvents.js";
+import type { Events } from "../types/events.ts";
 import type {
   Actor,
   MemberChanges,
@@ -18,8 +19,6 @@ import type {
 import { ADMIN_ROLES } from "../types/member.ts";
 
 const isAdmin = (role: Role) => ADMIN_ROLES.includes(role);
-
-type Events = { emit(eventName: string, payload: unknown): unknown };
 
 const noEvents: Events = { emit: () => false };
 
@@ -45,9 +44,7 @@ const createUsersService = (
     return this.getById(id);
   },
 
-  // Registration. It doesn't say if the email is already taken (see
-  // decisions.md, Exercise 7 Task 4): the caller gets the same answer either
-  // way, so nobody can use this to find out who has an account.
+  // same answer whether or not the email is taken, so accounts can't be discovered
   async create(signUp: SignUp): Promise<PublicMember | null> {
     // hash first, so a taken email takes as long as a new one
     const passwordHash = await hashPassword(signUp.password);

@@ -8,9 +8,9 @@ registerProcessErrorHandlers();
 const { default: createApp } = await import("./app.js");
 const { default: prisma } = await import("./db/prisma.js");
 const { default: createRepositories } =
-  await import("./repositories/createRepositories.js");
+  await import("./repositories/createRepositories.ts");
 const { default: createServices } =
-  await import("./services/createServices.js");
+  await import("./services/createServices.ts");
 const { default: domainEvents } = await import("./events/domainEvents.js");
 const { default: createSocketServer } =
   await import("./realtime/socketServer.js");

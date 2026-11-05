@@ -328,9 +328,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/users",
+              "raw": "{{baseUrl}}/api/v1/auth/register",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users"]
+              "path": ["api", "v1", "auth", "register"]
             }
           },
           "response": []
@@ -625,7 +625,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n  \"status\": \"approved\",\r\n  \"finePerDay\": 20\r\n}",
+              "raw": "{\r\n  \"status\": \"approved\"\r\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -762,9 +762,9 @@
               }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/users",
+              "raw": "{{baseUrl}}/api/v1/auth/register",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users"]
+              "path": ["api", "v1", "auth", "register"]
             }
           },
           "response": []

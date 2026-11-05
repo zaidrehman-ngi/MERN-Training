@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { ROLES } from "../types/member.ts";
 
-const userIdSchema = z.object({
-  id: z.string().min(1),
-});
-
 const userRoleSchema = z.enum(ROLES);
 
 const userQuerySchema = z.object({
@@ -14,7 +10,7 @@ const userQuerySchema = z.object({
 
 const createUserSchema = z.object({
   name: z.string().min(1),
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(8),
   role: z.literal("user").default("user"),
   branch: z.string().min(1),
@@ -23,14 +19,14 @@ const createUserSchema = z.object({
 
 const updateUserSchema = z.object({
   name: z.string().min(1).optional(),
-  email: z.string().email().optional(),
+  email: z.email().optional(),
   role: userRoleSchema.optional(),
   branch: z.string().min(1).optional(),
   joined: z.string().min(1).optional(),
   password: z.string().min(8).optional(),
 });
 
-export { userIdSchema, userQuerySchema, createUserSchema, updateUserSchema };
+export { userQuerySchema, createUserSchema, updateUserSchema };
 
 export type CreateUserBody = z.infer<typeof createUserSchema>;
 export type UpdateUserBody = z.infer<typeof updateUserSchema>;

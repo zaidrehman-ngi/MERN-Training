@@ -4,17 +4,16 @@ import {
   getBorrowRequestById,
   createBorrowRequest,
   updateBorrowRequest,
-  approveBorrowRequest,
   cancelBorrowRequest,
   getQueuePosition,
   returnBorrowedBook,
 } from "../controllers/borrowRequests.controller.ts";
-import requireAuth from "../middleware/requireAuth.js";
-import requireRole from "../middleware/requireRole.js";
-import { ROLES, STAFF_ROLES } from "../types/member.ts";
-import validate from "../middleware/validate.js";
+import requireAuth from "../middleware/requireAuth.ts";
+import requireRole from "../middleware/requireRole.ts";
+import { STAFF_ROLES } from "../types/member.ts";
+import validate from "../middleware/validate.ts";
+import { idParamsSchema } from "../schemas/common.ts";
 import {
-  borrowRequestIdSchema,
   borrowRequestQuerySchema,
   createBorrowRequestSchema,
   updateBorrowRequestSchema,
@@ -22,18 +21,9 @@ import {
 
 const router = express.Router();
 
-router.post(
-  "/:id/approve",
-  requireAuth,
-  requireRole(...STAFF_ROLES),
-  validate(borrowRequestIdSchema, "params"),
-  approveBorrowRequest,
-);
-
 router.get(
   "/",
   requireAuth,
-  requireRole(...ROLES),
   validate(borrowRequestQuerySchema, "query"),
   getBorrowRequests,
 );
@@ -41,7 +31,6 @@ router.get(
 router.post(
   "/",
   requireAuth,
-  requireRole(...ROLES),
   validate(createBorrowRequestSchema, "body"),
   createBorrowRequest,
 );
@@ -49,8 +38,7 @@ router.post(
 router.get(
   "/:id",
   requireAuth,
-  requireRole(...ROLES),
-  validate(borrowRequestIdSchema, "params"),
+  validate(idParamsSchema, "params"),
   getBorrowRequestById,
 );
 
@@ -58,7 +46,7 @@ router.patch(
   "/:id",
   requireAuth,
   requireRole(...STAFF_ROLES),
-  validate(borrowRequestIdSchema, "params"),
+  validate(idParamsSchema, "params"),
   validate(updateBorrowRequestSchema, "body"),
   updateBorrowRequest,
 );
@@ -66,16 +54,14 @@ router.patch(
 router.post(
   "/:id/cancel",
   requireAuth,
-  requireRole(...ROLES),
-  validate(borrowRequestIdSchema, "params"),
+  validate(idParamsSchema, "params"),
   cancelBorrowRequest,
 );
 
 router.get(
   "/:id/queue",
   requireAuth,
-  requireRole(...ROLES),
-  validate(borrowRequestIdSchema, "params"),
+  validate(idParamsSchema, "params"),
   getQueuePosition,
 );
 
@@ -83,7 +69,7 @@ router.post(
   "/:id/return",
   requireAuth,
   requireRole(...STAFF_ROLES),
-  validate(borrowRequestIdSchema, "params"),
+  validate(idParamsSchema, "params"),
   returnBorrowedBook,
 );
 

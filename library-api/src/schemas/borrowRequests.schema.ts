@@ -1,12 +1,6 @@
 import { z } from "zod";
 import { BORROW_REQUEST_STATUSES } from "../types/borrowRequest.ts";
 
-const borrowRequestIdSchema = z.object({
-  id: z.string().min(1),
-});
-
-const borrowRequestStatusSchema = z.enum(["pending", "approved", "rejected"]);
-
 const borrowRequestQuerySchema = z.object({
   userId: z.string().optional(),
   bookId: z.string().optional(),
@@ -20,17 +14,12 @@ const createBorrowRequestSchema = z.object({
   bookId: z.string().min(1),
 });
 
-const updateBorrowRequestSchema = z.object({
-  userId: z.string().min(1).optional(),
-  bookId: z.string().min(1).optional(),
-  status: borrowRequestStatusSchema.optional(),
-  requestedAt: z.string().min(1).optional(),
-  dueDate: z.string().min(1).optional(),
-  finePerDay: z.number().int().nonnegative().optional(),
+// staff only decide the status; dates and fine are set by the service
+const updateBorrowRequestSchema = z.strictObject({
+  status: z.enum(["pending", "approved", "rejected"]),
 });
 
 export {
-  borrowRequestIdSchema,
   borrowRequestQuerySchema,
   createBorrowRequestSchema,
   updateBorrowRequestSchema,

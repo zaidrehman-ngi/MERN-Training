@@ -1,6 +1,6 @@
 import type { Prisma, books } from "../generated/prisma/client.ts";
 import { IsbnTakenError } from "../errors/domainErrors.js";
-import translateDbError from "./dbErrors.js";
+import translateDbError from "./dbErrors.ts";
 import type { DeletableRepository } from "./repository.ts";
 import type { Changes } from "../types/changes.ts";
 import type { Book, BookQuery, BookStatus, NewBook } from "../types/book.ts";
@@ -25,8 +25,6 @@ const toBookStatus = (value: string): BookStatus => {
   throw new Error(`Unknown book status in the database: ${value}`);
 };
 
-// Turns a row from the books table into the same book shape the API
-// returned when the data came from db.json.
 const toBook = (row: books): Book => ({
   id: row.api_id,
   title: row.title,
@@ -40,7 +38,6 @@ const toBook = (row: books): Book => ({
   status: toBookStatus(row.status),
 });
 
-// API field names -> column names, for create and update.
 const toCreateRow = (book: NewBook): Prisma.booksUncheckedCreateInput => ({
   title: book.title,
   author: book.author ?? null,
@@ -81,7 +78,7 @@ const toOrderBy = (
   if (sort === "title") {
     return { title: order };
   }
-  // author and year can be empty, keep those books at the end of the list
+  // books without an author or year go last
   if (sort === "author") {
     return { author: { sort: order, nulls: "last" } };
   }
@@ -171,8 +168,7 @@ const createBooksRepository = (prisma: Db): BooksRepository => ({
     }
   },
 
-  // Adds (or with a negative number, takes away) available copies.
-  // The CHECK (available_copies >= 0) stops it going below zero.
+  // the CHECK (available_copies >= 0) stops it going below zero
   async changeAvailableCopies(
     id: string,
     change: number,
@@ -196,8 +192,7 @@ const createBooksRepository = (prisma: Db): BooksRepository => ({
     }
   },
 
-  // Soft delete: a book with loan history can't be removed from the table,
-  // so it is marked inactive and stops showing up in the API.
+  // soft delete: books with loan history can't be removed
   async deleteById(id: string): Promise<boolean> {
     const result = await prisma.books.updateMany({
       where: { api_id: id, is_active: true },

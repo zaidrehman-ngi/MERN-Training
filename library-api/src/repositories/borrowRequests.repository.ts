@@ -1,6 +1,6 @@
 import type { Prisma } from "../generated/prisma/client.ts";
 import { NotFoundError } from "../errors/domainErrors.js";
-import translateDbError from "./dbErrors.js";
+import translateDbError from "./dbErrors.ts";
 import type { Repository } from "./repository.ts";
 import type {
   BorrowRequest,
@@ -41,7 +41,6 @@ export interface BorrowRequestsRepository extends Repository<
   findExpiredHolds(today: string): Promise<BorrowRequest[]>;
 }
 
-// Only fetch the columns we actually send back.
 const requestColumns = {
   api_id: true,
   status: true,
@@ -52,14 +51,12 @@ const requestColumns = {
   fine_per_day: true,
 } satisfies Prisma.book_requestsSelect;
 
-// The list only needs the member's name and the book's title.
 const listSelect = {
   ...requestColumns,
   members: { select: { api_id: true, name: true } },
   books: { select: { api_id: true, title: true } },
 } satisfies Prisma.book_requestsSelect;
 
-// One borrow request gets a bit more about its member and book.
 const detailSelect = {
   ...requestColumns,
   members: { select: { api_id: true, name: true, email: true } },
@@ -82,7 +79,6 @@ const toStatus = (value: string): BorrowRequestStatus => {
   throw new Error(`Unknown borrow request status in the database: ${value}`);
 };
 
-// Same shape as db.json, plus the member and book objects.
 const toBorrowRequest = (row: DetailRow): BorrowRequest => ({
   id: row.api_id,
   bookId: row.books.api_id,
@@ -105,7 +101,6 @@ const toBorrowRequest = (row: DetailRow): BorrowRequest => ({
   },
 });
 
-// For the list: just the name and title, nothing else per row.
 const toListItem = (row: ListRow): BorrowRequestListItem => ({
   id: row.api_id,
   bookId: row.books.api_id,
@@ -120,7 +115,6 @@ const toListItem = (row: ListRow): BorrowRequestListItem => ({
   bookTitle: row.books.title,
 });
 
-// no status code here, the error handler decides that
 const notFoundField = (field: string) =>
   new NotFoundError("A related record does not exist.", {
     details: [{ field, message: "No record found with this id." }],
@@ -148,8 +142,7 @@ const findBookId = async (prisma: Db, apiId: string): Promise<string> => {
   return book.book_id;
 };
 
-// API field names -> column names. userId and bookId are the API ids
-// (m-1000, bk-1), so look up the real rows first.
+// userId and bookId are API ids (m-1000, bk-1), so look up the real rows
 const toUpdateRow = async (
   prisma: Db,
   changes: BorrowRequestChanges,
@@ -202,7 +195,6 @@ const createBorrowRequestsRepository = (
       where,
       select: listSelect,
       orderBy: { api_id: "asc" },
-      // no page given: the whole list, like before
       ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),
     });
     return rows.map(toListItem);

@@ -7,7 +7,11 @@ export interface Repository<T, New, Query, ListItem = T> {
   updateById(id: string, changes: Changes<New>): Promise<T | null>;
 }
 
-export interface DeletableRepository<T, New, Query, ListItem = T>
-  extends Repository<T, New, Query, ListItem> {
+export interface DeletableRepository<
+  T,
+  New,
+  Query,
+  ListItem = T,
+> extends Repository<T, New, Query, ListItem> {
   deleteById(id: string): Promise<boolean>;
 }

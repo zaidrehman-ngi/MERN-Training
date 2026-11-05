@@ -1,5 +1,17 @@
-// The denylist: ids (jti) of access tokens that were logged out early.
-const createRevokedTokensRepository = (prisma) => ({
+import type { Prisma } from "../generated/prisma/client.ts";
+
+type Db = Prisma.TransactionClient;
+
+// denylist of logged-out access token ids (jti)
+export interface RevokedTokensRepository {
+  add(jti: string, expiresAt: Date): Promise<void>;
+  isRevoked(jti: string): Promise<boolean>;
+  deleteExpired(): Promise<void>;
+}
+
+const createRevokedTokensRepository = (
+  prisma: Db,
+): RevokedTokensRepository => ({
   async add(jti, expiresAt) {
     await prisma.revoked_tokens.createMany({
       data: [{ jti, expires_at: expiresAt }],
@@ -15,8 +27,7 @@ const createRevokedTokensRepository = (prisma) => ({
     return row !== null;
   },
 
-  // Once a token's expiry has passed it's rejected anyway, so its row
-  // isn't needed. Keeps the table small.
+  // expired tokens are rejected anyway, so their rows can go
   async deleteExpired() {
     await prisma.revoked_tokens.deleteMany({
       where: { expires_at: { lt: new Date() } },

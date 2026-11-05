@@ -3,28 +3,41 @@ import jwt from "jsonwebtoken";
 import { hashPassword, verifyPassword } from "../utils/password.ts";
 import { AuthenticationError } from "../errors/domainErrors.js";
 import config from "../config/config.js";
+import type { UsersRepository } from "../repositories/users.repository.ts";
+import type { RefreshTokensRepository } from "../repositories/refreshTokens.repository.ts";
+import type { RevokedTokensRepository } from "../repositories/revokedTokens.repository.ts";
+import type { AuthMember, PublicMember } from "../types/member.ts";
 
-// The refresh token is just a long random string. It isn't a JWT because
-// the database has to be checked anyway (to see if it was revoked).
-// Only its SHA-256 hash is stored. A fast hash is fine here, unlike for
-// passwords, because the token is random and too long to guess.
-const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+export type VerifiedToken = { member: AuthMember; jti: string; exp: number };
 
-// Used when the email doesn't exist, so login still runs one bcrypt check
-// and takes as long as it does for a real account. Otherwise the timing
-// would show which emails are registered, even with the same message.
-let dummyHash;
+// a fast hash is fine for refresh tokens: they are random and too long to guess
+const sha256 = (value: string) =>
+  createHash("sha256").update(value).digest("hex");
+
+// checked when the email doesn't exist, so the timing doesn't reveal accounts
+let dummyHash: string | undefined;
 const getDummyHash = async () => {
   dummyHash ??= await hashPassword("not a real password");
   return dummyHash;
 };
 
+const verifyJwt = (token: string) => {
+  try {
+    return jwt.verify(token, config.jwtSecret);
+  } catch (err) {
+    const expired = err instanceof Error && err.name === "TokenExpiredError";
+    throw new AuthenticationError(
+      expired ? "Token has expired." : "Invalid token.",
+    );
+  }
+};
+
 const createAuthService = (
-  usersRepository,
-  refreshTokensRepository,
-  revokedTokensRepository,
+  usersRepository: UsersRepository,
+  refreshTokensRepository: RefreshTokensRepository,
+  revokedTokensRepository: RevokedTokensRepository,
 ) => ({
-  async authenticate(email, password) {
+  async authenticate(email: string, password: string): Promise<PublicMember> {
     const user = await usersRepository.findCredentialsByEmail(email);
     const hashToCheck = user?.passwordHash ?? (await getDummyHash());
     const passwordMatches = await verifyPassword(password, hashToCheck);
@@ -35,36 +48,28 @@ const createAuthService = (
       });
     }
 
-    // the hash was only needed for the check above, don't pass it on
     const { passwordHash, ...member } = user;
     return member;
   },
 
-  // The one check for an access token, used by requireAuth (HTTP) and by
-  // the socket server (handshake). Throws an AuthenticationError if it's missing, invalid,
-  // expired, logged out, or the member no longer exists.
-  // The role comes from the database, not from the token.
-  async verifyAccessToken(token) {
+  // used by requireAuth and the socket handshake; the role comes from the database
+  async verifyAccessToken(token: string | undefined): Promise<VerifiedToken> {
     if (!token) {
       throw new AuthenticationError();
     }
 
-    let payload;
-    try {
-      payload = jwt.verify(token, config.jwtSecret);
-    } catch (err) {
-      throw new AuthenticationError(
-        err.name === "TokenExpiredError" ? "Token has expired." : "Invalid token.",
-      );
+    const payload = verifyJwt(token);
+    if (typeof payload === "string" || !payload.sub || !payload.exp) {
+      throw new AuthenticationError("Invalid token.");
     }
 
-    // logged out tokens are on the denylist (tokens without an id are old or
-    // not made by us, so they're refused too)
-    if (!payload.jti || (await revokedTokensRepository.isRevoked(payload.jti))) {
+    if (
+      !payload.jti ||
+      (await revokedTokensRepository.isRevoked(payload.jti))
+    ) {
       throw new AuthenticationError("This token has been logged out.");
     }
 
-    // null if they were deleted (soft delete) since the token was made
     const member = await usersRepository.findForAuth(payload.sub);
     if (!member) {
       throw new AuthenticationError("This account no longer exists.");
@@ -73,9 +78,10 @@ const createAuthService = (
     return { member, jti: payload.jti, exp: payload.exp };
   },
 
-  // Logout: the access token goes on the denylist until it would have
-  // expired, and the refresh token is revoked, so neither can be used again.
-  async logout({ jti, exp }, refreshToken) {
+  async logout(
+    { jti, exp }: { jti: string; exp: number },
+    refreshToken?: string,
+  ): Promise<void> {
     await revokedTokensRepository.add(jti, new Date(exp * 1000));
     if (refreshToken) {
       await refreshTokensRepository.revokeByHash(sha256(refreshToken));
@@ -83,8 +89,7 @@ const createAuthService = (
     await revokedTokensRepository.deleteExpired();
   },
 
-  // Makes a new refresh token for a member and saves its hash.
-  async issueRefreshToken(memberId) {
+  async issueRefreshToken(memberId: string): Promise<string> {
     const token = randomBytes(32).toString("base64url");
     await refreshTokensRepository.create({
       memberId,
@@ -94,16 +99,14 @@ const createAuthService = (
     return token;
   },
 
-  // Swaps a refresh token for a new one (rotation): the old one is revoked,
-  // so each refresh token works only once. Returns the member and the new
-  // refresh token, so the controller can sign a new access token.
-  async rotateRefreshToken(token) {
+  // rotation: the old token is revoked, so each refresh token works once
+  async rotateRefreshToken(
+    token: string | undefined,
+  ): Promise<{ member: AuthMember; refreshToken: string }> {
     const found = token
       ? await refreshTokensRepository.findValidByHash(sha256(token))
       : null;
 
-    // revoke() only works once, so two requests with the same token can't
-    // both get through
     if (!found || !(await refreshTokensRepository.revoke(found.tokenId))) {
       throw new AuthenticationError(
         "Refresh token is missing, expired or already used.",
@@ -115,5 +118,7 @@ const createAuthService = (
     return { member: found.member, refreshToken: newToken };
   },
 });
+
+export type AuthService = ReturnType<typeof createAuthService>;
 
 export default createAuthService;

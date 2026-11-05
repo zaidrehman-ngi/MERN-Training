@@ -6,9 +6,14 @@ import type { CreateUserBody } from "../schemas/users.schema.ts";
 import { randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
 import config from "../config/config.js";
-import { registrationResponse } from "./users.controller.ts";
 import type { Role } from "../types/member.ts";
 import { AuthenticationError } from "../errors/domainErrors.js";
+
+// same response whether the email was new or already registered
+const registrationResponse = {
+  message:
+    "Registration received. If this email wasn't already registered, the account has been created and you can log in.",
+};
 
 const createAccessToken = (user: { id: string; role: Role }): string =>
   jwt.sign(

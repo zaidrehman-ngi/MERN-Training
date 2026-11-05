@@ -5,11 +5,9 @@ import {
   logout,
   refreshToken,
 } from "../controllers/auth.controller.ts";
-import requireAuth from "../middleware/requireAuth.js";
-import requireRole from "../middleware/requireRole.js";
-import { ROLES } from "../types/member.ts";
-import validate from "../middleware/validate.js";
-import loginRateLimiter from "../middleware/loginRateLimiter.js";
+import requireAuth from "../middleware/requireAuth.ts";
+import validate from "../middleware/validate.ts";
+import loginRateLimiter from "../middleware/loginRateLimiter.ts";
 import { loginSchema } from "../schemas/auth.schema.ts";
 import { createUserSchema } from "../schemas/users.schema.ts";
 
@@ -19,12 +17,7 @@ router.post("/register", validate(createUserSchema, "body"), register);
 
 router.post("/login", loginRateLimiter, validate(loginSchema, "body"), login);
 
-router.post(
-  "/logout",
-  requireAuth,
-  requireRole(...ROLES),
-  logout,
-);
+router.post("/logout", requireAuth, logout);
 
 router.post("/refresh", refreshToken);
 

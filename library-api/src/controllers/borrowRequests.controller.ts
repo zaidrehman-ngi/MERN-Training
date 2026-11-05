@@ -60,20 +60,6 @@ const updateBorrowRequest = async (
   });
 };
 
-const approveBorrowRequest = async (req: Request<IdParams>, res: Response) => {
-  const borrowRequest = await servicesFor(req).borrowRequests.update(
-    req.params.id,
-    { status: "approved" },
-    actorOf(req),
-  );
-
-  res.status(200).json({
-    message: "Borrow request approved",
-    borrowRequestId: borrowRequest.id,
-    status: borrowRequest.status,
-  });
-};
-
 const cancelBorrowRequest = async (req: Request<IdParams>, res: Response) => {
   if (!req.user) {
     throw new AuthenticationError();
@@ -110,7 +96,6 @@ export {
   getBorrowRequestById,
   createBorrowRequest,
   updateBorrowRequest,
-  approveBorrowRequest,
   cancelBorrowRequest,
   getQueuePosition,
   returnBorrowedBook,

@@ -34,4 +34,15 @@ const unauthorized = (
   code = "UNAUTHORIZED",
 ) => new ApiError(message, 401, { code });
 
-export { ApiError, notFound, badRequest, conflict, forbidden, unauthorized };
+const tooManyRequests = (message = "Too many requests. Please try again later.") =>
+  new ApiError(message, 429, { code: "RATE_LIMIT_EXCEEDED" });
+
+export {
+  ApiError,
+  notFound,
+  badRequest,
+  conflict,
+  forbidden,
+  unauthorized,
+  tooManyRequests,
+};

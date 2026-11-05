@@ -2,7 +2,7 @@ import cron from "node-cron";
 import type { ScheduledTask } from "node-cron";
 import config from "../config/config.js";
 import logger from "../config/logger.js";
-import type { Services } from "../controllers/services.ts";
+import type { Services } from "../services/createServices.ts";
 import { runJob } from "./runJob.ts";
 
 export const startJobs = (services: Services): ScheduledTask[] => {

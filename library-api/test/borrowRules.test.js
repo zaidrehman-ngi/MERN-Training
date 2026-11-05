@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
-import createBooksService from "../src/services/books.service.js";
+import createBooksService from "../src/services/books.service.ts";
 import createUsersService from "../src/services/users.service.ts";
 import createBorrowRequestsService from "../src/services/borrowRequests.service.ts";
 import { BorrowLimitReachedError } from "../src/errors/domainErrors.js";

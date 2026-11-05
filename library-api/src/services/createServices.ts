@@ -1,17 +1,21 @@
-import createBooksService from "./books.service.js";
+import createBooksService from "./books.service.ts";
 import createUsersService from "./users.service.ts";
 import createBorrowRequestsService from "./borrowRequests.service.ts";
-import createAuthService from "./auth.service.js";
+import type { Transaction } from "./borrowRequests.service.ts";
+import createAuthService from "./auth.service.ts";
 import createRemindersService from "./reminders.service.ts";
+import type { Repositories } from "../repositories/createRepositories.ts";
+import type { Events } from "../types/events.ts";
 import config from "../config/config.js";
 import logger from "../config/logger.js";
 
-const createServices = (repositories, events) => {
-  // Gives work services and repositories that use one transaction. Their
-  // events wait until it commits, so a rolled back change is never announced.
-  const transaction = async (work) => {
-    const held = [];
-    const heldEvents = { emit: (...args) => held.push(args) };
+const createServices = (repositories: Repositories, events: Events) => {
+  // events are held until the transaction commits, so a rollback is never announced
+  const transaction: Transaction = async (work) => {
+    const held: [string, unknown][] = [];
+    const heldEvents: Events = {
+      emit: (eventName, payload) => held.push([eventName, payload]),
+    };
     const result = await repositories.transaction((txRepositories) =>
       work({
         services: createServices(txRepositories, heldEvents),
@@ -19,7 +23,7 @@ const createServices = (repositories, events) => {
         events: heldEvents,
       }),
     );
-    held.forEach((args) => events.emit(...args));
+    held.forEach(([eventName, payload]) => events.emit(eventName, payload));
     return result;
   };
 
@@ -59,5 +63,7 @@ const createServices = (repositories, events) => {
     ),
   };
 };
+
+export type Services = ReturnType<typeof createServices>;
 
 export default createServices;

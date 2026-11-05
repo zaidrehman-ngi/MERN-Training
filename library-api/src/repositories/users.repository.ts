@@ -1,6 +1,6 @@
 import type { Prisma } from "../generated/prisma/client.ts";
 import { EmailTakenError, NotFoundError } from "../errors/domainErrors.js";
-import translateDbError from "./dbErrors.js";
+import translateDbError from "./dbErrors.ts";
 import type { DeletableRepository } from "./repository.ts";
 import type {
   AuthMember,
@@ -30,8 +30,7 @@ const translateWriteError = (err: unknown) =>
     members_active_email_unique: () => new EmailTakenError(),
   });
 
-// The columns a user is allowed to have in a response. password_hash is
-// left out on purpose, so it never leaves the database by accident.
+// no password_hash here, so it never leaves the database
 const publicSelect = {
   api_id: true,
   name: true,
@@ -53,7 +52,7 @@ type CredentialsRow = Prisma.membersGetPayload<{
   select: typeof credentialsSelect;
 }>;
 
-const toRole = (value: string): Role => {
+export const toRole = (value: string): Role => {
   const role = ROLES.find((known) => known === value);
   if (role) {
     return role;
@@ -61,7 +60,6 @@ const toRole = (value: string): Role => {
   throw new Error(`Unknown role in the database: ${value}`);
 };
 
-// Turns a members row into the same user shape the API returned from db.json.
 const toUser = (row: PublicMemberRow): PublicMember => ({
   id: row.api_id,
   name: row.name,
@@ -78,7 +76,6 @@ const toRecord = (row: CredentialsRow): MemberRecord => ({
 
 const findBranchId = async (prisma: Db, name: string): Promise<string> => {
   const branch = await prisma.branches.findFirst({ where: { name } });
-  // no status code here, the error handler decides that
   if (!branch) {
     throw new NotFoundError("Branch not found.", {
       details: [{ field: "branch", message: "No branch with this name." }],
@@ -87,7 +84,7 @@ const findBranchId = async (prisma: Db, name: string): Promise<string> => {
   return branch.branch_id;
 };
 
-// API field names -> column names. The API sends the branch by name.
+// the API sends the branch by name
 const toRow = async (
   prisma: Db,
   member: MemberRowInput,
@@ -111,7 +108,6 @@ const createUsersRepository = (prisma: Db): UsersRepository => ({
       where: { is_active: true },
       select: publicSelect,
       orderBy: { api_id: "asc" },
-      // no page given: the whole list, like before
       ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),
     });
     return rows.map(toUser);
@@ -133,8 +129,7 @@ const createUsersRepository = (prisma: Db): UsersRepository => ({
     return row ? toUser(row) : null;
   },
 
-  // For requireAuth on every protected request: one small query, only what
-  // the auth checks need.
+  // runs on every protected request, so it reads only what auth needs
   async findForAuth(id: string): Promise<AuthMember | null> {
     const row = await prisma.members.findFirst({
       where: { api_id: id, is_active: true },
@@ -145,7 +140,7 @@ const createUsersRepository = (prisma: Db): UsersRepository => ({
       : null;
   },
 
-  // Only for logging in: the one place the password hash is read.
+  // the only place the password hash is read
   async findCredentialsByEmail(email: string): Promise<MemberRecord | null> {
     const row = await prisma.members.findFirst({
       where: { email, is_active: true },
@@ -196,8 +191,7 @@ const createUsersRepository = (prisma: Db): UsersRepository => ({
     }
   },
 
-  // Soft delete, members with loans or requests can't be
-  // removed from the table, so they are marked inactive instead.
+  // soft delete: members with loan history can't be removed
   async deleteById(id: string): Promise<boolean> {
     const result = await prisma.members.updateMany({
       where: { api_id: id, is_active: true },

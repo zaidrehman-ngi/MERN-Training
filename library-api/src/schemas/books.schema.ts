@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { BOOK_STATUSES } from "../types/book.ts";
 
+const isbn = z.string().regex(/^\d{13}$/, "ISBN must be 13 digits.");
+
 const createBookSchema = z.object({
   title: z.string().min(1).max(200),
   author: z.string().optional(),
   year: z.number().int().nonnegative(),
-  isbn: z.string().regex(/^\d{13}$/, "ISBN must be 13 digits."),
+  isbn,
   coverUrl: z.string().optional(),
   onShelf: z.number().int().nonnegative(),
   totalCopies: z.number().int().positive(),
@@ -13,27 +15,12 @@ const createBookSchema = z.object({
   status: z.enum(BOOK_STATUSES),
 });
 
-// const task2Schema = z.object({
-//   title: z.string(),
-//   copies: z.number().int().positive(),
-// });
-
-const task2Schema = z.object({
-  title: z.string(),
-  copies: z.coerce.number().int().positive(),
-});
-
-// const booksQuerySchema = z.object({
-//   page: z.coerce.number().int().positive().default(1),
-//   limit: z.coerce.number().int().positive().default(10),
-//   filter: z.string().optional(),
-//   search: z.string().optional(),
-// });
+const updateBookSchema = createBookSchema.partial();
 
 const booksQuerySchema = z.object({
   author: z.string().optional(),
   title: z.string().optional(),
-  // "true"/"false" from the URL become a real boolean before the repository
+  // "true"/"false" from the URL become a real boolean
   available: z
     .enum(["true", "false"])
     .transform((value) => value === "true")
@@ -44,32 +31,7 @@ const booksQuerySchema = z.object({
   limit: z.coerce.number().int().positive().default(10),
 });
 
-const bookIdSchema = z.object({
-  id: z.string().min(1),
-});
-
-const updateBookSchema = z.object({
-  title: z.string().min(1).max(200).optional(),
-  author: z.string().optional(),
-  year: z.number().int().nonnegative().optional(),
-  isbn: z
-    .string()
-    .regex(/^\d{13}$/, "ISBN must be 13 digits.")
-    .optional(),
-  coverUrl: z.string().optional(),
-  onShelf: z.number().int().nonnegative().optional(),
-  totalCopies: z.number().int().nonnegative().optional(),
-  finePerDay: z.number().int().nonnegative().optional(),
-  status: z.enum(BOOK_STATUSES).optional(),
-});
-
-export {
-  createBookSchema,
-  task2Schema,
-  booksQuerySchema,
-  bookIdSchema,
-  updateBookSchema,
-};
+export { createBookSchema, updateBookSchema, booksQuerySchema };
 
 export type CreateBookBody = z.infer<typeof createBookSchema>;
 export type UpdateBookBody = z.infer<typeof updateBookSchema>;

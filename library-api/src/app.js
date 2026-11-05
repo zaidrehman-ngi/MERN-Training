@@ -5,20 +5,20 @@ import fs from "fs";
 import helmet from "helmet";
 import cors from "cors";
 
-import requestLog from "./middleware/requestLog.js";
-import requestId from "./middleware/requestId.js";
-import errorHandler from "./middleware/errorHandler.js";
-import apiRateLimiter from "./middleware/apiRateLimiter.js";
+import requestLog from "./middleware/requestLog.ts";
+import requestId from "./middleware/requestId.ts";
+import errorHandler from "./middleware/errorHandler.ts";
+import apiRateLimiter from "./middleware/apiRateLimiter.ts";
 
 import { notFound } from "./errors/ApiError.js";
 import config from "./config/config.js";
 import logger from "./config/logger.js";
 
-import booksRouter from "./routes/books.routes.js";
-import usersRouter from "./routes/users.routes.js";
-import borrowRequestsRouter from "./routes/borrowRequests.routes.js";
-import authRouter from "./routes/auth.routes.js";
-import jobsRouter from "./routes/jobs.routes.js";
+import booksRouter from "./routes/books.routes.ts";
+import usersRouter from "./routes/users.routes.ts";
+import borrowRequestsRouter from "./routes/borrowRequests.routes.ts";
+import authRouter from "./routes/auth.routes.ts";
+import jobsRouter from "./routes/jobs.routes.ts";
 
 const accessLogStream = logger.isEnabled("info")
   ? fs.createWriteStream(config.accessLogPath, { flags: "a" })

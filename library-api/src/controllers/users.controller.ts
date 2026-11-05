@@ -2,10 +2,7 @@ import type { Request, Response } from "express";
 import { servicesFor } from "./services.ts";
 import { actorOf } from "./actor.ts";
 import type { IdParams, RequestWithBody } from "../types/http.ts";
-import type {
-  CreateUserBody,
-  UpdateUserBody,
-} from "../schemas/users.schema.ts";
+import type { UpdateUserBody } from "../schemas/users.schema.ts";
 
 const getUsers = async (req: Request, res: Response) => {
   const users = await servicesFor(req).users.list(req.query);
@@ -20,20 +17,6 @@ const getUserById = async (req: Request<IdParams>, res: Response) => {
     actorOf(req),
   );
   res.status(200).json(user);
-};
-
-// Same response whether the email was new or already registered.
-const registrationResponse = {
-  message:
-    "Registration received. If this email wasn't already registered, the account has been created and you can log in.",
-};
-
-const createUser = async (
-  req: RequestWithBody<CreateUserBody>,
-  res: Response,
-) => {
-  await servicesFor(req).users.create(req.body);
-  res.status(201).json(registrationResponse);
 };
 
 const updateUser = async (
@@ -55,11 +38,4 @@ const deleteUser = async (req: Request<IdParams>, res: Response) => {
   res.status(204).send();
 };
 
-export {
-  getUsers,
-  getUserById,
-  createUser,
-  updateUser,
-  deleteUser,
-  registrationResponse,
-};
+export { getUsers, getUserById, updateUser, deleteUser };
