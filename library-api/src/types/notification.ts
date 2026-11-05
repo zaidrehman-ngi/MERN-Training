@@ -1,4 +1,5 @@
-export type NotificationKind = "due-reminder" | "hold-ready";
+export const NOTIFICATION_KINDS = ["due-reminder", "hold-ready"] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 export type Notification = {
   id: string;

@@ -15,8 +15,9 @@ import type {
   Role,
   SignUp,
 } from "../types/member.ts";
+import { ADMIN_ROLES } from "../types/member.ts";
 
-const isAdmin = (role: Role) => role === "admin" || role === "super admin";
+const isAdmin = (role: Role) => ADMIN_ROLES.includes(role);
 
 type Events = { emit(eventName: string, payload: unknown): unknown };
 

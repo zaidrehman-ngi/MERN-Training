@@ -4,6 +4,7 @@ import translateDbError from "./dbErrors.js";
 import type { DeletableRepository } from "./repository.ts";
 import type { Changes } from "../types/changes.ts";
 import type { Book, BookQuery, BookStatus, NewBook } from "../types/book.ts";
+import { BOOK_STATUSES } from "../types/book.ts";
 
 type Db = Prisma.TransactionClient;
 
@@ -17,13 +18,9 @@ export interface BooksRepository extends DeletableRepository<
 }
 
 const toBookStatus = (value: string): BookStatus => {
-  if (
-    value === "available" ||
-    value === "out" ||
-    value === "overdue" ||
-    value === "RESERVED_STACK"
-  ) {
-    return value;
+  const status = BOOK_STATUSES.find((known) => known === value);
+  if (status) {
+    return status;
   }
   throw new Error(`Unknown book status in the database: ${value}`);
 };

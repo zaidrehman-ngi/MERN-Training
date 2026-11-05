@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BOOK_STATUSES } from "../types/book.ts";
 
 const createBookSchema = z.object({
   title: z.string().min(1).max(200),
@@ -9,7 +10,7 @@ const createBookSchema = z.object({
   onShelf: z.number().int().nonnegative(),
   totalCopies: z.number().int().positive(),
   finePerDay: z.number().int().nonnegative(),
-  status: z.enum(["available", "out", "overdue", "RESERVED_STACK"]),
+  status: z.enum(BOOK_STATUSES),
 });
 
 // const task2Schema = z.object({
@@ -59,7 +60,7 @@ const updateBookSchema = z.object({
   onShelf: z.number().int().nonnegative().optional(),
   totalCopies: z.number().int().nonnegative().optional(),
   finePerDay: z.number().int().nonnegative().optional(),
-  status: z.enum(["available", "out", "overdue", "RESERVED_STACK"]).optional(),
+  status: z.enum(BOOK_STATUSES).optional(),
 });
 
 export {

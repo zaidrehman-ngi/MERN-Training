@@ -17,10 +17,8 @@ import {
 } from "./schemas.js";
 import { forbidden } from "../errors/ApiError.js";
 import { AuthenticationError } from "../errors/domainErrors.js";
+import { STAFF_ROLES } from "../types/member.ts";
 
-const STAFF_ROLES = new Set(["librarian", "admin", "super admin"]);
-// same roles as PATCH /borrow-requests/:id
-const DECIDE_ROLES = ["librarian", "admin", "super admin"];
 
 // Checks a payload against a zod schema. On failure it answers through the
 // ack (if there is one) and returns null, so the handler can just stop.
@@ -101,7 +99,7 @@ const createSocketServer = (httpServer, domainEvents, services) => {
     const { member } = socket.data;
 
     socket.join(memberRoom(member.id));
-    if (STAFF_ROLES.has(member.role)) {
+    if (STAFF_ROLES.includes(member.role)) {
       socket.join(COUNTER_ROOM);
     }
 
@@ -177,7 +175,7 @@ const createSocketServer = (httpServer, domainEvents, services) => {
       if (!data) return;
       const { mode } = data;
       if (mode !== "only-me") {
-        await authorise(socket, [...STAFF_ROLES]);
+        await authorise(socket, STAFF_ROLES);
       }
       const message = { mode, from: socket.id };
       if (mode === "only-me") {
@@ -211,7 +209,7 @@ const createSocketServer = (httpServer, domainEvents, services) => {
       const data = parsePayload(decideRequestSchema, payload, reply);
       if (!data) return;
 
-      const staff = await authorise(socket, DECIDE_ROLES);
+      const staff = await authorise(socket, STAFF_ROLES);
       const request = await services.borrowRequests.update(
         data.id,
         { status: data.status },

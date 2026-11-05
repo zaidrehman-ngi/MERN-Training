@@ -4,6 +4,7 @@ import type {
   Notification,
   NotificationKind,
 } from "../types/notification.ts";
+import { NOTIFICATION_KINDS } from "../types/notification.ts";
 
 type Db = Prisma.TransactionClient;
 
@@ -26,8 +27,9 @@ type NotificationRow = Prisma.notificationsGetPayload<{
 }>;
 
 const toKind = (value: string): NotificationKind => {
-  if (value === "due-reminder" || value === "hold-ready") {
-    return value;
+  const kind = NOTIFICATION_KINDS.find((known) => known === value);
+  if (kind) {
+    return kind;
   }
   throw new Error(`Unknown notification kind in the database: ${value}`);
 };

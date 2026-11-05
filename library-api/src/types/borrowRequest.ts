@@ -1,14 +1,16 @@
 import type { Changes } from "./changes.ts";
 
-export type BorrowRequestStatus =
-  | "pending"
-  | "queued"
-  | "held"
-  | "approved"
-  | "rejected"
-  | "cancelled"
-  | "expired"
-  | "returned";
+export const BORROW_REQUEST_STATUSES = [
+  "pending",
+  "queued",
+  "held",
+  "approved",
+  "rejected",
+  "cancelled",
+  "expired",
+  "returned",
+] as const;
+export type BorrowRequestStatus = (typeof BORROW_REQUEST_STATUSES)[number];
 
 export type BorrowRequest = {
   id: string;

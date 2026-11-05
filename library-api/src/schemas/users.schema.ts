@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { ROLES } from "../types/member.ts";
 
 const userIdSchema = z.object({
   id: z.string().min(1),
 });
 
-const userRoleSchema = z.enum(["user", "librarian", "admin", "super admin"]);
+const userRoleSchema = z.enum(ROLES);
 
 const userQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),

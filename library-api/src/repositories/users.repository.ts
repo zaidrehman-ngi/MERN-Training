@@ -11,6 +11,7 @@ import type {
   PublicMember,
   Role,
 } from "../types/member.ts";
+import { ROLES } from "../types/member.ts";
 
 type Db = Prisma.TransactionClient;
 
@@ -53,13 +54,9 @@ type CredentialsRow = Prisma.membersGetPayload<{
 }>;
 
 const toRole = (value: string): Role => {
-  if (
-    value === "user" ||
-    value === "librarian" ||
-    value === "admin" ||
-    value === "super admin"
-  ) {
-    return value;
+  const role = ROLES.find((known) => known === value);
+  if (role) {
+    return role;
   }
   throw new Error(`Unknown role in the database: ${value}`);
 };

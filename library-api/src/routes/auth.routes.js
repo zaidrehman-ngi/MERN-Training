@@ -7,6 +7,7 @@ import {
 } from "../controllers/auth.controller.ts";
 import requireAuth from "../middleware/requireAuth.js";
 import requireRole from "../middleware/requireRole.js";
+import { ROLES } from "../types/member.ts";
 import validate from "../middleware/validate.js";
 import loginRateLimiter from "../middleware/loginRateLimiter.js";
 import { loginSchema } from "../schemas/auth.schema.ts";
@@ -21,7 +22,7 @@ router.post("/login", loginRateLimiter, validate(loginSchema, "body"), login);
 router.post(
   "/logout",
   requireAuth,
-  requireRole("user", "librarian", "admin", "super admin"),
+  requireRole(...ROLES),
   logout,
 );
 

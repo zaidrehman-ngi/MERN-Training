@@ -8,6 +8,7 @@ import {
 } from "../controllers/books.controller.ts";
 import requireAuth from "../middleware/requireAuth.js";
 import requireRole from "../middleware/requireRole.js";
+import { STAFF_ROLES, ADMIN_ROLES } from "../types/member.ts";
 import validate from "../middleware/validate.js";
 import bookSearchRateLimiter from "../middleware/bookSearchRateLimiter.js";
 import {
@@ -29,7 +30,7 @@ router.get(
 router.post(
   "/",
   requireAuth,
-  requireRole("librarian", "admin", "super admin"),
+  requireRole(...STAFF_ROLES),
   validate(createBookSchema, "body"),
   createBook,
 );
@@ -39,7 +40,7 @@ router.get("/:id", validate(bookIdSchema, "params"), getBookById);
 router.patch(
   "/:id",
   requireAuth,
-  requireRole("librarian", "admin", "super admin"),
+  requireRole(...STAFF_ROLES),
   validate(bookIdSchema, "params"),
   validate(updateBookSchema, "body"),
   updateBook,
@@ -48,7 +49,7 @@ router.patch(
 router.delete(
   "/:id",
   requireAuth,
-  requireRole("admin", "super admin"),
+  requireRole(...ADMIN_ROLES),
   validate(bookIdSchema, "params"),
   deleteBook,
 );

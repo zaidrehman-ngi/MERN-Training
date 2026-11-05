@@ -1,4 +1,10 @@
-export type BookStatus = "available" | "out" | "overdue" | "RESERVED_STACK";
+export const BOOK_STATUSES = [
+  "available",
+  "out",
+  "overdue",
+  "RESERVED_STACK",
+] as const;
+export type BookStatus = (typeof BOOK_STATUSES)[number];
 
 export type Book = {
   id: string;

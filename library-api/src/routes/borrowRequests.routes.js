@@ -11,6 +11,7 @@ import {
 } from "../controllers/borrowRequests.controller.ts";
 import requireAuth from "../middleware/requireAuth.js";
 import requireRole from "../middleware/requireRole.js";
+import { ROLES, STAFF_ROLES } from "../types/member.ts";
 import validate from "../middleware/validate.js";
 import {
   borrowRequestIdSchema,
@@ -24,7 +25,7 @@ const router = express.Router();
 router.post(
   "/:id/approve",
   requireAuth,
-  requireRole("librarian", "admin", "super admin"),
+  requireRole(...STAFF_ROLES),
   validate(borrowRequestIdSchema, "params"),
   approveBorrowRequest,
 );
@@ -32,7 +33,7 @@ router.post(
 router.get(
   "/",
   requireAuth,
-  requireRole("user", "librarian", "admin", "super admin"),
+  requireRole(...ROLES),
   validate(borrowRequestQuerySchema, "query"),
   getBorrowRequests,
 );
@@ -40,7 +41,7 @@ router.get(
 router.post(
   "/",
   requireAuth,
-  requireRole("user", "librarian", "admin", "super admin"),
+  requireRole(...ROLES),
   validate(createBorrowRequestSchema, "body"),
   createBorrowRequest,
 );
@@ -48,7 +49,7 @@ router.post(
 router.get(
   "/:id",
   requireAuth,
-  requireRole("user", "librarian", "admin", "super admin"),
+  requireRole(...ROLES),
   validate(borrowRequestIdSchema, "params"),
   getBorrowRequestById,
 );
@@ -56,7 +57,7 @@ router.get(
 router.patch(
   "/:id",
   requireAuth,
-  requireRole("librarian", "admin", "super admin"),
+  requireRole(...STAFF_ROLES),
   validate(borrowRequestIdSchema, "params"),
   validate(updateBorrowRequestSchema, "body"),
   updateBorrowRequest,
@@ -65,7 +66,7 @@ router.patch(
 router.post(
   "/:id/cancel",
   requireAuth,
-  requireRole("user", "librarian", "admin", "super admin"),
+  requireRole(...ROLES),
   validate(borrowRequestIdSchema, "params"),
   cancelBorrowRequest,
 );
@@ -73,7 +74,7 @@ router.post(
 router.get(
   "/:id/queue",
   requireAuth,
-  requireRole("user", "librarian", "admin", "super admin"),
+  requireRole(...ROLES),
   validate(borrowRequestIdSchema, "params"),
   getQueuePosition,
 );
@@ -81,7 +82,7 @@ router.get(
 router.post(
   "/:id/return",
   requireAuth,
-  requireRole("librarian", "admin", "super admin"),
+  requireRole(...STAFF_ROLES),
   validate(borrowRequestIdSchema, "params"),
   returnBorrowedBook,
 );

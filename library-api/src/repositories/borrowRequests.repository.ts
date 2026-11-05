@@ -10,6 +10,7 @@ import type {
   BorrowRequestStatus,
   NewBorrowRequest,
 } from "../types/borrowRequest.ts";
+import { BORROW_REQUEST_STATUSES } from "../types/borrowRequest.ts";
 
 type Db = Prisma.TransactionClient;
 
@@ -73,19 +74,8 @@ type DetailRow = Prisma.book_requestsGetPayload<{
 const toDate = (date: Date | null): string | null =>
   date ? date.toISOString().slice(0, 10) : null;
 
-const statuses: BorrowRequestStatus[] = [
-  "pending",
-  "queued",
-  "held",
-  "approved",
-  "rejected",
-  "cancelled",
-  "expired",
-  "returned",
-];
-
 const toStatus = (value: string): BorrowRequestStatus => {
-  const status = statuses.find((known) => known === value);
+  const status = BORROW_REQUEST_STATUSES.find((known) => known === value);
   if (status) {
     return status;
   }
