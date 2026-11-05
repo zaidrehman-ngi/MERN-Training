@@ -35,6 +35,7 @@ const result = configSchema.safeParse({
   FINE_MAX_DAYS: process.env.FINE_MAX_DAYS,
   HOLD_DAYS: process.env.HOLD_DAYS,
   HOLD_EXPIRY_SCHEDULE: process.env.HOLD_EXPIRY_SCHEDULE,
+  ALLOW_SEED: process.env.ALLOW_SEED,
   LIBRARY_TIME_ZONE: process.env.LIBRARY_TIME_ZONE,
   DUE_REMINDER_SCHEDULE: process.env.DUE_REMINDER_SCHEDULE,
 });
@@ -80,6 +81,7 @@ const config = Object.freeze({
   fineMaxDays: values.FINE_MAX_DAYS,
   holdDays: values.HOLD_DAYS,
   holdExpirySchedule: values.HOLD_EXPIRY_SCHEDULE,
+  allowSeed: values.ALLOW_SEED === "true",
   libraryTimeZone: values.LIBRARY_TIME_ZONE,
   dueReminderSchedule: values.DUE_REMINDER_SCHEDULE,
 });

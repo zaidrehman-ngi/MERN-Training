@@ -1,4 +1,4 @@
-import { hashPassword } from "../utils/password.js";
+import { hashPassword } from "../utils/password.ts";
 import {
   EmailTakenError,
   ForbiddenError,

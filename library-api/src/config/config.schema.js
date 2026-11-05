@@ -72,6 +72,7 @@ const configSchema = z.object({
         return false;
       }
     }, "must be an IANA time zone such as Asia/Karachi"),
+  ALLOW_SEED: z.enum(["true", "false"]).default("false"),
   HOLD_EXPIRY_SCHEDULE: z
     .string()
     .default("5 0 * * *")

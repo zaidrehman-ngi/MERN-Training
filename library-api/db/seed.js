@@ -6,41 +6,252 @@
 // long as nothing else points at it) and puts the rows below back the way
 // they are here. Other data in the database is left alone.
 import prisma from "../src/db/prisma.js";
-import { hashPassword } from "../src/utils/password.js";
+import { hashPassword } from "../src/utils/password.ts";
+import config from "../src/config/config.js";
+
+if (config.nodeEnv === "production") {
+  console.error("The seed resets test data. It must not run in production.");
+  process.exit(1);
+}
+
+if (!config.allowSeed) {
+  console.error("Set ALLOW_SEED=true in .env to reset the test data.");
+  process.exit(1);
+}
 
 const books = [
-  { id: "bk-1", title: "Dune", author: "Frank Herbert", year: 1965, isbn: "9780441013593", coverUrl: "/uploads/dune.jpg", onShelf: 3, totalCopies: 5, finePerDay: 20, status: "available" },
-  { id: "bk-2", title: "Neuromancer", author: "William Gibson", year: 1984, isbn: "9780441569595", coverUrl: "/covers/neuromancer.jpg", onShelf: 0, totalCopies: 2, finePerDay: 20, status: "out" },
-  { id: "bk-3", title: "Hyperion", author: "Dan Simmons", year: 1989, isbn: "9780553283686", coverUrl: "/covers/hyperion.jpg", onShelf: 2, totalCopies: 4, finePerDay: 20, status: "available" },
-  { id: "bk-4", title: "Report on the Karachi Municipal Library, 1961", author: null, year: 1961, isbn: "9780000000001", coverUrl: "/covers/report-1961.jpg", onShelf: 1, totalCopies: 1, finePerDay: 20, status: "available" },
-  { id: "bk-5", title: "Sindhi Folk Tales", author: "Compiled by the Sindh Cultural Board", year: 1978, isbn: "9780000000002", coverUrl: null, onShelf: 2, totalCopies: 2, finePerDay: 20, status: "available" },
-  { id: "bk-6", title: "A Comprehensive and Illustrated Survey of the Coastal Flora of Sindh and Balochistan, With Notes on Seasonal Variation and an Appendix of Local Names in Six Languages", author: "M. A. Qureshi", year: 1994, isbn: "9780000000003", coverUrl: "/covers/flora.jpg", onShelf: 0, totalCopies: 1, finePerDay: 20, status: "out" },
-  { id: "bk-7", title: "The Sea and the Salt", author: "Zubaida Kazmi", year: 2003, isbn: "9780000000004", coverUrl: "/covers/sea-salt.jpg", onShelf: 4, totalCopies: 4, finePerDay: 20, status: "available" },
-  { id: "bk-8", title: "Karachi: A Sketchbook", author: "Farida Batool", year: 2015, isbn: "9780000000005", coverUrl: "/covers/sketchbook.jpg", onShelf: 1, totalCopies: 3, finePerDay: 20, status: "RESERVED_STACK" },
-  { id: "bk-9", title: "Untitled donation, box 14", author: null, year: null, isbn: null, coverUrl: null, onShelf: 1, totalCopies: 1, finePerDay: null, status: "available" },
+  {
+    id: "bk-1",
+    title: "Dune",
+    author: "Frank Herbert",
+    year: 1965,
+    isbn: "9780441013593",
+    coverUrl: "/uploads/dune.jpg",
+    onShelf: 3,
+    totalCopies: 5,
+    finePerDay: 20,
+    status: "available",
+  },
+  {
+    id: "bk-2",
+    title: "Neuromancer",
+    author: "William Gibson",
+    year: 1984,
+    isbn: "9780441569595",
+    coverUrl: "/covers/neuromancer.jpg",
+    onShelf: 0,
+    totalCopies: 2,
+    finePerDay: 20,
+    status: "out",
+  },
+  {
+    id: "bk-3",
+    title: "Hyperion",
+    author: "Dan Simmons",
+    year: 1989,
+    isbn: "9780553283686",
+    coverUrl: "/covers/hyperion.jpg",
+    onShelf: 2,
+    totalCopies: 4,
+    finePerDay: 20,
+    status: "available",
+  },
+  {
+    id: "bk-4",
+    title: "Report on the Karachi Municipal Library, 1961",
+    author: null,
+    year: 1961,
+    isbn: "9780000000001",
+    coverUrl: "/covers/report-1961.jpg",
+    onShelf: 1,
+    totalCopies: 1,
+    finePerDay: 20,
+    status: "available",
+  },
+  {
+    id: "bk-5",
+    title: "Sindhi Folk Tales",
+    author: "Compiled by the Sindh Cultural Board",
+    year: 1978,
+    isbn: "9780000000002",
+    coverUrl: null,
+    onShelf: 2,
+    totalCopies: 2,
+    finePerDay: 20,
+    status: "available",
+  },
+  {
+    id: "bk-6",
+    title:
+      "A Comprehensive and Illustrated Survey of the Coastal Flora of Sindh and Balochistan, With Notes on Seasonal Variation and an Appendix of Local Names in Six Languages",
+    author: "M. A. Qureshi",
+    year: 1994,
+    isbn: "9780000000003",
+    coverUrl: "/covers/flora.jpg",
+    onShelf: 0,
+    totalCopies: 1,
+    finePerDay: 20,
+    status: "out",
+  },
+  {
+    id: "bk-7",
+    title: "The Sea and the Salt",
+    author: "Zubaida Kazmi",
+    year: 2003,
+    isbn: "9780000000004",
+    coverUrl: "/covers/sea-salt.jpg",
+    onShelf: 4,
+    totalCopies: 4,
+    finePerDay: 20,
+    status: "available",
+  },
+  {
+    id: "bk-8",
+    title: "Karachi: A Sketchbook",
+    author: "Farida Batool",
+    year: 2015,
+    isbn: "9780000000005",
+    coverUrl: "/covers/sketchbook.jpg",
+    onShelf: 1,
+    totalCopies: 3,
+    finePerDay: 20,
+    status: "RESERVED_STACK",
+  },
+  {
+    id: "bk-9",
+    title: "Untitled donation, box 14",
+    author: null,
+    year: null,
+    isbn: null,
+    coverUrl: null,
+    onShelf: 1,
+    totalCopies: 1,
+    finePerDay: null,
+    status: "available",
+  },
 ];
 
 // test@lib.pk / test123 is the login the Postman collection uses (hashed
 // when seeding). admin-test / LibraryAdminTest2026! is the admin the collection
 // logs in as first (its "Setup" folder).
 const members = [
-  { id: "m-1000", name: "Aisha Khan", email: "aisha0@lib.pk", role: "admin", branch: "Clifton Branch", joined: "2018-01-15" },
-  { id: "m-1001", name: "Omar Sethi", email: "omar1@lib.pk", role: "librarian", branch: "Saddar Branch", joined: "2019-02-15" },
-  { id: "m-1002", name: "Zainab Qureshi", email: "zainab2@lib.pk", role: "librarian", branch: "Gulshan Branch", joined: "2020-03-15" },
-  { id: "m-1003", name: "Bilal Memon", email: "bilal3@lib.pk", role: "librarian", branch: "Clifton Branch", joined: "2021-04-15" },
-  { id: "m-test", name: "Test User", email: "test@lib.pk", password: "test123", role: "user", branch: "Clifton Branch", joined: "2026-09-30" },
-  { id: "m-admin-test", name: "Postman Test Admin", email: "admin-test@lib.pk", password: "LibraryAdminTest2026!", role: "super admin", branch: "Clifton Branch", joined: "2026-10-08" },
+  {
+    id: "m-1000",
+    name: "Aisha Khan",
+    email: "aisha0@lib.pk",
+    role: "admin",
+    branch: "Clifton Branch",
+    joined: "2018-01-15",
+  },
+  {
+    id: "m-1001",
+    name: "Omar Sethi",
+    email: "omar1@lib.pk",
+    role: "librarian",
+    branch: "Saddar Branch",
+    joined: "2019-02-15",
+  },
+  {
+    id: "m-1002",
+    name: "Zainab Qureshi",
+    email: "zainab2@lib.pk",
+    role: "librarian",
+    branch: "Gulshan Branch",
+    joined: "2020-03-15",
+  },
+  {
+    id: "m-1003",
+    name: "Bilal Memon",
+    email: "bilal3@lib.pk",
+    role: "librarian",
+    branch: "Clifton Branch",
+    joined: "2021-04-15",
+  },
+  {
+    id: "m-test",
+    name: "Test User",
+    email: "test@lib.pk",
+    password: "test123",
+    role: "user",
+    branch: "Clifton Branch",
+    joined: "2026-09-30",
+  },
+  {
+    id: "m-admin-test",
+    name: "Postman Test Admin",
+    email: "admin-test@lib.pk",
+    password: "LibraryAdminTest2026!",
+    role: "super admin",
+    branch: "Clifton Branch",
+    joined: "2026-10-08",
+  },
   // Exercise 7 Task 3: two members with the same password, to show the hashes differ
-  { id: "m-2001", name: "Sara Malik", email: "sara.malik@lib.pk", password: "Library@2026", role: "user", branch: "Clifton Branch", joined: "2026-10-20" },
-  { id: "m-2002", name: "Usman Tariq", email: "usman.tariq@lib.pk", password: "Library@2026", role: "user", branch: "Clifton Branch", joined: "2026-10-20" },
-  { id: "m-admin-demo", name: "Demo Admin", email: "admin@lib.pk", password: "Admin@2026", role: "admin", branch: "Clifton Branch", joined: "2026-11-04" },
-  { id: "m-librarian-test", name: "Demo Librarian", email: "librarian@lib.pk", password: "Librarian@2026", role: "librarian", branch: "Clifton Branch", joined: "2026-11-04" },
+  {
+    id: "m-2001",
+    name: "Sara Malik",
+    email: "sara.malik@lib.pk",
+    password: "Library@2026",
+    role: "user",
+    branch: "Clifton Branch",
+    joined: "2026-10-20",
+  },
+  {
+    id: "m-2002",
+    name: "Usman Tariq",
+    email: "usman.tariq@lib.pk",
+    password: "Library@2026",
+    role: "user",
+    branch: "Clifton Branch",
+    joined: "2026-10-20",
+  },
+  {
+    id: "m-admin-demo",
+    name: "Demo Admin",
+    email: "admin@lib.pk",
+    password: "Admin@2026",
+    role: "admin",
+    branch: "Clifton Branch",
+    joined: "2026-11-04",
+  },
+  {
+    id: "m-librarian-test",
+    name: "Demo Librarian",
+    email: "librarian@lib.pk",
+    password: "Librarian@2026",
+    role: "librarian",
+    branch: "Clifton Branch",
+    joined: "2026-11-04",
+  },
 ];
 
 const borrowRequests = [
-  { id: "br-100", bookId: "bk-1", userId: "m-1000", status: "pending", requestedAt: "2026-01-10", dueDate: "2026-01-20", finePerDay: 20 },
-  { id: "br-101", bookId: "bk-4", userId: "m-1001", status: "approved", requestedAt: "2026-02-11", dueDate: "2026-02-21", finePerDay: 20 },
-  { id: "br-102", bookId: "bk-7", userId: "m-1002", status: "rejected", requestedAt: "2026-03-12", dueDate: "2026-03-22", finePerDay: 20 },
+  {
+    id: "br-100",
+    bookId: "bk-1",
+    userId: "m-1000",
+    status: "pending",
+    requestedAt: "2026-01-10",
+    dueDate: "2026-01-20",
+    finePerDay: 20,
+  },
+  {
+    id: "br-101",
+    bookId: "bk-4",
+    userId: "m-1001",
+    status: "approved",
+    requestedAt: "2026-02-11",
+    dueDate: "2026-02-21",
+    finePerDay: 20,
+  },
+  {
+    id: "br-102",
+    bookId: "bk-7",
+    userId: "m-1002",
+    status: "rejected",
+    requestedAt: "2026-03-12",
+    dueDate: "2026-03-22",
+    finePerDay: 20,
+  },
 ];
 
 // ids like bk-1004 or m-5001 came from the sequences, so the API made them
@@ -55,10 +266,16 @@ const madeByApi = (apiId, start) => {
 await prisma.refresh_tokens.deleteMany({});
 await prisma.notifications.deleteMany({});
 
-const requests = await prisma.book_requests.findMany({ select: { request_id: true, api_id: true } });
+const requests = await prisma.book_requests.findMany({
+  select: { request_id: true, api_id: true },
+});
 await prisma.book_requests.deleteMany({
   where: {
-    request_id: { in: requests.filter((r) => madeByApi(r.api_id, 1000)).map((r) => r.request_id) },
+    request_id: {
+      in: requests
+        .filter((r) => madeByApi(r.api_id, 1000))
+        .map((r) => r.request_id),
+    },
   },
 });
 
@@ -68,7 +285,11 @@ const memberRows = await prisma.members.findMany({
 });
 await prisma.members.deleteMany({
   where: {
-    member_id: { in: memberRows.filter((m) => madeByApi(m.api_id, 5000)).map((m) => m.member_id) },
+    member_id: {
+      in: memberRows
+        .filter((m) => madeByApi(m.api_id, 5000))
+        .map((m) => m.member_id),
+    },
   },
 });
 
@@ -83,7 +304,11 @@ const bookRows = await prisma.books.findMany({
 });
 await prisma.books.deleteMany({
   where: {
-    book_id: { in: bookRows.filter((b) => madeByApi(b.api_id, 1000)).map((b) => b.book_id) },
+    book_id: {
+      in: bookRows
+        .filter((b) => madeByApi(b.api_id, 1000))
+        .map((b) => b.book_id),
+    },
   },
 });
 
@@ -106,7 +331,9 @@ for (const book of books) {
   // Dune was already in my database from Tuesday, so match it by ISBN too
   const existing =
     (await prisma.books.findUnique({ where: { api_id: book.id } })) ??
-    (book.isbn ? await prisma.books.findFirst({ where: { isbn: book.isbn } }) : null);
+    (book.isbn
+      ? await prisma.books.findFirst({ where: { isbn: book.isbn } })
+      : null);
 
   if (existing) {
     await prisma.books.update({ where: { book_id: existing.book_id }, data });
@@ -132,12 +359,20 @@ for (const member of members) {
     joined_on: new Date(member.joined),
     is_active: true,
   };
-  await prisma.members.upsert({ where: { api_id: member.id }, update: data, create: data });
+  await prisma.members.upsert({
+    where: { api_id: member.id },
+    update: data,
+    create: data,
+  });
 }
 
 for (const request of borrowRequests) {
-  const member = await prisma.members.findUnique({ where: { api_id: request.userId } });
-  const book = await prisma.books.findUnique({ where: { api_id: request.bookId } });
+  const member = await prisma.members.findUnique({
+    where: { api_id: request.userId },
+  });
+  const book = await prisma.books.findUnique({
+    where: { api_id: request.bookId },
+  });
   const data = {
     api_id: request.id,
     member_id: member.member_id,
@@ -147,7 +382,11 @@ for (const request of borrowRequests) {
     due_on: new Date(request.dueDate),
     fine_per_day: request.finePerDay,
   };
-  await prisma.book_requests.upsert({ where: { api_id: request.id }, update: data, create: data });
+  await prisma.book_requests.upsert({
+    where: { api_id: request.id },
+    update: data,
+    create: data,
+  });
 }
 
 console.log(

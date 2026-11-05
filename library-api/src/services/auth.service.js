@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import jwt from "jsonwebtoken";
-import { hashPassword, verifyPassword } from "../utils/password.js";
+import { hashPassword, verifyPassword } from "../utils/password.ts";
 import { AuthenticationError } from "../errors/domainErrors.js";
 import config from "../config/config.js";
 
