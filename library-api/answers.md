@@ -2592,3 +2592,154 @@ Tested with a user's token, the same script before and after:
 | user emits `client:demo:send` to everyone | Sara got the message | `FORBIDDEN`, Sara got nothing |
 | librarian emits `client:borrow-request:decide` | approved | approved |
 | librarian demoted while connected | still connected, still got a counter event | disconnected, no counter events |
+
+## Task 4: Reviewing the deliverable
+
+Checked against the Friday list as if someone else wrote it. To test
+"from empty" I made a new empty database, ran the migrations and the seed
+on it, and ran the API and Postman against that.
+
+**What holds:**
+- Migrations run from an empty database, and the seed gives a working
+  library (books, members of all four roles, borrow requests).
+- No `.env` is tracked or was ever committed, and the current JWT secret
+  isn't anywhere in git history. `.env.example` only has placeholders.
+- No password hash in any response: login, register, the user list, one
+  user, updating a user, borrow requests (which include the member) and
+  the error responses. None in the server log either.
+- Prisma only appears in the repositories (and `server.js`, where it's
+  wired in). No `req`, `res` or status codes in services or repositories.
+- Postman is green on a freshly seeded database.
+
+**What I found:**
+
+1. **Fines can't be demonstrated.** `calculateFine` exists and is tested,
+   but nothing calls it. There's no endpoint that shows a member their
+   fine, and the fine isn't stored when a book comes back, which is what
+   I committed to in Exercise 14 Task 2. Waiving a fine (matrix row 14)
+   doesn't exist either.
+2. **Reminders can only be seen in the log or the database.** They're
+   stored in `notifications`, but there's no endpoint to read them, and
+   `server:loan:due-soon` from the real-time table was never built.
+   `server:borrow-request:status-changed` is missing too, so a member
+   isn't told live when a librarian approves or rejects.
+3. **The frontend can't use the protected routes.** `library-web` never
+   sends the `Authorization` header and `requireAuth` only reads the
+   Bearer token, so its borrow requests page gets 401. This was already
+   on the Week 6 list and is still there.
+4. **The Postman collection only works once.** It's green on a fresh seed,
+   but a second run without reseeding fails 7 assertions (the test book's
+   ISBN already exists, m-1000 was deleted). It also needs the API started
+   with `JWT_EXPIRES_IN=10s` for the expiry step, and it has nothing for
+   the queue, fines, the four roles or the jobs route.
+5. **The JWT is still built in the auth controller.** `createAccessToken`
+   decides what goes in the token and how long it lasts, which is a rule.
+   It was on the Exercise 7 list of worst files and it's still in the
+   controller.
+6. **The seed has no production guard.** It deletes rows and resets
+   passwords, and it now creates a super admin with a password that's in
+   the repository. Nothing stops `npm run db:seed` from running with
+   `NODE_ENV=production`.
+7. **The README is out of date.** It describes Week 6. It doesn't mention
+   the queue, the roles and the demo accounts, `npm run demo:queue`,
+   `npm test` or `npm run typecheck`, and it says `JWT_EXPIRES_IN=20s` in
+   one place and `10s` in another.
+8. **Smaller things:**
+   - `auth.service.js`, `books.service.js` and two repositories are still
+     JavaScript, so the types stop at their boundary.
+   - `findOverdue` has no caller. Nothing marks a loan as overdue or shows
+     overdue loans to a librarian.
+   - The local database uses the default `postgres` password. Fine on a
+     laptop, but it can't go to the deployment like that.
+   - The login rate limiter (5 per account in 15 minutes) can lock the
+     demo accounts if the demo is rehearsed too many times in a row.
+
+## Task 5: Peer review
+
+There was no other trainee to swap with, so my code wasn't reviewed by a
+trainee either. It was reviewed by an AI agent that hadn't seen the code
+before and was only given the three questions, not my own notes. I
+checked its main findings against the code and they were right. There's
+nothing under "what I found in theirs" because there was no other
+trainee's code to review.
+
+**1. Finding the borrow request rules in 30 seconds.** Yes, from the
+folder names alone: `services/borrowRequests.service.ts`, the first file
+opened. The limit, the queue and the due date are all in it. What slowed
+it down:
+- The file is 457 lines, and `update()` mixes approving, rejecting,
+  re-queueing and the queue events in one function.
+- `BORROW_LIMIT` is hard-coded while the loan period, hold days and fine
+  come from config, so the real numbers needed two more files.
+- Some rules live elsewhere: the "no copies" check in the books service,
+  queue order in raw SQL in the repository, and who may approve in the
+  routes and again in the socket server.
+- The comment says dates are never taken from the caller, but
+  `PATCH /borrow-requests/:id` still accepts `dueDate`, `requestedAt`,
+  `userId`, `bookId` and `finePerDay`, and passes them through unless the
+  request is being approved.
+
+**2. Naming the layer from the path.** Fine for `routes/`, `middleware/`,
+`controllers/*.controller.ts`, `services/*.service.*` and
+`repositories/*.repository.*`. Misleading:
+- `controllers/services.ts` and `controllers/actor.ts` aren't controllers,
+  they're helpers sitting in that folder.
+- `services/fines.ts` is a pure function nothing uses, and
+  `services/createServices.js` and `repositories/createRepositories.js`
+  are the wiring and the transactions.
+- `realtime/socketServer.js` is a controller, an auth check and an error
+  handler in one file.
+- `realtime/events.js` (socket event names) vs `events/domainEvents.js`
+  (the internal event bus), and three different kinds of `schema` file.
+- `utils/roles.ts`, `shelfLabel.ts` and `surname.ts` are practice files
+  from Exercises 10 and 11 that nothing imports.
+
+**3. The same logic in more than one place.**
+- **Who counts as staff** is written out in every route, again in the
+  socket server (`STAFF_ROLES`, `DECIDE_ROLES`), and again in the users
+  service (`isAdmin`). Changing who can approve over HTTP doesn't change it
+  over the socket.
+- **Status and role lists** are written separately in the types, the zod
+  schemas and the repositories. Add a status to one and not the others
+  and reads start throwing.
+- **Queue position is worked out two ways.** The socket event uses the
+  order from `findQueue` (`queued_at`, then `api_id`), but
+  `GET /:id/queue` counts only by `queued_at`, so two requests made at the
+  same moment can be told different positions. `findNextInQueue` repeats
+  the same order and is never called.
+- **Sign-up is two routes:** `POST /users` and `POST /auth/register` run
+  the same handler, so a fix to one (like rate limiting) misses the
+  other.
+- **The member's role is built twice.** `findForAuth` checks the role
+  from the database, but the refresh token repository builds the same
+  member without that check, and that member is signed into a new token.
+- **The socket server re-does HTTP pieces**: its own validation errors,
+  its own error-to-reply mapping and its own role check, so the same error
+  looks different to an HTTP client and a socket client.
+- Smaller copies: the due date calculated twice in `update()`,
+  date-to-`YYYY-MM-DD` written by hand in four places, and
+  "find or throw User not found" three times in the users service instead
+  of reusing `getById`.
+
+## Task 6: What might not survive the demo
+
+1. **The queue and what stops two people getting one copy. Risk: I can't
+   explain it.** It works, but the reasons are the hardest part of the
+   week: the copy going to the first in line inside the same transaction
+   as the return, the conditional updates (`WHERE status = 'approved'`),
+   `FOR UPDATE SKIP LOCKED`, and events being held until the transaction
+   commits. A question like "what happens if two librarians press Return
+   at the same moment?" needs an answer without opening the code.
+
+2. **Fines. Risk: it breaks.** The calculation is done and tested, but no
+   endpoint or screen uses it and the fine isn't stored when a book comes
+   back, so there's nothing to show on a late return.
+
+3. **The live queue demo with two browsers. Risk: it breaks.** The code
+   holds up, but the setup around it is fragile. The login rate limiter
+   can lock the demo accounts, the data has to be reset just before or
+   Sara is already holding the copy, and an access token only lasts 15
+   minutes.
+
+None of them is slow. Everything measured answered in well under a
+second.
