@@ -88,4 +88,5 @@ const configSchema = z.object({
     ),
 });
 
+export { millisecondsByUnit };
 export default configSchema;

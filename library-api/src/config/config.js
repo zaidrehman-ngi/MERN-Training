@@ -1,15 +1,6 @@
 import "dotenv/config";
 import path from "node:path";
-import configSchema from "./config.schema.js";
-
-const millisecondsByUnit = {
-  ms: 1,
-  s: 1000,
-  m: 60_000,
-  h: 3_600_000,
-  d: 86_400_000,
-  w: 604_800_000,
-};
+import configSchema, { millisecondsByUnit } from "./config.schema.js";
 
 const result = configSchema.safeParse({
   NODE_ENV: process.env.NODE_ENV,
@@ -59,9 +50,7 @@ const config = Object.freeze({
   port: values.PORT,
   databaseUrl: values.DATABASE_URL,
   jwtSecret: values.JWT_SECRET,
-  jwtExpiresIn: values.JWT_EXPIRES_IN,
   jwtExpiresInMs: toMs(values.JWT_EXPIRES_IN),
-  refreshExpiresIn: values.JWT_REFRESH_EXPIRES_IN,
   refreshExpiresInMs: toMs(values.JWT_REFRESH_EXPIRES_IN),
   corsOrigin: values.CORS_ORIGIN,
   accessLogPath: path.resolve(process.cwd(), values.ACCESS_LOG_PATH),
