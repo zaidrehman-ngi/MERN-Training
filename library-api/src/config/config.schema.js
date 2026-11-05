@@ -45,7 +45,6 @@ const configSchema = z.object({
   CORS_ORIGIN: z
     .url()
     .refine((origin) => /^https?:\/\//i.test(origin), "must use http or https"),
-  UPLOADS_PATH: z.string().trim().min(1),
   ACCESS_LOG_PATH: z.string().trim().min(1).default("logs/access.log"),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive(),
   RATE_LIMIT_MAX: z.coerce.number().int().positive(),

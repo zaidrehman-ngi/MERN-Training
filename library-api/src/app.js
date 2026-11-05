@@ -1,5 +1,4 @@
 import express from "express";
-import path from "node:path";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import fs from "fs";
@@ -64,21 +63,6 @@ const createApp = (services) => {
 
   // 8. Apply the general API limit after body parsing; route-specific limits run in their routers.
   app.use("/api/v1", apiRateLimiter);
-
-  // 9. Serve uploaded static files before the remaining application routes.
-  app.use(
-    "/uploads",
-    (req, res, next) => {
-      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-      next();
-    },
-    express.static(config.uploadsPath, {
-      maxAge: "1h",
-    }),
-  );
-
-  // 9b. Plain HTML pages for testing sockets.
-  app.use(express.static(path.resolve(process.cwd(), "public")));
 
   // 10. Register the API root route.
   app.get("/", (req, res) => {
