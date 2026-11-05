@@ -1,0 +1,78 @@
+/* Shared design tokens. All application colors are defined in this file. */
+
+:root {
+  color-scheme: light;
+
+  /* ---- application palette ---- */
+  --colour-ink: #1c2b24;
+  --colour-body: #46584e;
+  --colour-muted: #718078;
+  --colour-line: #dce5de;
+  --colour-surface: #ffffff;
+  --colour-surface-raised: #ffffff;
+  --colour-surface-sunk: #f2f6f2;
+  --colour-page: #f6f8f5;
+  --colour-accent: #176b52;
+  --colour-accent-hover: #125640;
+  --colour-accent-soft: #e4f2eb;
+  --colour-accent-contrast: #ffffff;
+  --colour-danger: #ad3f3a;
+  --colour-danger-soft: #fbefed;
+  --colour-success: #28704f;
+  --colour-success-soft: #eaf5ed;
+  --colour-warning: #8b5b17;
+  --colour-warning-soft: #fbf3e4;
+  --colour-info: #315f83;
+  --colour-info-soft: #edf4f9;
+  --colour-available: #28704f;
+  --colour-out: #8b5b17;
+  --colour-overdue: #ad3f3a;
+  --colour-on-available: #ffffff;
+  --colour-on-out: #ffffff;
+  --colour-on-overdue: #ffffff;
+  --colour-focus: #247c60;
+  --colour-overlay: rgba(28, 43, 36, 0.08);
+
+  /* ---- spacing scale ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* ---- BookCard ---- */
+  --book-cover-width: 100px;
+  --book-cover-height: 140px;
+  --book-cover-width-compact: 70px;
+  --book-cover-height-compact: 100px;
+  --border-width-card: 1px;
+
+  /* ---- type ---- */
+  --font-body: "DM Sans", "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 20px;
+  --text-xl: 26px;
+  --text-2xl: 32px;
+  --leading-tight: 1.25;
+  --leading-body: 1.55;
+
+  /* ---- shape ---- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --shadow-card: 0 1px 2px rgba(28, 43, 36, 0.05),
+    0 8px 24px rgba(28, 43, 36, 0.06);
+  --shadow-float: 0 12px 32px rgba(28, 43, 36, 0.12);
+  --transition-fast: 140ms ease;
+
+  /* ---- layout ---- */
+  --page-max: 1080px;
+  --sidebar-width: 220px;
+  --header-height: 56px;
+}
+

@@ -1,0 +1,22 @@
+body {
+  font-family: system-ui, sans-serif;
+  max-width: 640px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+#banner {
+  background: #e6f4ea;
+  border: 2px solid #1e8e3e;
+  padding: 1rem;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+#login-error {
+  color: #c5221f;
+}
+
+li {
+  margin: 0.4rem 0;
+}
