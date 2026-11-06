@@ -18,6 +18,7 @@ import type { NotificationsRepository } from "../repositories/notifications.repo
 import type { Actor } from "../types/member.ts";
 import type { Events } from "../types/events.ts";
 import { addDays, todayIn } from "../utils/dates.ts";
+import { calculateFine } from "./fines.ts";
 
 type BooksService = {
   getById(id: string): Promise<Book>;
@@ -56,6 +57,7 @@ export type BorrowRequestsService = {
   getVisible(id: string, viewer: Actor): Promise<BorrowRequest>;
   findDueOn(date: string): Promise<BorrowRequest[]>;
   getById(id: string): Promise<BorrowRequest>;
+  listOverdue(): Promise<BorrowRequest[]>;
   create(memberId: string, bookId: string): Promise<BorrowRequest>;
   update(
     id: string,
@@ -72,9 +74,15 @@ export type LoanPolicy = {
   loanPeriodDays: number;
   holdDays: number;
   defaultFinePerDay: number;
+  fineMaxDays: number;
   timeZone: string;
   now?: () => Date;
 };
+
+type FineFields = Pick<
+  BorrowRequest,
+  "status" | "dueDate" | "finePerDay" | "fine"
+>;
 
 // requests that count against the borrow limit
 const OPEN_STATUSES: BorrowRequestStatus[] = [
@@ -103,6 +111,22 @@ const createBorrowRequestsService = (
   const now = () => (loanPolicy.now ? loanPolicy.now() : new Date());
   const today = () => todayIn(loanPolicy.timeZone, now());
 
+  const fineFor = (dueDate: string, finePerDay: number, returnedAt: Date | null) =>
+    calculateFine(
+      { dueDate, returnedAt, asOf: now() },
+      {
+        ratePerDay: finePerDay,
+        maxDays: loanPolicy.fineMaxDays,
+        timeZone: loanPolicy.timeZone,
+      },
+    );
+
+  // a book still out shows what its fine comes to today
+  const withFine = <T extends FineFields>(request: T): T =>
+    request.status === "approved" && request.dueDate
+      ? { ...request, fine: fineFor(request.dueDate, request.finePerDay, null) }
+      : request;
+
   const announceQueue = async (
     repository: BorrowRequestsRepository,
     eventsOut: Events,
@@ -122,14 +146,27 @@ const createBorrowRequestsService = (
     });
   };
 
+  // tells the member their request moved on (approved, returned, expired...)
+  const announceStatus = (eventsOut: Events, request: BorrowRequest) => {
+    eventsOut.emit(DOMAIN_EVENTS.BORROW_REQUEST_STATUS_CHANGED, {
+      memberId: request.userId,
+      id: request.id,
+      bookId: request.bookId,
+      status: request.status,
+    });
+  };
+
   const positionOf = async (
     repository: BorrowRequestsRepository,
     request: BorrowRequest,
   ): Promise<number> =>
     request.queuedAt === null
       ? 0
-      : (await repository.countAheadInQueue(request.bookId, request.queuedAt)) +
-        1;
+      : (await repository.countAheadInQueue(
+          request.bookId,
+          request.queuedAt,
+          request.id,
+        )) + 1;
 
   const releaseCopy = async (
     { services, repositories, events: txEvents }: Tx,
@@ -151,6 +188,7 @@ const createBorrowRequestsService = (
       message: `A copy of "${next.book.title}" is held for you until ${holdUntil}.`,
       forDate: today(),
     });
+    announceStatus(txEvents, next);
     txEvents.emit(DOMAIN_EVENTS.QUEUE_PROMOTED, {
       memberId: next.userId,
       bookId,
@@ -166,12 +204,14 @@ const createBorrowRequestsService = (
       : { status: "queued" as const, queuedAt: now().toISOString() };
 
   return {
-    list: (query, viewer) =>
-      borrowRequestsRepository.findAll(
+    async list(query, viewer) {
+      const requests = await borrowRequestsRepository.findAll(
         viewer && viewer.role === "user"
           ? { ...query, userId: viewer.id }
           : query,
-      ),
+      );
+      return requests.map(withFine);
+    },
 
     async getVisible(id, viewer) {
       const borrowRequest = await this.getById(id);
@@ -188,7 +228,12 @@ const createBorrowRequestsService = (
       if (!borrowRequest) {
         throw new NotFoundError("Borrow request not found.");
       }
-      return borrowRequest;
+      return withFine(borrowRequest);
+    },
+
+    async listOverdue() {
+      const requests = await borrowRequestsRepository.findOverdue(today());
+      return requests.map(withFine);
     },
 
     // status, dates and fine are set here, never taken from the caller
@@ -280,6 +325,9 @@ const createBorrowRequestsService = (
           if (!borrowRequest) {
             throw requestChanged();
           }
+          if (borrowRequest.status !== before.status) {
+            announceStatus(txEvents, borrowRequest);
+          }
           if (before.status === "held" && changes.status === "rejected") {
             await releaseCopy(
               { services, repositories, events: txEvents },
@@ -302,7 +350,7 @@ const createBorrowRequestsService = (
               await positionOf(repositories.borrowRequests, borrowRequest),
             );
           }
-          return borrowRequest;
+          return withFine(borrowRequest);
         },
       );
     },
@@ -319,17 +367,27 @@ const createBorrowRequestsService = (
             throw alreadyReturned;
           }
 
+          // only an approved loan had the book out, so only it is charged
+          const returnedAt = now();
+          const charge =
+            before.status === "approved" && before.dueDate
+              ? {
+                  returnedAt: returnedAt.toISOString(),
+                  fine: fineFor(before.dueDate, before.finePerDay, returnedAt),
+                }
+              : {};
           const borrowRequest =
             await repositories.borrowRequests.updateIfStatus(
               id,
               [before.status],
-              { status: "returned" },
+              { status: "returned", ...charge },
             );
           if (!borrowRequest) {
             throw before.status === "approved"
               ? alreadyReturned
               : requestChanged();
           }
+          announceStatus(txEvents, borrowRequest);
 
           // the returned copy goes to the queue first, then the shelf
           if (before.status === "approved") {
@@ -369,6 +427,7 @@ const createBorrowRequestsService = (
         if (!borrowRequest) {
           throw requestChanged();
         }
+        announceStatus(tx.events, borrowRequest);
         if (before.status === "held") {
           await releaseCopy(tx, before.bookId);
         }
@@ -388,23 +447,14 @@ const createBorrowRequestsService = (
       const request = viewer
         ? await this.getVisible(id, viewer)
         : await this.getById(id);
-      if (request.status !== "queued" || request.queuedAt === null) {
-        return {
-          id: request.id,
-          bookId: request.bookId,
-          status: request.status,
-          position: null,
-        };
-      }
-      const ahead = await borrowRequestsRepository.countAheadInQueue(
-        request.bookId,
-        request.queuedAt,
-      );
+      const queued = request.status === "queued" && request.queuedAt !== null;
       return {
         id: request.id,
         bookId: request.bookId,
         status: request.status,
-        position: ahead + 1,
+        position: queued
+          ? await positionOf(borrowRequestsRepository, request)
+          : null,
       };
     },
 
@@ -425,6 +475,7 @@ const createBorrowRequestsService = (
             if (!expiredHold) {
               return false;
             }
+            announceStatus(tx.events, expiredHold);
             await releaseCopy(tx, hold.bookId);
             return true;
           });

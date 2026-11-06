@@ -22,6 +22,9 @@ export type BorrowRequest = {
   queuedAt: string | null;
   holdUntil: string | null;
   finePerDay: number;
+  returnedAt: string | null;
+  // charged when returned; while still out, what it comes to today
+  fine: number | null;
   member: { id: string; name: string; email: string | null };
   book: { id: string; title: string; author: string | null };
 };
@@ -42,7 +45,9 @@ export type NewBorrowRequest = {
   finePerDay: number;
 };
 
-export type BorrowRequestChanges = Changes<NewBorrowRequest>;
+export type BorrowRequestChanges = Changes<
+  NewBorrowRequest & { returnedAt: string | null; fine: number | null }
+>;
 
 export type BorrowRequestQuery = {
   userId?: string;

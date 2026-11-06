@@ -4,6 +4,7 @@ import createBorrowRequestsService from "./borrowRequests.service.ts";
 import type { Transaction } from "./borrowRequests.service.ts";
 import createAuthService from "./auth.service.ts";
 import createRemindersService from "./reminders.service.ts";
+import createNotificationsService from "./notifications.service.ts";
 import type { Repositories } from "../repositories/createRepositories.ts";
 import type { Events } from "../types/events.ts";
 import config from "../config/config.ts";
@@ -39,6 +40,7 @@ const createServices = (repositories: Repositories, events: Events) => {
       loanPeriodDays: config.loanPeriodDays,
       holdDays: config.holdDays,
       defaultFinePerDay: config.finePerDay,
+      fineMaxDays: config.fineMaxDays,
       timeZone: config.libraryTimeZone,
     },
   );
@@ -50,12 +52,14 @@ const createServices = (repositories: Repositories, events: Events) => {
     reminders: createRemindersService(
       borrowRequests,
       repositories.notifications,
+      events,
       {
         timeZone: config.libraryTimeZone,
         log: (message) => logger.info(message),
         logError: (message, err) => logger.error(message, err),
       },
     ),
+    notifications: createNotificationsService(repositories.notifications),
     auth: createAuthService(
       repositories.users,
       repositories.refreshTokens,

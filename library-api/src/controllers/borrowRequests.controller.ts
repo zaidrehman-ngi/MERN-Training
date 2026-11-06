@@ -17,6 +17,11 @@ const getBorrowRequests = async (req: Request, res: Response) => {
   });
 };
 
+const getOverdueBorrowRequests = async (req: Request, res: Response) => {
+  const overdue = await servicesFor(req).borrowRequests.listOverdue();
+  res.status(200).json({ data: overdue });
+};
+
 const getBorrowRequestById = async (req: Request<IdParams>, res: Response) => {
   const borrowRequest = await servicesFor(req).borrowRequests.getVisible(
     req.params.id,
@@ -82,6 +87,7 @@ const returnBorrowedBook = async (req: Request<IdParams>, res: Response) => {
 
 export {
   getBorrowRequests,
+  getOverdueBorrowRequests,
   getBorrowRequestById,
   createBorrowRequest,
   updateBorrowRequest,

@@ -26,7 +26,6 @@ export interface BorrowRequestsRepository extends Repository<
   ): Promise<number>;
   findOverdue(today: string): Promise<BorrowRequest[]>;
   findDueOn(date: string): Promise<BorrowRequest[]>;
-  findNextInQueue(bookId: string): Promise<BorrowRequest | null>;
   findQueue(bookId: string): Promise<BorrowRequest[]>;
   updateIfStatus(
     id: string,
@@ -37,7 +36,11 @@ export interface BorrowRequestsRepository extends Repository<
     bookId: string,
     holdUntil: string,
   ): Promise<BorrowRequest | null>;
-  countAheadInQueue(bookId: string, queuedAt: string): Promise<number>;
+  countAheadInQueue(
+    bookId: string,
+    queuedAt: string,
+    id: string,
+  ): Promise<number>;
   findExpiredHolds(today: string): Promise<BorrowRequest[]>;
 }
 
@@ -49,6 +52,8 @@ const requestColumns = {
   queued_at: true,
   hold_until: true,
   fine_per_day: true,
+  returned_at: true,
+  fine: true,
 } satisfies Prisma.book_requestsSelect;
 
 const listSelect = {
@@ -89,6 +94,8 @@ const toBorrowRequest = (row: DetailRow): BorrowRequest => ({
   queuedAt: row.queued_at ? row.queued_at.toISOString() : null,
   holdUntil: toDate(row.hold_until),
   finePerDay: row.fine_per_day,
+  returnedAt: row.returned_at ? row.returned_at.toISOString() : null,
+  fine: row.fine,
   member: {
     id: row.members.api_id,
     name: row.members.name,
@@ -111,6 +118,8 @@ const toListItem = (row: ListRow): BorrowRequestListItem => ({
   queuedAt: row.queued_at ? row.queued_at.toISOString() : null,
   holdUntil: toDate(row.hold_until),
   finePerDay: row.fine_per_day,
+  returnedAt: row.returned_at ? row.returned_at.toISOString() : null,
+  fine: row.fine,
   memberName: row.members.name,
   bookTitle: row.books.title,
 });
@@ -164,6 +173,11 @@ const toUpdateRow = async (
     row.due_on = changes.dueDate === null ? null : new Date(changes.dueDate);
   }
   if (changes.finePerDay !== undefined) row.fine_per_day = changes.finePerDay;
+  if (changes.returnedAt !== undefined) {
+    row.returned_at =
+      changes.returnedAt === null ? null : new Date(changes.returnedAt);
+  }
+  if (changes.fine !== undefined) row.fine = changes.fine;
   if (changes.userId !== undefined) {
     row.member_id = await findMemberId(prisma, changes.userId);
   }
@@ -325,21 +339,14 @@ const createBorrowRequestsRepository = (
     return rows.map(toBorrowRequest);
   },
 
-  async findNextInQueue(bookId) {
-    const row = await prisma.book_requests.findFirst({
-      where: { status: "queued", books: { api_id: bookId } },
-      select: detailSelect,
-      orderBy: [{ queued_at: "asc" }, { api_id: "asc" }],
-    });
-    return row ? toBorrowRequest(row) : null;
-  },
-
-  countAheadInQueue(bookId, queuedAt) {
+  // same order as findQueue and claimNextInQueue: queued_at, then api_id for a tie
+  countAheadInQueue(bookId, queuedAt, id) {
+    const at = new Date(queuedAt);
     return prisma.book_requests.count({
       where: {
         status: "queued",
         books: { api_id: bookId },
-        queued_at: { lt: new Date(queuedAt) },
+        OR: [{ queued_at: { lt: at } }, { queued_at: at, api_id: { lt: id } }],
       },
     });
   },

@@ -3,6 +3,8 @@ const EVENTS = Object.freeze({
   SERVER_PRESENCE_CHANGED: "server:presence:changed",
   SERVER_BOOK_AVAILABILITY_CHANGED: "server:book:availability-changed",
   SERVER_BORROW_REQUEST_CREATED: "server:borrow-request:created",
+  SERVER_BORROW_REQUEST_STATUS_CHANGED: "server:borrow-request:status-changed",
+  SERVER_LOAN_DUE_SOON: "server:loan:due-soon",
   SERVER_QUEUE_POSITION_CHANGED: "server:queue:position-changed",
   SERVER_QUEUE_PROMOTED: "server:queue:promoted",
   SERVER_SESSION_EXPIRED: "server:session:expired",

@@ -242,6 +242,28 @@ const createSocketServer = (
   });
 
   domainEvents.on(
+    DOMAIN_EVENTS.BORROW_REQUEST_STATUS_CHANGED,
+    ({ memberId, id, bookId, status }) => {
+      io.to(memberRoom(memberId)).emit(
+        EVENTS.SERVER_BORROW_REQUEST_STATUS_CHANGED,
+        { id, bookId, status },
+      );
+    },
+  );
+
+  domainEvents.on(
+    DOMAIN_EVENTS.REMINDER_SENT,
+    ({ memberId, borrowRequestId, bookTitle, dueOn, message }) => {
+      io.to(memberRoom(memberId)).emit(EVENTS.SERVER_LOAN_DUE_SOON, {
+        borrowRequestId,
+        bookTitle,
+        dueOn,
+        message,
+      });
+    },
+  );
+
+  domainEvents.on(
     DOMAIN_EVENTS.QUEUE_POSITION_CHANGED,
     ({ memberId, bookId, position }) => {
       io.to(memberRoom(memberId)).emit(EVENTS.SERVER_QUEUE_POSITION_CHANGED, {

@@ -10,6 +10,10 @@ type Db = Prisma.TransactionClient;
 
 export interface NotificationsRepository {
   createOnce(notification: NewNotification): Promise<Notification | null>;
+  findForMember(
+    memberId: string,
+    page: { page: number; limit: number },
+  ): Promise<Notification[]>;
 }
 
 const notificationSelect = {
@@ -65,6 +69,17 @@ const createNotificationsRepository = (
       select: notificationSelect,
     });
     return toNotification(row);
+  },
+
+  async findForMember(memberId, { page, limit }) {
+    const rows = await prisma.notifications.findMany({
+      where: { members: { api_id: memberId } },
+      select: notificationSelect,
+      orderBy: { created_at: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    return rows.map(toNotification);
   },
 });
 

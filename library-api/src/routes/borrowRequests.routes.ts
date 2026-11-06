@@ -1,6 +1,7 @@
 import express from "express";
 import {
   getBorrowRequests,
+  getOverdueBorrowRequests,
   getBorrowRequestById,
   createBorrowRequest,
   updateBorrowRequest,
@@ -33,6 +34,14 @@ router.post(
   requireAuth,
   validate(createBorrowRequestSchema, "body"),
   createBorrowRequest,
+);
+
+// before "/:id", otherwise "overdue" would be taken as an id
+router.get(
+  "/overdue",
+  requireAuth,
+  requireRole(...STAFF_ROLES),
+  getOverdueBorrowRequests,
 );
 
 router.get(

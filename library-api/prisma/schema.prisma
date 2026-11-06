@@ -148,6 +148,8 @@ model book_requests {
   queued_at     DateTime?       @db.Timestamptz(6)
   hold_until    DateTime?       @db.Date
   fine_per_day  Int             @default(20)
+  returned_at   DateTime?       @db.Timestamptz(6)
+  fine          Int?
   notifications notifications[]
   members       members         @relation(fields: [member_id], references: [member_id], onDelete: NoAction, onUpdate: NoAction)
   books         books           @relation(fields: [book_id], references: [book_id], onDelete: NoAction, onUpdate: NoAction)

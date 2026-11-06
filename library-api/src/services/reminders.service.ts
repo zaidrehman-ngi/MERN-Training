@@ -1,6 +1,8 @@
 import type { BorrowRequestsService } from "./borrowRequests.service.ts";
 import type { NotificationsRepository } from "../repositories/notifications.repository.ts";
 import { addDays, todayIn } from "../utils/dates.ts";
+import { DOMAIN_EVENTS } from "../events/domainEvents.ts";
+import type { Events } from "../types/events.ts";
 
 export const REMINDER_DAYS_BEFORE = 2;
 
@@ -22,6 +24,7 @@ export type ReminderRun = {
 const createRemindersService = (
   borrowRequestsService: Pick<BorrowRequestsService, "findDueOn">,
   notificationsRepository: NotificationsRepository,
+  events: Events,
   options: RemindersOptions,
 ) => ({
   async sendDueReminders(): Promise<ReminderRun> {
@@ -62,6 +65,13 @@ const createRemindersService = (
         continue;
       }
       sent += 1;
+      events.emit(DOMAIN_EVENTS.REMINDER_SENT, {
+        memberId: loan.userId,
+        borrowRequestId: loan.id,
+        bookTitle: loan.book.title,
+        dueOn,
+        message,
+      });
       options.log(
         `[due-reminders] reminded ${loan.member.name} (${loan.userId}) about ${loan.id}: ${message}`,
       );
