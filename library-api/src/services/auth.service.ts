@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
 import { hashPassword, verifyPassword } from "../utils/password.ts";
 import { AuthenticationError } from "../errors/domainErrors.ts";
-import config from "../config/config.js";
+import config from "../config/config.ts";
 import type { UsersRepository } from "../repositories/users.repository.ts";
 import type { RefreshTokensRepository } from "../repositories/refreshTokens.repository.ts";
 import type { RevokedTokensRepository } from "../repositories/revokedTokens.repository.ts";
@@ -60,7 +60,6 @@ const createAuthService = (
     return member;
   },
 
-  // used by requireAuth and the socket handshake; the role comes from the database
   async verifyAccessToken(token: string | undefined): Promise<VerifiedToken> {
     if (!token) {
       throw new AuthenticationError();

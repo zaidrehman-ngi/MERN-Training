@@ -5,9 +5,9 @@
 // (anything that got its id from a sequence: bk-1000+, m-5000+, br-1000+, as
 // long as nothing else points at it) and puts the rows below back the way
 // they are here. Other data in the database is left alone.
-import prisma from "../src/db/prisma.js";
+import prisma from "../src/db/prisma.ts";
 import { hashPassword } from "../src/utils/password.ts";
-import config from "../src/config/config.js";
+import config from "../src/config/config.ts";
 
 if (config.nodeEnv === "production") {
   console.error("The seed resets test data. It must not run in production.");

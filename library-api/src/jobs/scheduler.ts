@@ -1,46 +1,32 @@
 import cron from "node-cron";
 import type { ScheduledTask } from "node-cron";
-import config from "../config/config.js";
-import logger from "../config/logger.js";
+import config from "../config/config.ts";
+import logger from "../config/logger.ts";
 import type { Services } from "../services/createServices.ts";
 import { runJob } from "./runJob.ts";
+import type { JobResult } from "./runJob.ts";
 
-export const startJobs = (services: Services): ScheduledTask[] => {
-  const dueReminders = cron.schedule(
-    config.dueReminderSchedule,
-    () =>
-      runJob(
-        "due-reminders",
-        () => services.reminders.sendDueReminders(),
-        logger,
-      ),
-    {
-      name: "due-reminders",
-      timezone: config.libraryTimeZone,
-      noOverlap: true,
-    },
-  );
-
-  const expireHolds = cron.schedule(
-    config.holdExpirySchedule,
-    () =>
-      runJob(
-        "expire-holds",
-        () => services.borrowRequests.expireHolds(),
-        logger,
-      ),
-    {
-      name: "expire-holds",
-      timezone: config.libraryTimeZone,
-      noOverlap: true,
-    },
-  );
-
+const schedule = (
+  name: string,
+  expression: string,
+  work: () => Promise<JobResult>,
+): ScheduledTask => {
+  const task = cron.schedule(expression, () => runJob(name, work, logger), {
+    name,
+    timezone: config.libraryTimeZone,
+    noOverlap: true,
+  });
   logger.info(
-    `[expire-holds] scheduled "${config.holdExpirySchedule}" (${config.libraryTimeZone}), next run ${expireHolds.getNextRun()?.toISOString()}`,
+    `[${name}] scheduled "${expression}" (${config.libraryTimeZone}), next run ${task.getNextRun()?.toISOString()}`,
   );
-  logger.info(
-    `[due-reminders] scheduled "${config.dueReminderSchedule}" (${config.libraryTimeZone}), next run ${dueReminders.getNextRun()?.toISOString()}`,
-  );
-  return [dueReminders, expireHolds];
+  return task;
 };
+
+export const startJobs = (services: Services): ScheduledTask[] => [
+  schedule("expire-holds", config.holdExpirySchedule, () =>
+    services.borrowRequests.expireHolds(),
+  ),
+  schedule("due-reminders", config.dueReminderSchedule, () =>
+    services.reminders.sendDueReminders(),
+  ),
+];

@@ -20,7 +20,6 @@ const updateBookSchema = createBookSchema.partial();
 const booksQuerySchema = z.object({
   author: z.string().optional(),
   title: z.string().optional(),
-  // "true"/"false" from the URL become a real boolean
   available: z
     .enum(["true", "false"])
     .transform((value) => value === "true")

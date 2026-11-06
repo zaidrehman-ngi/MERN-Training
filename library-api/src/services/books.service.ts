@@ -3,7 +3,7 @@ import {
   IsbnTakenError,
   NotFoundError,
 } from "../errors/domainErrors.ts";
-import { DOMAIN_EVENTS } from "../events/domainEvents.js";
+import { DOMAIN_EVENTS } from "../events/domainEvents.ts";
 import type { BooksRepository } from "../repositories/books.repository.ts";
 import type { Book, BookQuery, NewBook } from "../types/book.ts";
 import type { Changes } from "../types/changes.ts";

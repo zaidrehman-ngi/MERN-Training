@@ -25,5 +25,5 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
-  "include": ["src", "test", "db"]
+  "include": ["src", "test", "prisma"]
 }

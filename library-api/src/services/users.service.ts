@@ -5,7 +5,7 @@ import {
   NotFoundError,
 } from "../errors/domainErrors.ts";
 import type { UsersRepository } from "../repositories/users.repository.ts";
-import { DOMAIN_EVENTS } from "../events/domainEvents.js";
+import { DOMAIN_EVENTS } from "../events/domainEvents.ts";
 import type { Events } from "../types/events.ts";
 import type {
   Actor,

@@ -1,6 +1,6 @@
 import "dotenv/config";
 import path from "node:path";
-import configSchema, { millisecondsByUnit } from "./config.schema.js";
+import configSchema, { durationToMs } from "./config.schema.ts";
 
 const result = configSchema.safeParse({
   NODE_ENV: process.env.NODE_ENV,
@@ -32,7 +32,7 @@ const result = configSchema.safeParse({
 
 if (!result.success) {
   const issues = result.error.issues.map((issue) => {
-    const variable = issue.path[0] || "CONFIGURATION";
+    const variable = String(issue.path[0] ?? "CONFIGURATION");
     return `${variable}: ${issue.message}`;
   });
   console.error(`Invalid environment configuration:\n${issues.join("\n")}`);
@@ -40,10 +40,8 @@ if (!result.success) {
 }
 
 const values = result.data;
-const toMs = (duration) => {
-  const [, amount, unit] = duration.match(/^(\d+)(ms|s|m|h|d|w)$/);
-  return Number(amount) * millisecondsByUnit[unit];
-};
+// already validated by the schema, so never null here
+const toMs = (duration: string) => durationToMs(duration) ?? 0;
 
 const config = Object.freeze({
   nodeEnv: values.NODE_ENV,

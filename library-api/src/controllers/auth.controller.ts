@@ -3,7 +3,7 @@ import { servicesFor } from "./services.ts";
 import type { RequestWithBody } from "../types/http.ts";
 import type { LoginBody } from "../schemas/auth.schema.ts";
 import type { CreateUserBody } from "../schemas/users.schema.ts";
-import config from "../config/config.js";
+import config from "../config/config.ts";
 import { AuthenticationError } from "../errors/domainErrors.ts";
 
 // same response whether the email was new or already registered

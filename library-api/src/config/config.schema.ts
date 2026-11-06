@@ -1,7 +1,9 @@
 import { z } from "zod";
 import cron from "node-cron";
 
-const millisecondsByUnit = {
+type DurationUnit = "ms" | "s" | "m" | "h" | "d" | "w";
+
+const millisecondsByUnit: Record<DurationUnit, number> = {
   ms: 1,
   s: 1000,
   m: 60_000,
@@ -10,18 +12,22 @@ const millisecondsByUnit = {
   w: 604_800_000,
 };
 
-// "15m", "1h", "7d" etc.
+// "15m" -> 900000, or null if it isn't a duration
+export const durationToMs = (value: string): number | null => {
+  const match = value.match(/^(\d+)(ms|s|m|h|d|w)$/);
+  if (!match) {
+    return null;
+  }
+  const [, amount, unit] = match;
+  return Number(amount) * millisecondsByUnit[unit as DurationUnit];
+};
+
 const duration = z
   .string()
   .regex(/^[1-9]\d*(ms|s|m|h|d|w)$/, "must be a duration such as 15m or 1h")
   .refine((expiry) => {
-    const match = expiry.match(/^(\d+)(ms|s|m|h|d|w)$/);
-    if (!match) {
-      return false;
-    }
-
-    const [, amount, unit] = match;
-    return Number.isSafeInteger(Number(amount) * millisecondsByUnit[unit]);
+    const ms = durationToMs(expiry);
+    return ms !== null && Number.isSafeInteger(ms);
   }, "must be a supported duration");
 
 const configSchema = z.object({
@@ -40,7 +46,6 @@ const configSchema = z.object({
       "must not be a placeholder value",
     ),
   JWT_EXPIRES_IN: duration,
-  // the refresh token lives much longer than the access token
   JWT_REFRESH_EXPIRES_IN: duration.default("7d"),
   CORS_ORIGIN: z
     .url()
@@ -88,5 +93,4 @@ const configSchema = z.object({
     ),
 });
 
-export { millisecondsByUnit };
 export default configSchema;

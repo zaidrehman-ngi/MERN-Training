@@ -6,8 +6,8 @@ import createAuthService from "./auth.service.ts";
 import createRemindersService from "./reminders.service.ts";
 import type { Repositories } from "../repositories/createRepositories.ts";
 import type { Events } from "../types/events.ts";
-import config from "../config/config.js";
-import logger from "../config/logger.js";
+import config from "../config/config.ts";
+import logger from "../config/logger.ts";
 
 const createServices = (repositories: Repositories, events: Events) => {
   // events are held until the transaction commits, so a rollback is never announced

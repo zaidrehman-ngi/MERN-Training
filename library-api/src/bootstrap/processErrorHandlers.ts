@@ -3,7 +3,7 @@ import { writeSync } from "node:fs";
 
 let isExiting = false;
 
-const exitAfterFatalError = (eventName, error) => {
+const exitAfterFatalError = (eventName: string, error: unknown) => {
   if (isExiting) {
     return;
   }

@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { servicesFor } from "./services.ts";
 import { runJob } from "../jobs/runJob.ts";
-import logger from "../config/logger.js";
+import logger from "../config/logger.ts";
 
 const runDueReminders = async (req: Request, res: Response) => {
   const result = await runJob(

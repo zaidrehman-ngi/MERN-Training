@@ -6,7 +6,6 @@ type DomainErrorOptions = { code?: string; details?: ErrorDetail[] };
 class DomainError extends Error {
   code: string;
   details: ErrorDetail[];
-  // expected failures (a rule said no), not bugs
   isOperational = true;
 
   constructor(
@@ -20,21 +19,18 @@ class DomainError extends Error {
   }
 }
 
-// the thing asked for doesn't exist
 class NotFoundError extends DomainError {
   constructor(message: string, options: DomainErrorOptions = {}) {
     super(message, { code: "NOT_FOUND", ...options });
   }
 }
 
-// the action clashes with the current state (duplicate ISBN, no copies left)
 class ConflictError extends DomainError {
   constructor(message: string, options: DomainErrorOptions = {}) {
     super(message, { code: "CONFLICT", ...options });
   }
 }
 
-// we don't know who this is (bad password, bad or expired token)
 class AuthenticationError extends DomainError {
   constructor(
     message = "Authentication required.",
@@ -44,7 +40,6 @@ class AuthenticationError extends DomainError {
   }
 }
 
-// the caller is known but isn't allowed to do this to this record
 class ForbiddenError extends DomainError {
   constructor(
     message = "You can only do this to your own request.",
@@ -54,7 +49,6 @@ class ForbiddenError extends DomainError {
   }
 }
 
-// a value breaks a rule the data has to follow (more on the shelf than owned)
 class InvalidValueError extends DomainError {
   constructor(
     message = "One of the values is not allowed.",

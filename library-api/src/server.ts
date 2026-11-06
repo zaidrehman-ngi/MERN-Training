@@ -1,22 +1,21 @@
 import http from "node:http";
-import registerProcessErrorHandlers from "./bootstrap/processErrorHandlers.js";
-import config from "./config/config.js";
-import logger from "./config/logger.js";
+import registerProcessErrorHandlers from "./bootstrap/processErrorHandlers.ts";
+import config from "./config/config.ts";
+import logger from "./config/logger.ts";
 
 registerProcessErrorHandlers();
 
-const { default: createApp } = await import("./app.js");
-const { default: prisma } = await import("./db/prisma.js");
+const { default: createApp } = await import("./app.ts");
+const { default: prisma } = await import("./db/prisma.ts");
 const { default: createRepositories } =
   await import("./repositories/createRepositories.ts");
 const { default: createServices } =
   await import("./services/createServices.ts");
-const { default: domainEvents } = await import("./events/domainEvents.js");
+const { default: domainEvents } = await import("./events/domainEvents.ts");
 const { default: createSocketServer } =
-  await import("./realtime/socketServer.js");
+  await import("./realtime/socketServer.ts");
 const { startJobs } = await import("./jobs/scheduler.ts");
 
-// the one place the real database is chosen
 const services = createServices(createRepositories(prisma), domainEvents);
 const app = createApp(services);
 

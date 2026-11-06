@@ -11,21 +11,22 @@ import errorHandler from "./middleware/errorHandler.ts";
 import apiRateLimiter from "./middleware/apiRateLimiter.ts";
 
 import { notFound } from "./errors/ApiError.ts";
-import config from "./config/config.js";
-import logger from "./config/logger.js";
+import config from "./config/config.ts";
+import logger from "./config/logger.ts";
 
 import booksRouter from "./routes/books.routes.ts";
 import usersRouter from "./routes/users.routes.ts";
 import borrowRequestsRouter from "./routes/borrowRequests.routes.ts";
 import authRouter from "./routes/auth.routes.ts";
 import jobsRouter from "./routes/jobs.routes.ts";
+import type { Services } from "./services/createServices.ts";
 
 const accessLogStream = logger.isEnabled("info")
   ? fs.createWriteStream(config.accessLogPath, { flags: "a" })
   : null;
 
 // services come from outside, so the caller picks the real or a fake database
-const createApp = (services) => {
+const createApp = (services: Services) => {
   const app = express();
   app.locals.services = services;
 
@@ -33,7 +34,7 @@ const createApp = (services) => {
   app.use(requestId);
   app.use(requestLog);
 
-  if (logger.isEnabled("info")) {
+  if (accessLogStream) {
     app.use(morgan("combined", { stream: accessLogStream }));
   }
 

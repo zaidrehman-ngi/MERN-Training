@@ -4,7 +4,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from "../errors/domainErrors.ts";
-import { DOMAIN_EVENTS } from "../events/domainEvents.js";
+import { DOMAIN_EVENTS } from "../events/domainEvents.ts";
 import type { Book } from "../types/book.ts";
 import type {
   BorrowRequest,

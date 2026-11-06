@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt";
-import config from "../config/config.js";
+import config from "../config/config.ts";
 
 const hashPassword = (password: string): Promise<string> =>
   bcrypt.hash(password, config.bcryptCost);

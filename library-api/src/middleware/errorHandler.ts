@@ -9,12 +9,11 @@ import {
   InvalidValueError,
   NotFoundError,
 } from "../errors/domainErrors.ts";
-import config from "../config/config.js";
-import logger from "../config/logger.js";
+import config from "../config/config.ts";
+import logger from "../config/logger.ts";
 
 type ErrorBody = { error: string; message: string; details: unknown[] };
 
-// the one place a domain error becomes an HTTP status
 const statusForDomainError = (err: DomainError) => {
   if (err instanceof NotFoundError) return 404;
   if (err instanceof ConflictError) return 409;

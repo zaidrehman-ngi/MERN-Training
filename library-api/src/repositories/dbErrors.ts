@@ -9,13 +9,11 @@ type DbError = {
   };
 };
 
-// turns Prisma errors into our own errors
 const translateDbError = (
   err: unknown,
   uniqueErrors: Record<string, () => Error> = {},
 ): unknown => {
   const dbError = (err ?? {}) as DbError;
-  // the original Postgres error
   const cause = dbError.meta?.driverAdapterError?.cause ?? {};
 
   // P2002: unique constraint failed
