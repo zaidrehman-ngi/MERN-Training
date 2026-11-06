@@ -91,7 +91,8 @@ const OPEN_STATUSES: BorrowRequestStatus[] = [
   "held",
   "approved",
 ];
-const CANCELLABLE: BorrowRequestStatus[] = ["pending", "queued", "held"];
+// still waiting for a decision; only these can be changed or cancelled
+const WAITING_STATUSES: BorrowRequestStatus[] = ["pending", "queued", "held"];
 
 const requestChanged = () =>
   new ConflictError(
@@ -274,6 +275,13 @@ const createBorrowRequestsService = (
       return transaction(
         async ({ services, repositories, events: txEvents }) => {
           const before = await services.borrowRequests.getById(id);
+          // an approved loan ends through /return, the others are final
+          if (!WAITING_STATUSES.includes(before.status)) {
+            throw new ConflictError(
+              `This request is ${before.status} and can't be changed.`,
+              { code: "REQUEST_CLOSED" },
+            );
+          }
           const deciding =
             changes.status === "approved" || changes.status === "rejected";
           if (actor && deciding && before.userId === actor.id) {
@@ -411,7 +419,7 @@ const createBorrowRequestsService = (
         if (before.userId !== memberId) {
           throw new ForbiddenError();
         }
-        if (!CANCELLABLE.includes(before.status)) {
+        if (!WAITING_STATUSES.includes(before.status)) {
           throw new ConflictError(
             "Only a request that is still waiting can be cancelled.",
             { code: "NOT_CANCELLABLE" },
