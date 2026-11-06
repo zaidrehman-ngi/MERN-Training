@@ -367,7 +367,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Status code is 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\n\r\npm.test(\"Content-Type is JSON\", function () {\r\n    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");\r\n});\r\n\r\npm.test(\"User ID matches requested ID\", function () {\r\n    const response = pm.response.json();\r\n    pm.expect(response.id).to.eql(\"m-1000\");\r\n});"
+                  "pm.test(\"Status code is 200\", function () {\r\n    pm.response.to.have.status(200);\r\n});\r\n\r\npm.test(\"Content-Type is JSON\", function () {\r\n    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");\r\n});\r\n\r\npm.test(\"User ID matches requested ID\", function () {\r\n    const response = pm.response.json();\r\n    pm.expect(response.data.id).to.eql(\"m-1000\");\r\n});"
                 ]
               }
             }

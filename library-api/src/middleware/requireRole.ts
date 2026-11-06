@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
-import { forbidden } from "../errors/ApiError.js";
-import { AuthenticationError } from "../errors/domainErrors.js";
+import { forbidden } from "../errors/ApiError.ts";
+import { AuthenticationError } from "../errors/domainErrors.ts";
 import type { Role } from "../types/member.ts";
 
 // runs after requireAuth

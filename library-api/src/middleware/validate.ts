@@ -1,6 +1,6 @@
 import type { RequestHandler } from "express";
 import type { ZodType } from "zod";
-import { badRequest } from "../errors/ApiError.js";
+import { badRequest } from "../errors/ApiError.ts";
 
 type Source = "body" | "query" | "params";
 

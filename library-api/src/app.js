@@ -10,7 +10,7 @@ import requestId from "./middleware/requestId.ts";
 import errorHandler from "./middleware/errorHandler.ts";
 import apiRateLimiter from "./middleware/apiRateLimiter.ts";
 
-import { notFound } from "./errors/ApiError.js";
+import { notFound } from "./errors/ApiError.ts";
 import config from "./config/config.js";
 import logger from "./config/logger.js";
 

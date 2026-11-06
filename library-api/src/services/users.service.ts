@@ -3,7 +3,7 @@ import {
   EmailTakenError,
   ForbiddenError,
   NotFoundError,
-} from "../errors/domainErrors.js";
+} from "../errors/domainErrors.ts";
 import type { UsersRepository } from "../repositories/users.repository.ts";
 import { DOMAIN_EVENTS } from "../events/domainEvents.js";
 import type { Events } from "../types/events.ts";

@@ -13,7 +13,7 @@ const getBooks = async (req: Request, res: Response) => {
 
 const getBookById = async (req: Request<IdParams>, res: Response) => {
   const book = await servicesFor(req).books.getById(req.params.id);
-  res.status(200).json(book);
+  res.status(200).json({ data: book });
 };
 
 const createBook = async (

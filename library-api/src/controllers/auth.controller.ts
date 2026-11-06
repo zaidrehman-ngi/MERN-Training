@@ -3,37 +3,13 @@ import { servicesFor } from "./services.ts";
 import type { RequestWithBody } from "../types/http.ts";
 import type { LoginBody } from "../schemas/auth.schema.ts";
 import type { CreateUserBody } from "../schemas/users.schema.ts";
-import { randomUUID } from "node:crypto";
-import jwt from "jsonwebtoken";
 import config from "../config/config.js";
-import type { Role } from "../types/member.ts";
-import { AuthenticationError } from "../errors/domainErrors.js";
+import { AuthenticationError } from "../errors/domainErrors.ts";
 
 // same response whether the email was new or already registered
 const registrationResponse = {
   message:
     "Registration received. If this email wasn't already registered, the account has been created and you can log in.",
-};
-
-const createAccessToken = (user: { id: string; role: Role }): string =>
-  jwt.sign(
-    {
-      sub: user.id,
-      role: user.role,
-    },
-    config.jwtSecret,
-    {
-      expiresIn: Math.floor(config.jwtExpiresInMs / 1000),
-      jwtid: randomUUID(),
-    },
-  );
-
-const setAccessTokenCookie = (res: Response, accessToken: string) => {
-  res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    sameSite: "strict",
-    maxAge: config.jwtExpiresInMs,
-  });
 };
 
 const REFRESH_COOKIE_PATH = "/api/v1/auth";
@@ -48,6 +24,11 @@ const setRefreshTokenCookie = (res: Response, refreshToken: string) => {
   });
 };
 
+const refreshTokenCookie = (req: Request): string | undefined => {
+  const value: unknown = req.cookies?.refreshToken;
+  return typeof value === "string" ? value : undefined;
+};
+
 const register = async (
   req: RequestWithBody<CreateUserBody>,
   res: Response,
@@ -57,14 +38,11 @@ const register = async (
 };
 
 const login = async (req: RequestWithBody<LoginBody>, res: Response) => {
-  const { email, password } = req.body || {};
-  const user = await servicesFor(req).auth.authenticate(email, password);
+  const { auth } = servicesFor(req);
+  const user = await auth.authenticate(req.body.email, req.body.password);
 
-  const accessToken = createAccessToken(user);
-  setAccessTokenCookie(res, accessToken);
-
-  const refreshToken = await servicesFor(req).auth.issueRefreshToken(user.id);
-  setRefreshTokenCookie(res, refreshToken);
+  const accessToken = auth.createAccessToken(user);
+  setRefreshTokenCookie(res, await auth.issueRefreshToken(user.id));
 
   res.status(200).json({
     accessToken,
@@ -77,36 +55,26 @@ const login = async (req: RequestWithBody<LoginBody>, res: Response) => {
   });
 };
 
-const refreshTokenCookie = (req: Request): string | undefined => {
-  const value: unknown = req.cookies?.refreshToken;
-  return typeof value === "string" ? value : undefined;
-};
-
 const logout = async (req: Request, res: Response) => {
   if (!req.token) {
     throw new AuthenticationError();
   }
   await servicesFor(req).auth.logout(req.token, refreshTokenCookie(req));
 
-  res.clearCookie("accessToken");
   res.clearCookie("refreshToken", { path: REFRESH_COOKIE_PATH });
-
   res.status(200).json({
     message: "Logged out successfully.",
   });
 };
 
 const refreshToken = async (req: Request, res: Response) => {
-  const { member, refreshToken: newRefreshToken } = await servicesFor(
-    req,
-  ).auth.rotateRefreshToken(refreshTokenCookie(req));
+  const { auth } = servicesFor(req);
+  const { member, refreshToken: newRefreshToken } =
+    await auth.rotateRefreshToken(refreshTokenCookie(req));
 
-  const accessToken = createAccessToken(member);
-  setAccessTokenCookie(res, accessToken);
   setRefreshTokenCookie(res, newRefreshToken);
-
   res.status(200).json({
-    accessToken,
+    accessToken: auth.createAccessToken(member),
   });
 };
 

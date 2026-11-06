@@ -5,7 +5,6 @@ import type {
   CreateBorrowRequestBody,
   UpdateBorrowRequestBody,
 } from "../schemas/borrowRequests.schema.ts";
-import { AuthenticationError } from "../errors/domainErrors.js";
 import { actorOf } from "./actor.ts";
 
 const getBorrowRequests = async (req: Request, res: Response) => {
@@ -23,18 +22,15 @@ const getBorrowRequestById = async (req: Request<IdParams>, res: Response) => {
     req.params.id,
     actorOf(req),
   );
-  res.status(200).json(borrowRequest);
+  res.status(200).json({ data: borrowRequest });
 };
 
 const createBorrowRequest = async (
   req: RequestWithBody<CreateBorrowRequestBody>,
   res: Response,
 ) => {
-  if (!req.user) {
-    throw new AuthenticationError();
-  }
   const newBorrowRequest = await servicesFor(req).borrowRequests.create(
-    req.user.sub,
+    actorOf(req).id,
     req.body.bookId,
   );
 
@@ -61,12 +57,9 @@ const updateBorrowRequest = async (
 };
 
 const cancelBorrowRequest = async (req: Request<IdParams>, res: Response) => {
-  if (!req.user) {
-    throw new AuthenticationError();
-  }
   const borrowRequest = await servicesFor(req).borrowRequests.cancel(
     req.params.id,
-    req.user.sub,
+    actorOf(req).id,
   );
   res.status(200).json({ data: borrowRequest });
 };
@@ -84,11 +77,7 @@ const returnBorrowedBook = async (req: Request<IdParams>, res: Response) => {
     req.params.id,
   );
 
-  res.status(200).json({
-    message: "Book returned successfully.",
-    borrowRequestId: borrowRequest.id,
-    status: borrowRequest.status,
-  });
+  res.status(200).json({ data: borrowRequest });
 };
 
 export {

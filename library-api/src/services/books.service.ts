@@ -2,7 +2,7 @@ import {
   ConflictError,
   IsbnTakenError,
   NotFoundError,
-} from "../errors/domainErrors.js";
+} from "../errors/domainErrors.ts";
 import { DOMAIN_EVENTS } from "../events/domainEvents.js";
 import type { BooksRepository } from "../repositories/books.repository.ts";
 import type { Book, BookQuery, NewBook } from "../types/book.ts";

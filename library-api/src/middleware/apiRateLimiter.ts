@@ -1,6 +1,6 @@
 import { ipKeyGenerator, rateLimit } from "express-rate-limit";
 import config from "../config/config.js";
-import { tooManyRequests } from "../errors/ApiError.js";
+import { tooManyRequests } from "../errors/ApiError.ts";
 
 const apiRateLimiter = rateLimit({
   windowMs: config.rateLimitWindowMs,

@@ -15,8 +15,8 @@ import {
   demoSendSchema,
   helloSchema,
 } from "./schemas.js";
-import { forbidden } from "../errors/ApiError.js";
-import { AuthenticationError } from "../errors/domainErrors.js";
+import { forbidden } from "../errors/ApiError.ts";
+import { AuthenticationError } from "../errors/domainErrors.ts";
 import { STAFF_ROLES } from "../types/member.ts";
 
 

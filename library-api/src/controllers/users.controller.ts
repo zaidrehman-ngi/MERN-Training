@@ -16,7 +16,7 @@ const getUserById = async (req: Request<IdParams>, res: Response) => {
     req.params.id,
     actorOf(req),
   );
-  res.status(200).json(user);
+  res.status(200).json({ data: user });
 };
 
 const updateUser = async (

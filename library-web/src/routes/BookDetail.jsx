@@ -35,7 +35,7 @@ function BookDetail() {
     getBook(id)
       .then((response) => {
         if (active) {
-          setBookState({ id, book: response.data, status: "succeeded" });
+          setBookState({ id, book: response.data.data, status: "succeeded" });
         }
       })
       .catch((error) => {

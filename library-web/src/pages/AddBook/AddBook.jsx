@@ -25,7 +25,7 @@ function AddBook() {
     getBook(id)
       .then((response) => {
         if (active) {
-          setLoadedBook({ id, book: response.data, status: "succeeded" });
+          setLoadedBook({ id, book: response.data.data, status: "succeeded" });
         }
       })
       .catch((error) => {

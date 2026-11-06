@@ -5,5 +5,5 @@ export function listUsers() {
 }
 
 export function createUser(user) {
-  return client.post("/users", user);
+  return client.post("/auth/register", user);
 }

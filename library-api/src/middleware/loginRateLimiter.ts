@@ -1,7 +1,7 @@
 import type { Request, RequestHandler } from "express";
 import { ipKeyGenerator } from "express-rate-limit";
 import config from "../config/config.js";
-import { tooManyRequests } from "../errors/ApiError.js";
+import { tooManyRequests } from "../errors/ApiError.ts";
 
 const windowMs = config.loginRateLimitWindowMs;
 const limit = config.loginRateLimitMax;

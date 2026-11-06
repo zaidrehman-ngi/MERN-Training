@@ -1,4 +1,4 @@
-import { ConflictError, InvalidValueError } from "../errors/domainErrors.js";
+import { ConflictError, InvalidValueError } from "../errors/domainErrors.ts";
 
 type DbError = {
   code?: string;

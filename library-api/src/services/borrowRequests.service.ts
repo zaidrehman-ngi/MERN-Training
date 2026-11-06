@@ -3,7 +3,7 @@ import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
-} from "../errors/domainErrors.js";
+} from "../errors/domainErrors.ts";
 import { DOMAIN_EVENTS } from "../events/domainEvents.js";
 import type { Book } from "../types/book.ts";
 import type {

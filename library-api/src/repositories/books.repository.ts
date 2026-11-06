@@ -1,5 +1,5 @@
 import type { Prisma, books } from "../generated/prisma/client.ts";
-import { IsbnTakenError } from "../errors/domainErrors.js";
+import { IsbnTakenError } from "../errors/domainErrors.ts";
 import translateDbError from "./dbErrors.ts";
 import type { DeletableRepository } from "./repository.ts";
 import type { Changes } from "../types/changes.ts";

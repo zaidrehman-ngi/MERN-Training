@@ -1,6 +1,6 @@
 import { inspect } from "node:util";
 import type { ErrorRequestHandler } from "express";
-import { ApiError } from "../errors/ApiError.js";
+import { ApiError } from "../errors/ApiError.ts";
 import {
   AuthenticationError,
   ConflictError,
@@ -8,7 +8,7 @@ import {
   ForbiddenError,
   InvalidValueError,
   NotFoundError,
-} from "../errors/domainErrors.js";
+} from "../errors/domainErrors.ts";
 import config from "../config/config.js";
 import logger from "../config/logger.js";
 

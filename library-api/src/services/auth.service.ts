@@ -1,12 +1,12 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
 import { hashPassword, verifyPassword } from "../utils/password.ts";
-import { AuthenticationError } from "../errors/domainErrors.js";
+import { AuthenticationError } from "../errors/domainErrors.ts";
 import config from "../config/config.js";
 import type { UsersRepository } from "../repositories/users.repository.ts";
 import type { RefreshTokensRepository } from "../repositories/refreshTokens.repository.ts";
 import type { RevokedTokensRepository } from "../repositories/revokedTokens.repository.ts";
-import type { AuthMember, PublicMember } from "../types/member.ts";
+import type { AuthMember, PublicMember, Role } from "../types/member.ts";
 
 export type VerifiedToken = { member: AuthMember; jti: string; exp: number };
 
@@ -37,6 +37,14 @@ const createAuthService = (
   refreshTokensRepository: RefreshTokensRepository,
   revokedTokensRepository: RevokedTokensRepository,
 ) => ({
+  // the jti lets logout put this one token on the denylist
+  createAccessToken(member: { id: string; role: Role }): string {
+    return jwt.sign({ sub: member.id, role: member.role }, config.jwtSecret, {
+      expiresIn: Math.floor(config.jwtExpiresInMs / 1000),
+      jwtid: randomUUID(),
+    });
+  },
+
   async authenticate(email: string, password: string): Promise<PublicMember> {
     const user = await usersRepository.findCredentialsByEmail(email);
     const hashToCheck = user?.passwordHash ?? (await getDummyHash());

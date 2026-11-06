@@ -1,5 +1,5 @@
 import type { Prisma } from "../generated/prisma/client.ts";
-import { NotFoundError } from "../errors/domainErrors.js";
+import { NotFoundError } from "../errors/domainErrors.ts";
 import translateDbError from "./dbErrors.ts";
 import type { Repository } from "./repository.ts";
 import type {

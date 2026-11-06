@@ -1,5 +1,5 @@
 import type { Prisma } from "../generated/prisma/client.ts";
-import { EmailTakenError, NotFoundError } from "../errors/domainErrors.js";
+import { EmailTakenError, NotFoundError } from "../errors/domainErrors.ts";
 import translateDbError from "./dbErrors.ts";
 import type { DeletableRepository } from "./repository.ts";
 import type {
