@@ -30,7 +30,7 @@ const duration = z
     return ms !== null && Number.isSafeInteger(ms);
   }, "must be a supported duration");
 
-const configSchema = z.object({
+const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
@@ -49,7 +49,11 @@ const configSchema = z.object({
   JWT_REFRESH_EXPIRES_IN: duration.default("7d"),
   CORS_ORIGIN: z
     .url()
-    .refine((origin) => /^https?:\/\//i.test(origin), "must use http or https"),
+    .refine((origin) => /^https?:\/\//i.test(origin), "must use http or https")
+    .refine(
+      (origin) => new URL(origin).origin === origin,
+      "must be only the origin, like https://app.example.com (no path or trailing slash)",
+    ),
   ACCESS_LOG_PATH: z.string().trim().min(1).default("logs/access.log"),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive(),
   RATE_LIMIT_MAX: z.coerce.number().int().positive(),
@@ -91,6 +95,20 @@ const configSchema = z.object({
       (expression) => cron.validate(expression),
       "must be a cron expression",
     ),
+});
+
+const configSchema = envSchema.superRefine((env, ctx) => {
+  if (
+    env.NODE_ENV === "production" &&
+    !env.CORS_ORIGIN.startsWith("https://")
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["CORS_ORIGIN"],
+      message:
+        "must be the https address of the deployed frontend in production",
+    });
+  }
 });
 
 export default configSchema;

@@ -22,14 +22,6 @@ client.interceptors.response.use(
     const status = error.response?.status;
     const code = error.code;
 
-    if (status === 404) {
-      return Promise.reject({
-        status,
-        message: "This book is no longer available.",
-        action: "Go back to the catalogue.",
-      });
-    }
-
     if (code === "ECONNABORTED" || code === "ETIMEDOUT") {
       return Promise.reject({
         status,
@@ -58,7 +50,10 @@ client.interceptors.response.use(
 
     return Promise.reject({
       status,
-      message: "Something went wrong. Please try again.",
+      code: error.response.data?.error,
+      message:
+        error.response.data?.message ||
+        "Something went wrong. Please try again.",
       action: "Retry the request.",
     });
   },

@@ -5,6 +5,7 @@ import type { Transaction } from "./borrowRequests.service.ts";
 import createAuthService from "./auth.service.ts";
 import createRemindersService from "./reminders.service.ts";
 import createNotificationsService from "./notifications.service.ts";
+import createBranchesService from "./branches.service.ts";
 import type { Repositories } from "../repositories/createRepositories.ts";
 import type { Events } from "../types/events.ts";
 import config from "../config/config.ts";
@@ -60,6 +61,7 @@ const createServices = (repositories: Repositories, events: Events) => {
       },
     ),
     notifications: createNotificationsService(repositories.notifications),
+    branches: createBranchesService(repositories.branches),
     auth: createAuthService(
       repositories.users,
       repositories.refreshTokens,

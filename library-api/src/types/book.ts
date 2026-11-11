@@ -25,6 +25,8 @@ export type NewBook = Omit<Book, "id" | "author" | "coverUrl"> & {
 };
 
 export type BookQuery = {
+  q?: string | undefined;
+  status?: BookStatus | undefined;
   author?: string | undefined;
   title?: string | undefined;
   available?: boolean | undefined;

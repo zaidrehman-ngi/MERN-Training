@@ -18,6 +18,8 @@ const createBookSchema = z.object({
 const updateBookSchema = createBookSchema.partial();
 
 const booksQuerySchema = z.object({
+  q: z.string().trim().min(1).optional(),
+  status: z.enum(BOOK_STATUSES).optional(),
   author: z.string().optional(),
   title: z.string().optional(),
   available: z

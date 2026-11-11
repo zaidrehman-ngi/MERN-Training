@@ -88,6 +88,8 @@ const toOrderBy = (
 
 const createBooksRepository = (prisma: Db): BooksRepository => ({
   async findAll({
+    q,
+    status,
     author,
     title,
     available,
@@ -97,6 +99,17 @@ const createBooksRepository = (prisma: Db): BooksRepository => ({
     limit,
   }: BookQuery): Promise<Book[]> {
     const where: Prisma.booksWhereInput = { is_active: true };
+
+    if (q) {
+      where.OR = [
+        { title: { contains: q, mode: "insensitive" } },
+        { author: { contains: q, mode: "insensitive" } },
+      ];
+    }
+
+    if (status) {
+      where.status = status;
+    }
 
     if (author) {
       where.author = author;

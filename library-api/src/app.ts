@@ -20,6 +20,7 @@ import borrowRequestsRouter from "./routes/borrowRequests.routes.ts";
 import authRouter from "./routes/auth.routes.ts";
 import jobsRouter from "./routes/jobs.routes.ts";
 import notificationsRouter from "./routes/notifications.routes.ts";
+import branchesRouter from "./routes/branches.routes.ts";
 import type { Services } from "./services/createServices.ts";
 
 const accessLogStream = logger.isEnabled("info")
@@ -62,6 +63,7 @@ const createApp = (services: Services) => {
   app.use("/api/v1/auth", authRouter);
   app.use("/api/v1/jobs", jobsRouter);
   app.use("/api/v1/notifications", notificationsRouter);
+  app.use("/api/v1/branches", branchesRouter);
 
   app.use((req) => {
     throw notFound("Route not found.");

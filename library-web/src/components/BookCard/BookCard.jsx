@@ -10,11 +10,15 @@ function BookCard({ book, onSelect, variant = "default" }) {
 
   const coverUrl = book.coverUrl
     ? new URL(book.coverUrl, API_ORIGIN).href
-    : "/covers/placeholder.jpg";
+    : null;
 
-  const status = ["available", "out", "overdue"].includes(book.status)
-    ? book.status
-    : "Status unavailable";
+  const statusLabels = {
+    available: "available",
+    out: "out",
+    overdue: "overdue",
+    RESERVED_STACK: "reserved",
+  };
+  const status = statusLabels[book.status] ?? "Status unavailable";
 
   const statusClass =
     {
@@ -29,7 +33,9 @@ function BookCard({ book, onSelect, variant = "default" }) {
         variant === "compact" ? styles.compact : ""
       }`}
     >
-      <img className={styles.cover} src={coverUrl} alt={`${title} cover`} />
+      {coverUrl && (
+        <img className={styles.cover} src={coverUrl} alt={`${title} cover`} />
+      )}
 
       <div className={styles.content}>
         <h3 className={styles.title}>{title}</h3>

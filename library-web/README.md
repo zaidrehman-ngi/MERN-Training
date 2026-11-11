@@ -1,45 +1,40 @@
 # Library Web
 
-A React and Vite frontend for the library catalogue. The app reads book data from the JSON Server API backed by `../db.json`.
-
-## Prerequisites
-
-- Install Node.js (the current LTS release is recommended). npm is included with Node.js.
-- Clone this repository. The `db.json` API database is in the repository root, alongside the `library-web` folder.
+A React and Vite frontend for the library catalogue. It reads its data from `library-api`.
 
 ## Install dependencies
-
-Open a terminal in the repository and run:
 
 ```bash
 cd library-web
 npm install
 ```
 
-The project lockfile resolves JSON Server to version 0.17.4.
+Copy `.env.example` to `.env`. `VITE_API_URL` must point at the running API.
 
-## Start the API server
+## Start the API
 
-In a terminal whose current directory is `library-web`, run:
-
-```bash
-npx json-server@0.17.4 --watch ../db.json --port 4000 --delay 300
-```
-
-The API listens at `http://localhost:4000`. Keep this terminal open while using the app. The API server must be running for the catalogue to load.
-
-## Start the app
-
-Open a second terminal, also in `library-web`, and run:
+The API is in `library-api`. Follow its README to set up the database, then run:
 
 ```bash
+cd library-api
 npm run dev
 ```
 
-Open the local URL printed by Vite. Its default frontend port is `5173` (`http://localhost:5173`). If that port is occupied, Vite may print a URL using another port. Keep this terminal open too.
+It listens at `http://localhost:3000`.
+
+## Start the app
+
+In a second terminal:
+
+```bash
+cd library-web
+npm run dev
+```
+
+Open `http://localhost:5173`. The API only accepts requests from this origin (`CORS_ORIGIN` in the API's `.env`), so keep the app on port 5173.
 
 ## If the catalogue does not load
 
-If you forgot to start the API server, start it using the command above. When the page shows a connection error, click **Retry**; if needed, refresh the page. The catalogue cannot load until the API server is running.
+Make sure the API is running, then click **Retry** or refresh the page.
 
-If the page says **No books found**, the request succeeded but the current search or filter returned no matches. Clear the search or choose a different filter. The API server must still be running for catalogue data to be available.
+If the page says **No books found**, the request worked but the search or filter matched nothing. Clear the search or pick another filter.

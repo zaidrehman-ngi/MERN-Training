@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { createUser } from "../../api/users";
+import { listBranches } from "../../api/branches";
 import styles from "./Register.module.css";
-
-const branches = ["Clifton Branch", "Saddar Branch", "Gulshan Branch"];
 
 function Register() {
   const [form, setForm] = useState({
@@ -13,11 +12,26 @@ function Register() {
     confirmPassword: "",
     branch: "",
   });
+  const [branches, setBranches] = useState([]);
+  const [branchesError, setBranchesError] = useState("");
   const [touched, setTouched] = useState({});
+
   const [submission, setSubmission] = useState({
     status: "idle",
     message: "",
   });
+
+  useEffect(() => {
+    listBranches()
+      .then((response) => {
+        setBranches(response.data.data.map((branch) => branch.name));
+      })
+      .catch(() => {
+        setBranchesError(
+          "Could not load branches. Refresh the page to try again.",
+        );
+      });
+  }, []);
 
   const errors = {
     name: form.name.trim() ? "" : "Please enter a name.",
@@ -214,6 +228,7 @@ function Register() {
             </option>
           ))}
         </select>
+        {branchesError && <p className={styles.error}>{branchesError}</p>}
         {touched.branch && errors.branch && (
           <p className={styles.error} id="branch-error">
             {errors.branch}

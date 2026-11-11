@@ -14,6 +14,7 @@ function BookDetail() {
   const dispatch = useDispatch();
 
   const [bookState, setBookState] = useState(null);
+  const [attempt, setAttempt] = useState(0);
   const book = bookState?.id === id ? bookState.book : null;
   const error = bookState?.id === id ? bookState.error : null;
   const loadStatus = bookState?.id === id ? bookState.status : "loading";
@@ -47,24 +48,18 @@ function BookDetail() {
     return () => {
       active = false;
     };
-  }, [dispatch, id]);
+  }, [dispatch, id, attempt]);
+
+  const handleRetry = () => {
+    setBookState(null);
+    setAttempt((current) => current + 1);
+  };
 
   const handleBorrow = () => {
-    const requestedAt = new Date();
-    const dueDate = new Date(requestedAt);
-    dueDate.setDate(dueDate.getDate() + 10);
-
     dispatch(
       borrowBookThunk({
         bookId: book.id,
-        request: {
-          bookId: book.id,
-          userId: "m-1000",
-          status: "pending",
-          requestedAt: requestedAt.toISOString().slice(0, 10),
-          dueDate: dueDate.toISOString().slice(0, 10),
-          finePerDay: book.finePerDay ?? 20,
-        },
+        request: { bookId: book.id },
       }),
     );
   };
@@ -77,14 +72,24 @@ function BookDetail() {
     });
   };
 
-  if (error) {
+  if (error && (error.status === 404 || error.status === 400)) {
     return (
       <main>
         <h1>Book Not Found</h1>
-        <p role="alert">
-          {error.message || "This book is no longer available."}
-        </p>
+        <p role="alert">This book is no longer available.</p>
 
+        <button onClick={() => navigate("/books")}>Back to catalogue</button>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main>
+        <h1>Could not load this book</h1>
+        <p role="alert">{error.message}</p>
+
+        <button onClick={handleRetry}>Retry</button>
         <button onClick={() => navigate("/books")}>Back to catalogue</button>
       </main>
     );
@@ -151,7 +156,9 @@ function BookDetail() {
             className="dangerButton"
             type="button"
             onClick={handleDelete}
-            disabled={deleteStatus === "loading" || deleteStatus === "succeeded"}
+            disabled={
+              deleteStatus === "loading" || deleteStatus === "succeeded"
+            }
           >
             {deleteStatus === "loading" ? "Deleting..." : "Delete book"}
           </button>

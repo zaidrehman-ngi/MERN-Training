@@ -5,6 +5,7 @@ import createBorrowRequestsRepository from "./borrowRequests.repository.ts";
 import createRefreshTokensRepository from "./refreshTokens.repository.ts";
 import createRevokedTokensRepository from "./revokedTokens.repository.ts";
 import createNotificationsRepository from "./notifications.repository.ts";
+import createBranchesRepository from "./branches.repository.ts";
 
 type Db = Prisma.TransactionClient;
 
@@ -15,6 +16,7 @@ const createTableRepositories = (db: Db) => ({
   refreshTokens: createRefreshTokensRepository(db),
   revokedTokens: createRevokedTokensRepository(db),
   notifications: createNotificationsRepository(db),
+  branches: createBranchesRepository(db),
 });
 
 export type Repositories = ReturnType<typeof createTableRepositories> & {

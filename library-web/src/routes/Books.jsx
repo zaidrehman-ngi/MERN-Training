@@ -31,13 +31,6 @@ function Books() {
     dispatch(fetchBooks({ filter, search: debouncedSearchText }));
   }, [dispatch, filter, debouncedSearchText]);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      dispatch(fetchBooks({ filter, search: debouncedSearchText }));
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [dispatch, filter, debouncedSearchText]);
-
   const handleSelect = useCallback(
     (selectedBook) => {
       navigate(`/books/${selectedBook.id}`);
