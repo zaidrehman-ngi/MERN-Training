@@ -32,7 +32,7 @@ const translateWriteError = (err: unknown) =>
 
 // no password_hash here, so it never leaves the database
 const publicSelect = {
-  api_id: true,
+  member_id: true,
   name: true,
   email: true,
   role: true,
@@ -61,7 +61,7 @@ export const toRole = (value: string): Role => {
 };
 
 const toUser = (row: PublicMemberRow): PublicMember => ({
-  id: row.api_id,
+  id: row.member_id,
   name: row.name,
   email: row.email,
   role: toRole(row.role),
@@ -107,7 +107,7 @@ const createUsersRepository = (prisma: Db): UsersRepository => ({
     const rows = await prisma.members.findMany({
       where: { is_active: true },
       select: publicSelect,
-      orderBy: { api_id: "asc" },
+      orderBy: [{ name: "asc" }, { member_id: "asc" }],
       ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),
     });
     return rows.map(toUser);
@@ -115,7 +115,7 @@ const createUsersRepository = (prisma: Db): UsersRepository => ({
 
   async findById(id: string): Promise<PublicMember | null> {
     const row = await prisma.members.findFirst({
-      where: { api_id: id, is_active: true },
+      where: { member_id: id, is_active: true },
       select: publicSelect,
     });
     return row ? toUser(row) : null;
@@ -132,11 +132,11 @@ const createUsersRepository = (prisma: Db): UsersRepository => ({
   // runs on every protected request, so it reads only what auth needs
   async findForAuth(id: string): Promise<AuthMember | null> {
     const row = await prisma.members.findFirst({
-      where: { api_id: id, is_active: true },
-      select: { api_id: true, name: true, role: true },
+      where: { member_id: id, is_active: true },
+      select: { member_id: true, name: true, role: true },
     });
     return row
-      ? { id: row.api_id, name: row.name, role: toRole(row.role) }
+      ? { id: row.member_id, name: row.name, role: toRole(row.role) }
       : null;
   },
 
@@ -171,7 +171,7 @@ const createUsersRepository = (prisma: Db): UsersRepository => ({
     changes: MemberRowInput,
   ): Promise<PublicMember | null> {
     const existing = await prisma.members.findFirst({
-      where: { api_id: id, is_active: true },
+      where: { member_id: id, is_active: true },
       select: { member_id: true },
     });
     if (!existing) {
@@ -194,7 +194,7 @@ const createUsersRepository = (prisma: Db): UsersRepository => ({
   // soft delete: members with loan history can't be removed
   async deleteById(id: string): Promise<boolean> {
     const result = await prisma.members.updateMany({
-      where: { api_id: id, is_active: true },
+      where: { member_id: id, is_active: true },
       data: { is_active: false },
     });
     return result.count > 0;

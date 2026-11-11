@@ -2,8 +2,8 @@ import { z } from "zod";
 import { BORROW_REQUEST_STATUSES } from "../types/borrowRequest.ts";
 
 const borrowRequestQuerySchema = z.object({
-  userId: z.string().optional(),
-  bookId: z.string().optional(),
+  userId: z.uuid().optional(),
+  bookId: z.uuid().optional(),
   status: z.enum(BORROW_REQUEST_STATUSES).optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().default(10),
@@ -11,7 +11,7 @@ const borrowRequestQuerySchema = z.object({
 
 // the member comes from the token, everything else is set by the service
 const createBorrowRequestSchema = z.object({
-  bookId: z.string().min(1),
+  bookId: z.uuid(),
 });
 
 // staff only decide the status; dates and fine are set by the service

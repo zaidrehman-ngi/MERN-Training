@@ -22,8 +22,8 @@ const notificationSelect = {
   message: true,
   for_date: true,
   created_at: true,
-  members: { select: { api_id: true } },
-  book_requests: { select: { api_id: true } },
+  member_id: true,
+  request_id: true,
 } satisfies Prisma.notificationsSelect;
 
 type NotificationRow = Prisma.notificationsGetPayload<{
@@ -40,8 +40,8 @@ const toKind = (value: string): NotificationKind => {
 
 const toNotification = (row: NotificationRow): Notification => ({
   id: row.notification_id,
-  memberId: row.members.api_id,
-  borrowRequestId: row.book_requests?.api_id ?? null,
+  memberId: row.member_id,
+  borrowRequestId: row.request_id,
   kind: toKind(row.kind),
   message: row.message,
   forDate: row.for_date.toISOString().slice(0, 10),
@@ -54,10 +54,8 @@ const createNotificationsRepository = (
   async createOnce(notification) {
     const rows = await prisma.$queryRaw<{ notification_id: string }[]>`
       INSERT INTO notifications (member_id, request_id, kind, message, for_date)
-      SELECT m.member_id, r.request_id, ${notification.kind}, ${notification.message}, ${notification.forDate}::date
-      FROM members m
-      LEFT JOIN book_requests r ON r.api_id = ${notification.borrowRequestId}
-      WHERE m.api_id = ${notification.memberId}
+      VALUES (${notification.memberId}::uuid, ${notification.borrowRequestId}::uuid,
+        ${notification.kind}, ${notification.message}, ${notification.forDate}::date)
       ON CONFLICT (request_id, kind, for_date) DO NOTHING
       RETURNING notification_id`;
     const inserted = rows[0];
@@ -73,9 +71,9 @@ const createNotificationsRepository = (
 
   async findForMember(memberId, { page, limit }) {
     const rows = await prisma.notifications.findMany({
-      where: { members: { api_id: memberId } },
+      where: { member_id: memberId },
       select: notificationSelect,
-      orderBy: { created_at: "desc" },
+      orderBy: [{ created_at: "desc" }, { notification_id: "asc" }],
       skip: (page - 1) * limit,
       take: limit,
     });

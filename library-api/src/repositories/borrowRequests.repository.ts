@@ -1,5 +1,4 @@
 import type { Prisma } from "../generated/prisma/client.ts";
-import { NotFoundError } from "../errors/domainErrors.ts";
 import translateDbError from "./dbErrors.ts";
 import type { Repository } from "./repository.ts";
 import type {
@@ -45,7 +44,9 @@ export interface BorrowRequestsRepository extends Repository<
 }
 
 const requestColumns = {
-  api_id: true,
+  request_id: true,
+  member_id: true,
+  book_id: true,
   status: true,
   requested_on: true,
   due_on: true,
@@ -54,22 +55,22 @@ const requestColumns = {
   fine_per_day: true,
   returned_at: true,
   fine: true,
-} satisfies Prisma.book_requestsSelect;
+} satisfies Prisma.borrow_requestsSelect;
 
 const listSelect = {
   ...requestColumns,
-  members: { select: { api_id: true, name: true } },
-  books: { select: { api_id: true, title: true } },
-} satisfies Prisma.book_requestsSelect;
+  members: { select: { name: true } },
+  books: { select: { title: true } },
+} satisfies Prisma.borrow_requestsSelect;
 
 const detailSelect = {
   ...requestColumns,
-  members: { select: { api_id: true, name: true, email: true } },
-  books: { select: { api_id: true, title: true, author: true } },
-} satisfies Prisma.book_requestsSelect;
+  members: { select: { name: true, email: true } },
+  books: { select: { title: true, author: true } },
+} satisfies Prisma.borrow_requestsSelect;
 
-type ListRow = Prisma.book_requestsGetPayload<{ select: typeof listSelect }>;
-type DetailRow = Prisma.book_requestsGetPayload<{
+type ListRow = Prisma.borrow_requestsGetPayload<{ select: typeof listSelect }>;
+type DetailRow = Prisma.borrow_requestsGetPayload<{
   select: typeof detailSelect;
 }>;
 
@@ -85,9 +86,9 @@ const toStatus = (value: string): BorrowRequestStatus => {
 };
 
 const toBorrowRequest = (row: DetailRow): BorrowRequest => ({
-  id: row.api_id,
-  bookId: row.books.api_id,
-  userId: row.members.api_id,
+  id: row.request_id,
+  bookId: row.book_id,
+  userId: row.member_id,
   status: toStatus(row.status),
   requestedAt: toDate(row.requested_on),
   dueDate: toDate(row.due_on),
@@ -97,21 +98,21 @@ const toBorrowRequest = (row: DetailRow): BorrowRequest => ({
   returnedAt: row.returned_at ? row.returned_at.toISOString() : null,
   fine: row.fine,
   member: {
-    id: row.members.api_id,
+    id: row.member_id,
     name: row.members.name,
     email: row.members.email,
   },
   book: {
-    id: row.books.api_id,
+    id: row.book_id,
     title: row.books.title,
     author: row.books.author,
   },
 });
 
 const toListItem = (row: ListRow): BorrowRequestListItem => ({
-  id: row.api_id,
-  bookId: row.books.api_id,
-  userId: row.members.api_id,
+  id: row.request_id,
+  bookId: row.book_id,
+  userId: row.member_id,
   status: toStatus(row.status),
   requestedAt: toDate(row.requested_on),
   dueDate: toDate(row.due_on),
@@ -124,39 +125,10 @@ const toListItem = (row: ListRow): BorrowRequestListItem => ({
   bookTitle: row.books.title,
 });
 
-const notFoundField = (field: string) =>
-  new NotFoundError("A related record does not exist.", {
-    details: [{ field, message: "No record found with this id." }],
-  });
-
-const findMemberId = async (prisma: Db, apiId: string): Promise<string> => {
-  const member = await prisma.members.findFirst({
-    where: { api_id: apiId, is_active: true },
-    select: { member_id: true },
-  });
-  if (!member) {
-    throw notFoundField("userId");
-  }
-  return member.member_id;
-};
-
-const findBookId = async (prisma: Db, apiId: string): Promise<string> => {
-  const book = await prisma.books.findFirst({
-    where: { api_id: apiId, is_active: true },
-    select: { book_id: true },
-  });
-  if (!book) {
-    throw notFoundField("bookId");
-  }
-  return book.book_id;
-};
-
-// userId and bookId are API ids (m-1000, bk-1), so look up the real rows
-const toUpdateRow = async (
-  prisma: Db,
+const toUpdateRow = (
   changes: BorrowRequestChanges,
-): Promise<Prisma.book_requestsUncheckedUpdateInput> => {
-  const row: Prisma.book_requestsUncheckedUpdateInput = {};
+): Prisma.borrow_requestsUncheckedUpdateInput => {
+  const row: Prisma.borrow_requestsUncheckedUpdateInput = {};
   if (changes.status !== undefined) row.status = changes.status;
   if (changes.requestedAt !== undefined) {
     row.requested_on = new Date(changes.requestedAt);
@@ -178,12 +150,8 @@ const toUpdateRow = async (
       changes.returnedAt === null ? null : new Date(changes.returnedAt);
   }
   if (changes.fine !== undefined) row.fine = changes.fine;
-  if (changes.userId !== undefined) {
-    row.member_id = await findMemberId(prisma, changes.userId);
-  }
-  if (changes.bookId !== undefined) {
-    row.book_id = await findBookId(prisma, changes.bookId);
-  }
+  if (changes.userId !== undefined) row.member_id = changes.userId;
+  if (changes.bookId !== undefined) row.book_id = changes.bookId;
   return row;
 };
 
@@ -191,41 +159,41 @@ const createBorrowRequestsRepository = (
   prisma: Db,
 ): BorrowRequestsRepository => ({
   async findAll({ userId, bookId, status, page, limit }) {
-    const where: Prisma.book_requestsWhereInput = {};
+    const where: Prisma.borrow_requestsWhereInput = {};
 
     if (userId) {
-      where.members = { api_id: userId };
+      where.member_id = userId;
     }
 
     if (bookId) {
-      where.books = { api_id: bookId };
+      where.book_id = bookId;
     }
 
     if (status) {
       where.status = status;
     }
 
-    const rows = await prisma.book_requests.findMany({
+    const rows = await prisma.borrow_requests.findMany({
       where,
       select: listSelect,
-      orderBy: { api_id: "asc" },
+      orderBy: [{ requested_on: "asc" }, { request_id: "asc" }],
       ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),
     });
     return rows.map(toListItem);
   },
 
   async findById(id) {
-    const row = await prisma.book_requests.findUnique({
-      where: { api_id: id },
+    const row = await prisma.borrow_requests.findUnique({
+      where: { request_id: id },
       select: detailSelect,
     });
     return row ? toBorrowRequest(row) : null;
   },
 
   async create(requestData) {
-    const data: Prisma.book_requestsUncheckedCreateInput = {
-      member_id: await findMemberId(prisma, requestData.userId),
-      book_id: await findBookId(prisma, requestData.bookId),
+    const data: Prisma.borrow_requestsUncheckedCreateInput = {
+      member_id: requestData.userId,
+      book_id: requestData.bookId,
       status: requestData.status,
       requested_on: new Date(requestData.requestedAt),
       due_on:
@@ -237,7 +205,7 @@ const createBorrowRequestsRepository = (
       fine_per_day: requestData.finePerDay,
     };
     try {
-      const row = await prisma.book_requests.create({
+      const row = await prisma.borrow_requests.create({
         data,
         select: detailSelect,
       });
@@ -248,19 +216,18 @@ const createBorrowRequestsRepository = (
   },
 
   async updateById(id, changes) {
-    const existing = await prisma.book_requests.findUnique({
-      where: { api_id: id },
+    const existing = await prisma.borrow_requests.findUnique({
+      where: { request_id: id },
       select: { request_id: true },
     });
     if (!existing) {
       return null;
     }
 
-    const data = await toUpdateRow(prisma, changes);
     try {
-      const row = await prisma.book_requests.update({
-        where: { request_id: existing.request_id },
-        data,
+      const row = await prisma.borrow_requests.update({
+        where: { request_id: id },
+        data: toUpdateRow(changes),
         select: detailSelect,
       });
       return toBorrowRequest(row);
@@ -270,16 +237,16 @@ const createBorrowRequestsRepository = (
   },
 
   countForMember(memberId, statuses) {
-    return prisma.book_requests.count({
+    return prisma.borrow_requests.count({
       where: {
-        members: { api_id: memberId },
+        member_id: memberId,
         status: { in: statuses },
       },
     });
   },
 
   async findOverdue(today) {
-    const rows = await prisma.book_requests.findMany({
+    const rows = await prisma.borrow_requests.findMany({
       where: { status: "approved", due_on: { lt: new Date(today) } },
       select: detailSelect,
       orderBy: { due_on: "asc" },
@@ -288,20 +255,19 @@ const createBorrowRequestsRepository = (
   },
 
   async findDueOn(date) {
-    const rows = await prisma.book_requests.findMany({
+    const rows = await prisma.borrow_requests.findMany({
       where: { status: "approved", due_on: new Date(date) },
       select: detailSelect,
-      orderBy: { api_id: "asc" },
+      orderBy: { request_id: "asc" },
     });
     return rows.map(toBorrowRequest);
   },
 
   async updateIfStatus(id, from, changes) {
-    const data = await toUpdateRow(prisma, changes);
     try {
-      const result = await prisma.book_requests.updateMany({
-        where: { api_id: id, status: { in: from } },
-        data,
+      const result = await prisma.borrow_requests.updateMany({
+        where: { request_id: id, status: { in: from } },
+        data: toUpdateRow(changes),
       });
       if (result.count === 0) {
         return null;
@@ -313,46 +279,48 @@ const createBorrowRequestsRepository = (
   },
 
   async claimNextInQueue(bookId, holdUntil) {
-    const rows = await prisma.$queryRaw<{ api_id: string }[]>`
-      UPDATE book_requests
+    const rows = await prisma.$queryRaw<{ request_id: string }[]>`
+      UPDATE borrow_requests
       SET status = 'held', hold_until = ${holdUntil}::date
       WHERE request_id = (
-        SELECT r.request_id
-        FROM book_requests r
-        JOIN books b ON b.book_id = r.book_id
-        WHERE b.api_id = ${bookId} AND r.status = 'queued'
-        ORDER BY r.queued_at, r.api_id
+        SELECT request_id
+        FROM borrow_requests
+        WHERE book_id = ${bookId}::uuid AND status = 'queued'
+        ORDER BY queued_at, request_id
         LIMIT 1
-        FOR UPDATE OF r SKIP LOCKED
+        FOR UPDATE SKIP LOCKED
       )
-      RETURNING api_id`;
+      RETURNING request_id`;
     const claimed = rows[0];
-    return claimed ? this.findById(claimed.api_id) : null;
+    return claimed ? this.findById(claimed.request_id) : null;
   },
 
   async findQueue(bookId) {
-    const rows = await prisma.book_requests.findMany({
-      where: { status: "queued", books: { api_id: bookId } },
+    const rows = await prisma.borrow_requests.findMany({
+      where: { status: "queued", book_id: bookId },
       select: detailSelect,
-      orderBy: [{ queued_at: "asc" }, { api_id: "asc" }],
+      orderBy: [{ queued_at: "asc" }, { request_id: "asc" }],
     });
     return rows.map(toBorrowRequest);
   },
 
-  // same order as findQueue and claimNextInQueue: queued_at, then api_id for a tie
+  // same order as findQueue and claimNextInQueue: queued_at, then request_id for a tie
   countAheadInQueue(bookId, queuedAt, id) {
     const at = new Date(queuedAt);
-    return prisma.book_requests.count({
+    return prisma.borrow_requests.count({
       where: {
         status: "queued",
-        books: { api_id: bookId },
-        OR: [{ queued_at: { lt: at } }, { queued_at: at, api_id: { lt: id } }],
+        book_id: bookId,
+        OR: [
+          { queued_at: { lt: at } },
+          { queued_at: at, request_id: { lt: id } },
+        ],
       },
     });
   },
 
   async findExpiredHolds(today) {
-    const rows = await prisma.book_requests.findMany({
+    const rows = await prisma.borrow_requests.findMany({
       where: { status: "held", hold_until: { lt: new Date(today) } },
       select: detailSelect,
       orderBy: { hold_until: "asc" },

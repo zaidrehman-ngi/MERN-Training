@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
+import { z } from "zod";
 import { hashPassword, verifyPassword } from "../utils/password.ts";
 import { AuthenticationError } from "../errors/domainErrors.ts";
 import config from "../config/config.ts";
@@ -66,7 +67,13 @@ const createAuthService = (
     }
 
     const payload = verifyJwt(token);
-    if (typeof payload === "string" || !payload.sub || !payload.exp) {
+    // old tokens carry ids like m-1000, which the database would reject
+    if (
+      typeof payload === "string" ||
+      !payload.sub ||
+      !z.uuid().safeParse(payload.sub).success ||
+      !payload.exp
+    ) {
       throw new AuthenticationError("Invalid token.");
     }
 

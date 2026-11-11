@@ -26,7 +26,7 @@ const toBookStatus = (value: string): BookStatus => {
 };
 
 const toBook = (row: books): Book => ({
-  id: row.api_id,
+  id: row.book_id,
   title: row.title,
   author: row.author,
   year: row.publication_year,
@@ -71,21 +71,20 @@ const translateWriteError = (err: unknown) =>
     books_active_isbn_unique: () => new IsbnTakenError(),
   });
 
+// title by default; book_id last breaks ties, so pages never repeat or skip a book
 const toOrderBy = (
   sort: BookQuery["sort"],
   order: "asc" | "desc",
-): Prisma.booksOrderByWithRelationInput | undefined => {
-  if (sort === "title") {
-    return { title: order };
-  }
+): Prisma.booksOrderByWithRelationInput[] => {
+  const tieBreak = { book_id: "asc" as const };
   // books without an author or year go last
   if (sort === "author") {
-    return { author: { sort: order, nulls: "last" } };
+    return [{ author: { sort: order, nulls: "last" } }, tieBreak];
   }
   if (sort === "year") {
-    return { publication_year: { sort: order, nulls: "last" } };
+    return [{ publication_year: { sort: order, nulls: "last" } }, tieBreak];
   }
-  return undefined;
+  return [{ title: order }, tieBreak];
 };
 
 const createBooksRepository = (prisma: Db): BooksRepository => ({
@@ -112,10 +111,9 @@ const createBooksRepository = (prisma: Db): BooksRepository => ({
       where.available_copies = available ? { gt: 0 } : 0;
     }
 
-    const orderBy = toOrderBy(sort, order);
     const rows = await prisma.books.findMany({
       where,
-      ...(orderBy ? { orderBy } : {}),
+      orderBy: toOrderBy(sort, order),
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -125,7 +123,7 @@ const createBooksRepository = (prisma: Db): BooksRepository => ({
 
   async findById(id: string): Promise<Book | null> {
     const row = await prisma.books.findFirst({
-      where: { api_id: id, is_active: true },
+      where: { book_id: id, is_active: true },
     });
     return row ? toBook(row) : null;
   },
@@ -151,7 +149,7 @@ const createBooksRepository = (prisma: Db): BooksRepository => ({
     changes: Changes<NewBook>,
   ): Promise<Book | null> {
     const existing = await prisma.books.findFirst({
-      where: { api_id: id, is_active: true },
+      where: { book_id: id, is_active: true },
     });
     if (!existing) {
       return null;
@@ -174,7 +172,7 @@ const createBooksRepository = (prisma: Db): BooksRepository => ({
     change: number,
   ): Promise<Book | null> {
     const existing = await prisma.books.findFirst({
-      where: { api_id: id, is_active: true },
+      where: { book_id: id, is_active: true },
       select: { book_id: true },
     });
     if (!existing) {
@@ -195,7 +193,7 @@ const createBooksRepository = (prisma: Db): BooksRepository => ({
   // soft delete: books with loan history can't be removed
   async deleteById(id: string): Promise<boolean> {
     const result = await prisma.books.updateMany({
-      where: { api_id: id, is_active: true },
+      where: { book_id: id, is_active: true },
       data: { is_active: false },
     });
     return result.count > 0;

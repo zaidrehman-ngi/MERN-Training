@@ -28,7 +28,7 @@ const createRefreshTokensRepository = (
       data: {
         token_hash: tokenHash,
         expires_at: expiresAt,
-        members: { connect: { api_id: memberId } },
+        member_id: memberId,
       },
     });
   },
@@ -43,7 +43,7 @@ const createRefreshTokensRepository = (
       },
       select: {
         token_id: true,
-        members: { select: { api_id: true, name: true, role: true } },
+        members: { select: { member_id: true, name: true, role: true } },
       },
     });
     if (!row) {
@@ -52,7 +52,7 @@ const createRefreshTokensRepository = (
     return {
       tokenId: row.token_id,
       member: {
-        id: row.members.api_id,
+        id: row.members.member_id,
         name: row.members.name,
         role: toRole(row.members.role),
       },

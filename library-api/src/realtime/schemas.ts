@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 export const bookWatchSchema = z.object({
-  bookId: z.string().trim().min(1).max(50),
+  bookId: z.uuid(),
 });
 
 export const decideRequestSchema = z.object({
-  id: z.string().trim().min(1).max(50),
+  id: z.uuid(),
   status: z.enum(["approved", "rejected"]),
 });
