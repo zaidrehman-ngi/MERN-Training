@@ -67,7 +67,6 @@ const createAuthService = (
     }
 
     const payload = verifyJwt(token);
-    // old tokens carry ids like m-1000, which the database would reject
     if (
       typeof payload === "string" ||
       !payload.sub ||

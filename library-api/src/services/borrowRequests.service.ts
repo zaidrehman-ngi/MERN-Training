@@ -147,7 +147,6 @@ const createBorrowRequestsService = (
     });
   };
 
-  // tells the member their request moved on (approved, returned, expired...)
   const announceStatus = (eventsOut: Events, request: BorrowRequest) => {
     eventsOut.emit(DOMAIN_EVENTS.BORROW_REQUEST_STATUS_CHANGED, {
       memberId: request.userId,

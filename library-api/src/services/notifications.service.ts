@@ -4,7 +4,6 @@ import type { Notification } from "../types/notification.ts";
 const createNotificationsService = (
   notificationsRepository: NotificationsRepository,
 ) => ({
-  // newest first; a member only ever sees their own
   listFor(
     memberId: string,
     { page = 1, limit = 20 }: { page?: number; limit?: number } = {},

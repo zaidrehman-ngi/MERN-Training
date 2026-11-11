@@ -168,7 +168,6 @@ const members = [
     branch: "Clifton Branch",
     joined: "2026-10-08",
   },
-  // Exercise 7 Task 3: two members with the same password, to show the hashes differ
   {
     name: "Sara Malik",
     email: "sara.malik@lib.pk",

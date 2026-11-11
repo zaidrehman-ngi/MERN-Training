@@ -15,7 +15,6 @@ const createBooksService = (
   booksRepository: BooksRepository,
   events: Events,
 ) => {
-  // the only place that announces an availability change
   const announceAvailability = (book: Book) => {
     events.emit(DOMAIN_EVENTS.BOOK_AVAILABILITY_CHANGED, {
       bookId: book.id,

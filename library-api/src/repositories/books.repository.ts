@@ -77,7 +77,6 @@ const toOrderBy = (
   order: "asc" | "desc",
 ): Prisma.booksOrderByWithRelationInput[] => {
   const tieBreak = { book_id: "asc" as const };
-  // books without an author or year go last
   if (sort === "author") {
     return [{ author: { sort: order, nulls: "last" } }, tieBreak];
   }
