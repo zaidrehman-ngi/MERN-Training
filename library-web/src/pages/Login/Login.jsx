@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { loginUser } from "../../api/auth";
-import socket from "../../api/socket";
+import { Link, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { login } from "../../store/authSlice";
 import styles from "../Register/Register.module.css";
 
 function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [submission, setSubmission] = useState({
     status: "idle",
     message: "",
@@ -21,14 +23,8 @@ function Login() {
     setSubmission({ status: "loading", message: "" });
 
     try {
-      const { data } = await loginUser(form);
-      // the socket handshake needs the token, so reconnect with it
-      sessionStorage.setItem("token", data.accessToken);
-      socket.disconnect().connect();
-      setSubmission({
-        status: "succeeded",
-        message: "Login successful.",
-      });
+      await dispatch(login(form)).unwrap();
+      navigate("/books");
     } catch (error) {
       setSubmission({
         status: "failed",

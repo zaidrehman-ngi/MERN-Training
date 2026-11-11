@@ -1,9 +1,19 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import socket from "../api/socket";
+import { logout, selectUser } from "../store/authSlice";
 
 export default function Header() {
-  const [live, setLive] = useState("connecting...");
+  const [live, setLive] = useState(socket.connected ? "connected" : "offline");
+  const user = useSelector(selectUser);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await dispatch(logout());
+    navigate("/login");
+  };
 
   useEffect(() => {
     const onConnect = () => setLive("connected");
@@ -16,13 +26,11 @@ export default function Header() {
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("connect_error", onError);
-    socket.connect();
 
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("connect_error", onError);
-      socket.disconnect();
     };
   }, []);
 
@@ -38,6 +46,16 @@ export default function Header() {
         </span>
       </Link>
       <span data-testid="live-status">Live: {live}</span>
+      {user ? (
+        <span>
+          {user.name} ({user.role}){" "}
+          <button type="button" onClick={handleLogout}>
+            Log out
+          </button>
+        </span>
+      ) : (
+        <Link to="/login">Log in</Link>
+      )}
     </header>
   );
 }

@@ -3,6 +3,14 @@ import { ROLES } from "../types/member.ts";
 
 const userRoleSchema = z.enum(ROLES);
 
+const password = z
+  .string()
+  .min(8, "Password must be at least 8 characters long.")
+  .refine(
+    (value) => Buffer.byteLength(value) <= 72,
+    "Password must be at most 72 bytes.",
+  );
+
 const userQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().default(10),
@@ -11,7 +19,7 @@ const userQuerySchema = z.object({
 const createUserSchema = z.object({
   name: z.string().min(1),
   email: z.email(),
-  password: z.string().min(8),
+  password,
   role: z.literal("user").default("user"),
   branch: z.string().min(1),
   joined: z.string().min(1),
@@ -23,7 +31,7 @@ const updateUserSchema = z.object({
   role: userRoleSchema.optional(),
   branch: z.string().min(1).optional(),
   joined: z.string().min(1).optional(),
-  password: z.string().min(8).optional(),
+  password: password.optional(),
 });
 
 export { userQuerySchema, createUserSchema, updateUserSchema };

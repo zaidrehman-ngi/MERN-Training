@@ -1,4 +1,7 @@
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { Routes, Route } from "react-router-dom";
+import { restoreSession, selectAuthStatus } from "./store/authSlice";
 import AppLayout from "./layout/AppLayout";
 import Home from "./routes/Home";
 import Books from "./routes/Books";
@@ -11,6 +14,17 @@ import Register from "./pages/Register/Register";
 import Login from "./pages/Login/Login";
 
 function App() {
+  const dispatch = useDispatch();
+  const authStatus = useSelector(selectAuthStatus);
+
+  useEffect(() => {
+    dispatch(restoreSession());
+  }, [dispatch]);
+
+  if (authStatus === "checking") {
+    return <p role="status">Loading...</p>;
+  }
+
   return (
     <Routes>
       <Route element={<AppLayout />}>

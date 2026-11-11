@@ -75,6 +75,7 @@ const refreshToken = async (req: Request, res: Response) => {
   setRefreshTokenCookie(res, newRefreshToken);
   res.status(200).json({
     accessToken: auth.createAccessToken(member),
+    user: { id: member.id, name: member.name, role: member.role },
   });
 };
 

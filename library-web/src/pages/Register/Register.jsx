@@ -2,24 +2,31 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { createUser } from "../../api/users";
 import { listBranches } from "../../api/branches";
+import useForm from "../../hooks/useForm";
 import styles from "./Register.module.css";
 
+const initialValues = {
+  name: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  branch: "",
+};
+
+const today = () => {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+};
+
 function Register() {
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    branch: "",
-  });
   const [branches, setBranches] = useState([]);
   const [branchesError, setBranchesError] = useState("");
-  const [touched, setTouched] = useState({});
-
-  const [submission, setSubmission] = useState({
-    status: "idle",
-    message: "",
-  });
+  const [serverErrors, setServerErrors] = useState({});
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     listBranches()
@@ -33,86 +40,91 @@ function Register() {
       });
   }, []);
 
-  const errors = {
-    name: form.name.trim() ? "" : "Please enter a name.",
-    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)
+  const validate = (values) => ({
+    name: values.name.trim() ? "" : "Please enter a name.",
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)
       ? ""
       : "Please enter a valid email address.",
     password:
-      form.password.length >= 8
+      values.password.length >= 8
         ? ""
         : "Password must be at least 8 characters long.",
     confirmPassword:
-      form.confirmPassword && form.confirmPassword === form.password
+      values.confirmPassword && values.confirmPassword === values.password
         ? ""
         : "Passwords do not match.",
-    branch: branches.includes(form.branch) ? "" : "Please select a branch.",
-  };
+    branch: branches.includes(values.branch) ? "" : "Please select a branch.",
+  });
 
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    setForm((currentForm) => ({ ...currentForm, [name]: value }));
-  };
-
-  const handleBlur = (event) => {
-    const { name } = event.target;
-    setTouched((currentTouched) => ({ ...currentTouched, [name]: true }));
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setTouched({
-      name: true,
-      email: true,
-      password: true,
-      confirmPassword: true,
-      branch: true,
-    });
-
-    if (Object.values(errors).some(Boolean)) {
-      return;
-    }
-
-    const now = new Date();
-    const joined = [
-      now.getFullYear(),
-      String(now.getMonth() + 1).padStart(2, "0"),
-      String(now.getDate()).padStart(2, "0"),
-    ].join("-");
-
-    setSubmission({ status: "loading", message: "" });
+  const submit = async (values) => {
+    setServerErrors({});
+    setSuccessMessage("");
 
     try {
-      await createUser({
-        name: form.name,
-        email: form.email,
-        password: form.password,
-        branch: form.branch,
-        role: "user",
-        joined,
+      const response = await createUser({
+        name: values.name,
+        email: values.email,
+        password: values.password,
+        branch: values.branch,
+        joined: today(),
       });
-      setSubmission({
-        status: "succeeded",
-        message: "Your account has been created.",
-      });
-      setForm({
-        name: "",
-        email: "",
-        password: "",
-        confirmPassword: "",
-        branch: "",
-      });
-      setTouched({});
+      setSuccessMessage(response.data.message);
+      resetForm();
     } catch (error) {
-      setSubmission({
-        status: "failed",
-        message: error.message || "Unable to create your account.",
-      });
+      const fieldErrors = {};
+      for (const detail of error.details ?? []) {
+        if (detail.field in initialValues && !fieldErrors[detail.field]) {
+          fieldErrors[detail.field] = detail.message;
+        }
+      }
+
+      if (Object.keys(fieldErrors).length === 0) {
+        throw error;
+      }
+      setServerErrors(fieldErrors);
     }
   };
 
-  const describedBy = (field) =>
-    touched[field] && errors[field] ? `${field}-error` : undefined;
+  const {
+    values,
+    errors,
+    touched,
+    handleChange,
+    handleBlur,
+    handleSubmit,
+    isSubmitting,
+    submitError,
+    resetForm,
+  } = useForm({ initialValues, validate, onSubmit: submit });
+
+  const handleFieldChange = (event) => {
+    const { name } = event.target;
+    setServerErrors((current) => ({ ...current, [name]: "" }));
+    setSuccessMessage("");
+    handleChange(event);
+  };
+
+  const errorFor = (field) =>
+    serverErrors[field] || (touched[field] ? errors[field] : "");
+
+  const fieldProps = (field) => ({
+    id: field,
+    name: field,
+    value: values[field],
+    onChange: handleFieldChange,
+    onBlur: handleBlur,
+    className: styles.control,
+    "aria-invalid": !!errorFor(field),
+    "aria-describedby": errorFor(field) ? `${field}-error` : undefined,
+    required: true,
+  });
+
+  const fieldError = (field) =>
+    errorFor(field) && (
+      <p className={styles.error} id={`${field}-error`}>
+        {errorFor(field)}
+      </p>
+    );
 
   return (
     <main className={styles.page}>
@@ -122,105 +134,41 @@ function Register() {
         <label className={styles.label} htmlFor="name">
           Name
         </label>
-        <input
-          className={styles.control}
-          id="name"
-          name="name"
-          type="text"
-          value={form.name}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          aria-invalid={touched.name && !!errors.name}
-          aria-describedby={describedBy("name")}
-          required
-        />
-        {touched.name && errors.name && (
-          <p className={styles.error} id="name-error">
-            {errors.name}
-          </p>
-        )}
+        <input {...fieldProps("name")} type="text" />
+        {fieldError("name")}
 
         <label className={styles.label} htmlFor="email">
           Email
         </label>
-        <input
-          className={styles.control}
-          id="email"
-          name="email"
-          type="email"
-          value={form.email}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          aria-invalid={touched.email && !!errors.email}
-          aria-describedby={describedBy("email")}
-          required
-        />
-        {touched.email && errors.email && (
-          <p className={styles.error} id="email-error">
-            {errors.email}
-          </p>
-        )}
+        <input {...fieldProps("email")} type="email" />
+        {fieldError("email")}
 
         <label className={styles.label} htmlFor="password">
           Password
         </label>
         <input
-          className={styles.control}
-          id="password"
-          name="password"
+          {...fieldProps("password")}
           type="password"
-          value={form.password}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          aria-invalid={touched.password && !!errors.password}
-          aria-describedby={describedBy("password")}
           autoComplete="new-password"
           minLength={8}
-          required
         />
-        {touched.password && errors.password && (
-          <p className={styles.error} id="password-error">
-            {errors.password}
-          </p>
-        )}
+        {fieldError("password")}
 
         <label className={styles.label} htmlFor="confirmPassword">
           Confirm Password
         </label>
         <input
-          className={styles.control}
-          id="confirmPassword"
-          name="confirmPassword"
+          {...fieldProps("confirmPassword")}
           type="password"
-          value={form.confirmPassword}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          aria-invalid={touched.confirmPassword && !!errors.confirmPassword}
-          aria-describedby={describedBy("confirmPassword")}
           autoComplete="new-password"
           minLength={8}
-          required
         />
-        {touched.confirmPassword && errors.confirmPassword && (
-          <p className={styles.error} id="confirmPassword-error">
-            {errors.confirmPassword}
-          </p>
-        )}
+        {fieldError("confirmPassword")}
 
         <label className={styles.label} htmlFor="branch">
           Branch
         </label>
-        <select
-          className={styles.control}
-          id="branch"
-          name="branch"
-          value={form.branch}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          aria-invalid={touched.branch && !!errors.branch}
-          aria-describedby={describedBy("branch")}
-          required
-        >
+        <select {...fieldProps("branch")}>
           <option value="">Select a branch</option>
           {branches.map((branch) => (
             <option key={branch} value={branch}>
@@ -229,27 +177,17 @@ function Register() {
           ))}
         </select>
         {branchesError && <p className={styles.error}>{branchesError}</p>}
-        {touched.branch && errors.branch && (
-          <p className={styles.error} id="branch-error">
-            {errors.branch}
+        {fieldError("branch")}
+
+        {submitError && (
+          <p className={styles.error} role="alert">
+            {submitError}
           </p>
         )}
+        {successMessage && <p role="status">{successMessage}</p>}
 
-        {submission.message && (
-          <p
-            className={submission.status === "failed" ? styles.error : ""}
-            role={submission.status === "failed" ? "alert" : "status"}
-          >
-            {submission.message}
-          </p>
-        )}
-
-        <button
-          className={styles.submit}
-          type="submit"
-          disabled={submission.status === "loading"}
-        >
-          {submission.status === "loading" ? "Creating..." : "Create User"}
+        <button className={styles.submit} type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Creating..." : "Create User"}
         </button>
       </form>
 

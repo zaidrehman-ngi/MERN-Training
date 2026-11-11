@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getAccessToken } from "./session";
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -11,6 +12,10 @@ const client = axios.create({
 
 // Request interceptor
 client.interceptors.request.use((config) => {
+  const token = getAccessToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   console.log(`${config.method?.toUpperCase()} ${config.url}`);
   return config;
 });
@@ -51,6 +56,7 @@ client.interceptors.response.use(
     return Promise.reject({
       status,
       code: error.response.data?.error,
+      details: error.response.data?.details ?? [],
       message:
         error.response.data?.message ||
         "Something went wrong. Please try again.",
