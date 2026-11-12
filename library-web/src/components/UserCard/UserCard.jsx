@@ -1,7 +1,7 @@
 import { formatDay } from "../../utils/dates";
 import styles from "./UserCard.module.css";
 
-function UserCard({ user }) {
+function UserCard({ user, children }) {
   return (
     <article className={styles.card}>
       <h2 className={styles.name}>{user.name}</h2>
@@ -10,6 +10,7 @@ function UserCard({ user }) {
       <p className={styles.detail}>Role: {user.role}</p>
       <p className={styles.detail}>Branch: {user.branch}</p>
       <p className={styles.detail}>Joined: {formatDay(user.joined)}</p>
+      {children}
     </article>
   );
 }

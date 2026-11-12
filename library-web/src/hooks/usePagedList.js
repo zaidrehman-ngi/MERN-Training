@@ -4,6 +4,7 @@ export function usePagedList(load, params) {
   const [result, setResult] = useState({ items: [], total: 0, limit: 10 });
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState(null);
+  const [version, setVersion] = useState(0);
   const key = JSON.stringify(params);
 
   useEffect(() => {
@@ -29,8 +30,9 @@ export function usePagedList(load, params) {
     return () => {
       active = false;
     };
-  }, [load, key]);
+  }, [load, key, version]);
 
   const pageCount = Math.max(1, Math.ceil(result.total / result.limit));
-  return { ...result, pageCount, status, error };
+  const reload = () => setVersion((current) => current + 1);
+  return { ...result, pageCount, status, error, reload };
 }

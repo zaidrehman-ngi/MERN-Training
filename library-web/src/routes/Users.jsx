@@ -4,8 +4,14 @@ import useDebounce from "../hooks/useDebounce";
 import UserCard from "../components/UserCard/UserCard";
 import Pagination from "../components/Pagination";
 import { ROLES } from "../constants/roles";
+import { useCurrentUser } from "../hooks/useCurrentUser";
+import { assignableRoles, canManageMember } from "../constants/permissions";
+import { deactivateUser, updateUser } from "../api/users";
 
 function Users() {
+  const { user: me, can } = useCurrentUser();
+  const [busyId, setBusyId] = useState(null);
+  const [actionError, setActionError] = useState(null);
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("all");
   const [page, setPage] = useState(1);
@@ -16,6 +22,7 @@ function Users() {
     pageCount,
     status,
     error,
+    reload,
   } = useUsers({
     page,
     search: debouncedSearch,
@@ -23,9 +30,69 @@ function Users() {
   });
   const filtered = debouncedSearch.trim() !== "" || role !== "all";
 
+  const runAction = async (id, action) => {
+    setBusyId(id);
+    setActionError(null);
+    try {
+      await action();
+      reload();
+    } catch (error) {
+      setActionError({ id, message: error.message });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDeactivate = (member) => {
+    if (
+      window.confirm(`Deactivate ${member.name}? They won't be able to log in.`)
+    ) {
+      runAction(member.id, () => deactivateUser(member.id));
+    }
+  };
+
+  const manageControls = (member) => {
+    if (!canManageMember(me, member)) {
+      return null;
+    }
+    const roles = [...new Set([member.role, ...assignableRoles(me.role)])];
+    return (
+      <div>
+        <label htmlFor={`role-${member.id}`}>Role</label>
+        <select
+          id={`role-${member.id}`}
+          value={member.role}
+          disabled={busyId === member.id}
+          onChange={(event) =>
+            runAction(member.id, () =>
+              updateUser(member.id, { role: event.target.value }),
+            )
+          }
+        >
+          {roles.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>{" "}
+        <button
+          className="dangerButton"
+          type="button"
+          disabled={busyId === member.id}
+          onClick={() => handleDeactivate(member)}
+        >
+          Deactivate
+        </button>
+        {actionError?.id === member.id && (
+          <p role="alert">{actionError.message}</p>
+        )}
+      </div>
+    );
+  };
+
   return (
     <main>
-      <h1>Users</h1>
+      <h1>{can("members:manage") ? "Manage members" : "Members"}</h1>
 
       <label htmlFor="user-search">Search users</label>
       <input
@@ -74,7 +141,9 @@ function Users() {
           </p>
           <div>
             {users.map((user) => (
-              <UserCard key={user.id} user={user} />
+              <UserCard key={user.id} user={user}>
+                {manageControls(user)}
+              </UserCard>
             ))}
           </div>
           <Pagination

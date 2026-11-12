@@ -1,54 +1,36 @@
 import { NavLink } from "react-router-dom";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
 import styles from "./Navbar.module.css";
 
+const linkClass = ({ isActive }) =>
+  isActive ? `${styles.link} ${styles.linkActive}` : styles.link;
+
 function Navbar() {
+  const { user, can } = useCurrentUser();
+
   return (
     <nav className={styles.navbar}>
-      <NavLink
-        to="/"
-        end
-        className={({ isActive }) =>
-          isActive ? `${styles.link} ${styles.linkActive}` : styles.link
-        }
-      >
+      <NavLink to="/" end className={linkClass}>
         Home
       </NavLink>
-
-      <NavLink
-        to="/books"
-        className={({ isActive }) =>
-          isActive ? `${styles.link} ${styles.linkActive}` : styles.link
-        }
-      >
+      <NavLink to="/books" end className={linkClass}>
         Books
       </NavLink>
-
-      <NavLink
-        to="/books/add"
-        className={({ isActive }) =>
-          isActive ? `${styles.link} ${styles.linkActive}` : styles.link
-        }
-      >
-        Add Book
-      </NavLink>
-
-      <NavLink
-        to="/users"
-        className={({ isActive }) =>
-          isActive ? `${styles.link} ${styles.linkActive}` : styles.link
-        }
-      >
-        Users
-      </NavLink>
-
-      <NavLink
-        to="/borrow-requests"
-        className={({ isActive }) =>
-          isActive ? `${styles.link} ${styles.linkActive}` : styles.link
-        }
-      >
-        Borrow Requests
-      </NavLink>
+      {user && (
+        <NavLink to="/borrow-requests" className={linkClass}>
+          {can("requests:seeAll") ? "Approval queue" : "My requests"}
+        </NavLink>
+      )}
+      {can("books:add") && (
+        <NavLink to="/books/add" className={linkClass}>
+          Add Book
+        </NavLink>
+      )}
+      {can("members:list") && (
+        <NavLink to="/users" className={linkClass}>
+          {can("members:manage") ? "Manage members" : "Members"}
+        </NavLink>
+      )}
     </nav>
   );
 }

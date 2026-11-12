@@ -14,3 +14,15 @@ export function listBorrowRequests({
 export function createBorrowRequest(request) {
   return client.post("/borrow-requests", request);
 }
+
+export function decideBorrowRequest(id, status) {
+  return client.patch(`/borrow-requests/${id}`, { status });
+}
+
+export function cancelBorrowRequest(id) {
+  return client.post(`/borrow-requests/${id}/cancel`);
+}
+
+export function returnBorrowRequest(id) {
+  return client.post(`/borrow-requests/${id}/return`);
+}

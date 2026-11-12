@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import socket from "../api/socket";
-import { logout, selectUser } from "../store/authSlice";
+import { logout } from "../store/authSlice";
+import { useCurrentUser } from "../hooks/useCurrentUser";
 
 export default function Header() {
   const [live, setLive] = useState(socket.connected ? "connected" : "offline");
-  const user = useSelector(selectUser);
+  const { user } = useCurrentUser();
   const dispatch = useDispatch();
   const navigate = useNavigate();
 

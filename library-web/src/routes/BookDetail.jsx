@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { getBook } from "../api/books";
+import { useCurrentUser } from "../hooks/useCurrentUser";
 import {
   borrowBookThunk,
   deleteBookThunk,
@@ -12,6 +13,7 @@ function BookDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { user, can } = useCurrentUser();
 
   const [bookState, setBookState] = useState(null);
   const [attempt, setAttempt] = useState(0);
@@ -136,32 +138,44 @@ function BookDetail() {
           </div>
         </dl>
         <div className="detailActions">
-          <button
-            type="button"
-            onClick={handleBorrow}
-            disabled={
-              borrowStatus === "pending" ||
-              borrowStatus === "succeeded" ||
-              Number(book.onShelf) < 1
-            }
-          >
-            {borrowStatus === "pending"
-              ? "Requesting..."
-              : borrowStatus === "succeeded"
-                ? "Request sent"
-                : "Borrow"}
-          </button>
-          <Link to={`/books/${book.id}/edit`}>Edit book</Link>
-          <button
-            className="dangerButton"
-            type="button"
-            onClick={handleDelete}
-            disabled={
-              deleteStatus === "loading" || deleteStatus === "succeeded"
-            }
-          >
-            {deleteStatus === "loading" ? "Deleting..." : "Delete book"}
-          </button>
+          {can("requests:create") ? (
+            <button
+              type="button"
+              onClick={handleBorrow}
+              disabled={
+                borrowStatus === "pending" || borrowStatus === "succeeded"
+              }
+            >
+              {borrowStatus === "pending"
+                ? "Requesting..."
+                : borrowStatus === "succeeded"
+                  ? "Request sent"
+                  : Number(book.onShelf) < 1
+                    ? "Join the queue"
+                    : "Borrow"}
+            </button>
+          ) : (
+            !user && (
+              <Link to="/login" state={{ from: `/books/${book.id}` }}>
+                Log in to borrow
+              </Link>
+            )
+          )}
+          {can("books:edit") && (
+            <Link to={`/books/${book.id}/edit`}>Edit book</Link>
+          )}
+          {can("books:delete") && (
+            <button
+              className="dangerButton"
+              type="button"
+              onClick={handleDelete}
+              disabled={
+                deleteStatus === "loading" || deleteStatus === "succeeded"
+              }
+            >
+              {deleteStatus === "loading" ? "Deleting..." : "Delete book"}
+            </button>
+          )}
         </div>
         {borrowError && <p role="alert">{borrowError.message}</p>}
         {deleteError && <p role="alert">{deleteError.message}</p>}

@@ -1,10 +1,8 @@
-import { useSelector } from "react-redux";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { selectAuthStatus, selectUser } from "../store/authSlice";
+import { useCurrentUser } from "../hooks/useCurrentUser";
 
 function RequireAuth({ roles }) {
-  const user = useSelector(selectUser);
-  const status = useSelector(selectAuthStatus);
+  const { user, status, hasRole } = useCurrentUser();
   const location = useLocation();
 
   if (!user) {
@@ -20,7 +18,7 @@ function RequireAuth({ roles }) {
     );
   }
 
-  if (roles && !roles.includes(user.role)) {
+  if (roles && !hasRole(roles)) {
     return (
       <main>
         <h1>Not allowed</h1>

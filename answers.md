@@ -303,3 +303,53 @@ slice end to end (log in, list books, borrow one) in the first week, so
 the contract gets tested by both apps before either side builds on top of
 it. And I would check the spec automatically, with Postman tests that
 assert the documented shapes, so it can't quietly go out of date again.
+
+# Exercise 4 — Four roles, one interface
+
+## Task 1: The current user everywhere
+
+The user is kept in the Redux store (`authSlice`). It gets filled by login
+and by the refresh on page load, and cleared by logout or an expired
+session. Components read it through one hook, `useCurrentUser()` in
+`src/hooks/useCurrentUser.js`. The hook returns `user`, `role`, `status`,
+`isStaff`, `isAdmin` and `hasRole(roles)`. `Header` and `RequireAuth` use
+it, so no component reads the store directly.
+
+Context or Redux: Redux. In Week 4 my rule was Context for shared data that
+is simple, and Redux only when it's needed. The rule still holds, but the
+current user isn't simple anymore. It comes from the server through async
+login, refresh and logout. It has a status (checking, signed in, signed
+out, expired). It can also be changed from outside React: the Axios
+interceptor ends the session when a refresh fails, and it can dispatch to
+the store but can't set a Context value. So the rule needs one more line:
+once a value comes from the server and something outside the component tree
+has to change it, it goes in the store.
+
+## Task 2: One interface, four roles
+
+I used the Week 7 permission matrix as it is. It's now in
+`src/constants/permissions.js` as a map from action to roles (for example
+`"books:delete": ADMIN_ROLES`), plus two helpers for the member rows:
+`assignableRoles` and `canManageMember`. Components ask
+`can("books:delete")` through `useCurrentUser()` instead of checking role
+names.
+
+What each role sees:
+
+- **Logged out:** the catalogue, and "Log in to borrow" on a book.
+- **Member:** the catalogue, Borrow (or "Join the queue" when no copy is
+  on the shelf), and "My borrow requests" with Cancel on their own waiting
+  requests.
+- **Librarian:** everything a member sees, plus Add Book and Edit book, an
+  "Approval queue" that opens on pending requests with Approve and Reject
+  (not on their own requests) and "Mark returned" on approved loans, and
+  the member list (read only).
+- **Admin:** everything a librarian sees, plus Delete book, a "Send due
+  reminders now" button, and "Manage members": change a role to user or
+  librarian, or deactivate. Not for themselves, other admins or the super
+  admin.
+- **Super admin:** everything an admin sees, and can also manage admins
+  and give the admin or super admin role.
+
+Two rows of the matrix have no UI because the API has no endpoint for them
+yet: changing a due date (row 11) and waiving a fine (row 14).
