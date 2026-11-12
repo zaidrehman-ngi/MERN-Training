@@ -1,7 +1,8 @@
 import { configureStore } from "@reduxjs/toolkit";
 import uiReducer from "./uiSlice";
 import booksReducer from "./booksSlice";
-import authReducer from "./authSlice";
+import authReducer, { sessionEnded } from "./authSlice";
+import { setOnSessionEnd } from "../api/session";
 
 export const store = configureStore({
   reducer: {
@@ -10,3 +11,5 @@ export const store = configureStore({
     auth: authReducer,
   },
 });
+
+setOnSessionEnd(() => store.dispatch(sessionEnded()));

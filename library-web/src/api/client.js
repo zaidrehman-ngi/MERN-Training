@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getAccessToken } from "./session";
+import { endSession, getAccessToken, setAccessToken } from "./session";
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -20,12 +20,42 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
+let refreshing = null;
+
+export function refreshSession() {
+  refreshing ??= client.post("/auth/refresh").finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+const canRetryWithNewToken = (config) =>
+  config &&
+  !config.retried &&
+  config.headers?.Authorization &&
+  !config.url.startsWith("/auth/");
+
 // Response interceptor
 client.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error.response?.status;
     const code = error.code;
+
+    if (status === 401 && canRetryWithNewToken(error.config)) {
+      try {
+        const response = await refreshSession();
+        setAccessToken(response.data.accessToken);
+        return client({ ...error.config, retried: true });
+      } catch {
+        endSession();
+        return Promise.reject({
+          status,
+          code: "SESSION_EXPIRED",
+          message: "Your session has expired. Please log in again.",
+        });
+      }
+    }
 
     if (code === "ECONNABORTED" || code === "ETIMEDOUT") {
       return Promise.reject({

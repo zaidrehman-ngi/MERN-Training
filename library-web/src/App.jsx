@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { restoreSession, selectAuthStatus } from "./store/authSlice";
 import AppLayout from "./layout/AppLayout";
 import Home from "./routes/Home";
@@ -12,14 +12,27 @@ import AddBook from "./pages/AddBook/AddBook";
 import BookDetail from "./routes/BookDetail";
 import Register from "./pages/Register/Register";
 import Login from "./pages/Login/Login";
+import RequireAuth from "./components/RequireAuth";
+import { STAFF_ROLES } from "./constants/roles";
 
 function App() {
   const dispatch = useDispatch();
   const authStatus = useSelector(selectAuthStatus);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     dispatch(restoreSession());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (authStatus === "expired" && location.pathname !== "/login") {
+      navigate("/login", {
+        replace: true,
+        state: { from: location.pathname + location.search, expired: true },
+      });
+    }
+  }, [authStatus, location, navigate]);
 
   if (authStatus === "checking") {
     return <p role="status">Loading...</p>;
@@ -32,13 +45,20 @@ function App() {
 
         <Route path="/books">
           <Route index element={<Books />} />
-          <Route path="add" element={<AddBook />} />
-          <Route path=":id/edit" element={<AddBook />} />
           <Route path=":id" element={<BookDetail />} />
+          <Route element={<RequireAuth roles={STAFF_ROLES} />}>
+            <Route path="add" element={<AddBook />} />
+            <Route path=":id/edit" element={<AddBook />} />
+          </Route>
         </Route>
 
-        <Route path="/users" element={<Users />} />
-        <Route path="/borrow-requests" element={<BorrowRequests />} />
+        <Route element={<RequireAuth />}>
+          <Route path="/borrow-requests" element={<BorrowRequests />} />
+        </Route>
+
+        <Route element={<RequireAuth roles={STAFF_ROLES} />}>
+          <Route path="/users" element={<Users />} />
+        </Route>
       </Route>
 
       <Route path="/login" element={<Login />} />

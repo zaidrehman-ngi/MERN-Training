@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { login } from "../../store/authSlice";
 import styles from "../Register/Register.module.css";
@@ -8,6 +8,9 @@ function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from ?? "/books";
+  const expired = location.state?.expired;
   const [submission, setSubmission] = useState({
     status: "idle",
     message: "",
@@ -24,7 +27,7 @@ function Login() {
 
     try {
       await dispatch(login(form)).unwrap();
-      navigate("/books");
+      navigate(from, { replace: true });
     } catch (error) {
       setSubmission({
         status: "failed",
@@ -36,6 +39,10 @@ function Login() {
   return (
     <main className={styles.page}>
       <h1>Login</h1>
+
+      {expired && submission.status === "idle" && (
+        <p role="status">Your session has expired. Please log in again.</p>
+      )}
 
       <form className={styles.form} onSubmit={handleSubmit}>
         <label className={styles.label} htmlFor="email">
