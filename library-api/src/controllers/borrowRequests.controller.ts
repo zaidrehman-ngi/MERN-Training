@@ -6,15 +6,15 @@ import type {
   UpdateBorrowRequestBody,
 } from "../schemas/borrowRequests.schema.ts";
 import { actorOf } from "./actor.ts";
+import { pageBody } from "./page.ts";
+import type { BorrowRequestQuery } from "../types/borrowRequest.ts";
 
 const getBorrowRequests = async (req: Request, res: Response) => {
   const result = await servicesFor(req).borrowRequests.list(
-    req.query,
+    req.query as unknown as BorrowRequestQuery,
     actorOf(req),
   );
-  res.status(200).json({
-    data: result,
-  });
+  res.status(200).json(pageBody(result));
 };
 
 const getOverdueBorrowRequests = async (req: Request, res: Response) => {

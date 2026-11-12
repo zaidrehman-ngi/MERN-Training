@@ -4,7 +4,6 @@ import type { Repository } from "./repository.ts";
 import type {
   BorrowRequest,
   BorrowRequestChanges,
-  BorrowRequestListItem,
   BorrowRequestQuery,
   BorrowRequestStatus,
   NewBorrowRequest,
@@ -16,9 +15,9 @@ type Db = Prisma.TransactionClient;
 export interface BorrowRequestsRepository extends Repository<
   BorrowRequest,
   NewBorrowRequest,
-  BorrowRequestQuery,
-  BorrowRequestListItem
+  BorrowRequestQuery
 > {
+  count(query: BorrowRequestQuery): Promise<number>;
   countForMember(
     memberId: string,
     statuses: BorrowRequestStatus[],
@@ -57,19 +56,12 @@ const requestColumns = {
   fine: true,
 } satisfies Prisma.borrow_requestsSelect;
 
-const listSelect = {
-  ...requestColumns,
-  members: { select: { name: true } },
-  books: { select: { title: true } },
-} satisfies Prisma.borrow_requestsSelect;
-
 const detailSelect = {
   ...requestColumns,
   members: { select: { name: true, email: true } },
   books: { select: { title: true, author: true } },
 } satisfies Prisma.borrow_requestsSelect;
 
-type ListRow = Prisma.borrow_requestsGetPayload<{ select: typeof listSelect }>;
 type DetailRow = Prisma.borrow_requestsGetPayload<{
   select: typeof detailSelect;
 }>;
@@ -97,7 +89,7 @@ const toBorrowRequest = (row: DetailRow): BorrowRequest => ({
   finePerDay: row.fine_per_day,
   returnedAt: row.returned_at ? row.returned_at.toISOString() : null,
   fine: row.fine,
-  member: {
+  user: {
     id: row.member_id,
     name: row.members.name,
     email: row.members.email,
@@ -107,22 +99,6 @@ const toBorrowRequest = (row: DetailRow): BorrowRequest => ({
     title: row.books.title,
     author: row.books.author,
   },
-});
-
-const toListItem = (row: ListRow): BorrowRequestListItem => ({
-  id: row.request_id,
-  bookId: row.book_id,
-  userId: row.member_id,
-  status: toStatus(row.status),
-  requestedAt: toDate(row.requested_on),
-  dueDate: toDate(row.due_on),
-  queuedAt: row.queued_at ? row.queued_at.toISOString() : null,
-  holdUntil: toDate(row.hold_until),
-  finePerDay: row.fine_per_day,
-  returnedAt: row.returned_at ? row.returned_at.toISOString() : null,
-  fine: row.fine,
-  memberName: row.members.name,
-  bookTitle: row.books.title,
 });
 
 const toUpdateRow = (
@@ -155,31 +131,47 @@ const toUpdateRow = (
   return row;
 };
 
+const toWhere = ({
+  q,
+  userId,
+  bookId,
+  status,
+}: BorrowRequestQuery): Prisma.borrow_requestsWhereInput => {
+  const where: Prisma.borrow_requestsWhereInput = {};
+  if (q) {
+    where.OR = [
+      { books: { title: { contains: q, mode: "insensitive" } } },
+      { members: { name: { contains: q, mode: "insensitive" } } },
+    ];
+  }
+  if (userId) {
+    where.member_id = userId;
+  }
+  if (bookId) {
+    where.book_id = bookId;
+  }
+  if (status) {
+    where.status = status;
+  }
+  return where;
+};
+
 const createBorrowRequestsRepository = (
   prisma: Db,
 ): BorrowRequestsRepository => ({
-  async findAll({ userId, bookId, status, page, limit }) {
-    const where: Prisma.borrow_requestsWhereInput = {};
-
-    if (userId) {
-      where.member_id = userId;
-    }
-
-    if (bookId) {
-      where.book_id = bookId;
-    }
-
-    if (status) {
-      where.status = status;
-    }
-
+  async findAll(query) {
     const rows = await prisma.borrow_requests.findMany({
-      where,
-      select: listSelect,
+      where: toWhere(query),
+      select: detailSelect,
       orderBy: [{ requested_on: "asc" }, { request_id: "asc" }],
-      ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
     });
-    return rows.map(toListItem);
+    return rows.map(toBorrowRequest);
+  },
+
+  count(query) {
+    return prisma.borrow_requests.count({ where: toWhere(query) });
   },
 
   async findById(id) {

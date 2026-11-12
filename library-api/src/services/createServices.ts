@@ -30,7 +30,11 @@ const createServices = (repositories: Repositories, events: Events) => {
   };
 
   const books = createBooksService(repositories.books, events);
-  const users = createUsersService(repositories.users, events);
+  const users = createUsersService(
+    repositories.users,
+    events,
+    config.libraryTimeZone,
+  );
   const borrowRequests = createBorrowRequestsService(
     repositories.borrowRequests,
     books,

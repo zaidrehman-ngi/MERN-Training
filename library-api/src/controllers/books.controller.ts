@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { servicesFor } from "./services.ts";
+import { pageBody } from "./page.ts";
 import type { IdParams, RequestWithBody } from "../types/http.ts";
 import type {
   CreateBookBody,
@@ -8,7 +9,7 @@ import type {
 
 const getBooks = async (req: Request, res: Response) => {
   const books = await servicesFor(req).books.list(req.query);
-  res.status(200).json({ data: books });
+  res.status(200).json(pageBody(books));
 };
 
 const getBookById = async (req: Request<IdParams>, res: Response) => {

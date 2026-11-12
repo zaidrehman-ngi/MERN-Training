@@ -1,3 +1,4 @@
+import { formatDay } from "../../utils/dates";
 import styles from "./UserCard.module.css";
 
 function UserCard({ user }) {
@@ -8,7 +9,7 @@ function UserCard({ user }) {
       <p className={styles.detail}>Email: {user.email}</p>
       <p className={styles.detail}>Role: {user.role}</p>
       <p className={styles.detail}>Branch: {user.branch}</p>
-      <p className={styles.detail}>Joined: {user.joined}</p>
+      <p className={styles.detail}>Joined: {formatDay(user.joined)}</p>
     </article>
   );
 }

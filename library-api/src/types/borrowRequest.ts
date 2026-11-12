@@ -25,13 +25,8 @@ export type BorrowRequest = {
   returnedAt: string | null;
   // charged when returned; while still out, what it comes to today
   fine: number | null;
-  member: { id: string; name: string; email: string | null };
+  user: { id: string; name: string; email: string | null };
   book: { id: string; title: string; author: string | null };
-};
-
-export type BorrowRequestListItem = Omit<BorrowRequest, "member" | "book"> & {
-  memberName: string;
-  bookTitle: string;
 };
 
 export type NewBorrowRequest = {
@@ -50,9 +45,10 @@ export type BorrowRequestChanges = Changes<
 >;
 
 export type BorrowRequestQuery = {
-  userId?: string;
-  bookId?: string;
-  status?: BorrowRequestStatus;
-  page?: number;
-  limit?: number;
+  q?: string | undefined;
+  userId?: string | undefined;
+  bookId?: string | undefined;
+  status?: BorrowRequestStatus | undefined;
+  page: number;
+  limit: number;
 };

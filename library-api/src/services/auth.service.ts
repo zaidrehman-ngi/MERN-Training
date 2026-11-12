@@ -7,7 +7,12 @@ import config from "../config/config.ts";
 import type { UsersRepository } from "../repositories/users.repository.ts";
 import type { RefreshTokensRepository } from "../repositories/refreshTokens.repository.ts";
 import type { RevokedTokensRepository } from "../repositories/revokedTokens.repository.ts";
-import type { AuthMember, PublicMember, Role } from "../types/member.ts";
+import type {
+  AuthMember,
+  PublicMember,
+  Role,
+  SessionUser,
+} from "../types/member.ts";
 
 export type VerifiedToken = { member: AuthMember; jti: string; exp: number };
 
@@ -115,7 +120,7 @@ const createAuthService = (
   // rotation: the old token is revoked, so each refresh token works once
   async rotateRefreshToken(
     token: string | undefined,
-  ): Promise<{ member: AuthMember; refreshToken: string }> {
+  ): Promise<{ member: SessionUser; refreshToken: string }> {
     const found = token
       ? await refreshTokensRepository.findValidByHash(sha256(token))
       : null;

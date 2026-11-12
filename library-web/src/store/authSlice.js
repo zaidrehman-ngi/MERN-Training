@@ -19,7 +19,7 @@ export const login = createAsyncThunk(
   async (credentials, { rejectWithValue }) => {
     try {
       const response = await loginUser(credentials);
-      return startSession(response.data);
+      return startSession(response.data.data);
     } catch (error) {
       return rejectWithValue(error);
     }
@@ -31,7 +31,7 @@ export const restoreSession = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await refreshSession();
-      return startSession(response.data);
+      return startSession(response.data.data);
     } catch (error) {
       return rejectWithValue(error);
     }

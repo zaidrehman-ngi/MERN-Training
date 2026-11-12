@@ -78,8 +78,9 @@ function BookForm({ book }) {
     isbn: book?.isbn ?? "",
     copies: book?.onShelf == null ? "" : String(book.onShelf),
     totalCopies: book?.totalCopies == null ? "" : String(book.totalCopies),
+    year: book?.year == null ? "" : String(book.year),
+    finePerDay: book?.finePerDay == null ? "" : String(book.finePerDay),
     status: book?.status ?? "available",
-    branch: book?.branch ?? "",
   };
 
   function validateTitle(value) {
@@ -134,9 +135,23 @@ function BookForm({ book }) {
     return "";
   }
 
-  function validateBranch(value) {
-    if (!value) {
-      return "Please select a branch.";
+  function validateYear(value) {
+    const year = Number(value);
+
+    if (value === "" || !Number.isInteger(year) || year < 0) {
+      return "Please enter the publication year.";
+    }
+
+    if (year > new Date().getFullYear()) {
+      return "Year cannot be in the future.";
+    }
+
+    return "";
+  }
+
+  function validateFine(value) {
+    if (value === "" || !Number.isInteger(Number(value)) || Number(value) < 0) {
+      return "Fine per day must be 0 or more.";
     }
 
     return "";
@@ -148,7 +163,8 @@ function BookForm({ book }) {
     isbn: validateIsbn(values.isbn),
     copies: validateCopies(values.copies),
     totalCopies: validateTotalCopies(values.totalCopies, values),
-    branch: book ? "" : validateBranch(values.branch),
+    year: validateYear(values.year),
+    finePerDay: validateFine(values.finePerDay),
     status: "",
   });
 
@@ -165,21 +181,14 @@ function BookForm({ book }) {
     validate,
     onSubmit: async (values) => {
       const payload = {
-        ...(book ?? {}),
-          title: values.title,
-          author: values.author,
-          isbn: values.isbn,
-          onShelf: Number(values.copies),
-        ...(!book
-          ? {
-              totalCopies: Number(values.copies),
-              status: "available",
-              branch: values.branch,
-            }
-            : {
-                totalCopies: Number(values.totalCopies),
-                status: values.status,
-              }),
+        title: values.title,
+        author: values.author,
+        isbn: values.isbn,
+        year: Number(values.year),
+        finePerDay: Number(values.finePerDay),
+        onShelf: Number(values.copies),
+        totalCopies: Number(book ? values.totalCopies : values.copies),
+        status: book ? values.status : "available",
       };
       const request = book
         ? dispatch(updateBookThunk({ id: book.id, book: payload }))
@@ -269,6 +278,52 @@ function BookForm({ book }) {
           </p>
         )}
 
+        <label className={styles.label} htmlFor="year">
+          Year
+        </label>
+        <input
+          id="year"
+          type="number"
+          name="year"
+          min="0"
+          value={values.year}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          aria-invalid={touched.year && !!errors.year}
+          className={styles.control}
+          aria-describedby={
+            touched.year && errors.year ? "year-error" : undefined
+          }
+        />
+        {touched.year && errors.year && (
+          <p className={styles.error} id="year-error">
+            {errors.year}
+          </p>
+        )}
+
+        <label className={styles.label} htmlFor="finePerDay">
+          Fine per day (Rs.)
+        </label>
+        <input
+          id="finePerDay"
+          type="number"
+          name="finePerDay"
+          min="0"
+          value={values.finePerDay}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          aria-invalid={touched.finePerDay && !!errors.finePerDay}
+          className={styles.control}
+          aria-describedby={
+            touched.finePerDay && errors.finePerDay ? "finePerDay-error" : undefined
+          }
+        />
+        {touched.finePerDay && errors.finePerDay && (
+          <p className={styles.error} id="finePerDay-error">
+            {errors.finePerDay}
+          </p>
+        )}
+
         <label className={styles.label} htmlFor="copies">
           Copies
         </label>
@@ -338,36 +393,6 @@ function BookForm({ book }) {
                   </option>
                 ))}
             </select>
-          </>
-        )}
-
-        {!book && (
-          <>
-            <label className={styles.label} htmlFor="branch">
-              Branch
-            </label>
-            <select
-              id="branch"
-              name="branch"
-              value={values.branch}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              aria-invalid={touched.branch && !!errors.branch}
-              className={styles.control}
-              aria-describedby={
-                touched.branch && errors.branch ? "branch-error" : undefined
-              }
-            >
-              <option value="">Select a branch</option>
-              <option value="clifton">Clifton</option>
-              <option value="defence">Defence</option>
-              <option value="gulshan">Gulshan</option>
-            </select>
-            {touched.branch && errors.branch && (
-              <p className={styles.error} id="branch-error">
-                {errors.branch}
-              </p>
-            )}
           </>
         )}
 

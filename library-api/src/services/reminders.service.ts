@@ -73,7 +73,7 @@ const createRemindersService = (
         message,
       });
       options.log(
-        `[due-reminders] reminded ${loan.member.name} (${loan.userId}) about ${loan.id}: ${message}`,
+        `[due-reminders] reminded ${loan.user.name} (${loan.userId}) about ${loan.id}: ${message}`,
       );
     }
 

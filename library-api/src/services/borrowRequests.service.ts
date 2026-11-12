@@ -9,10 +9,10 @@ import type { Book } from "../types/book.ts";
 import type {
   BorrowRequest,
   BorrowRequestChanges,
-  BorrowRequestListItem,
   BorrowRequestQuery,
   BorrowRequestStatus,
 } from "../types/borrowRequest.ts";
+import type { Page } from "../types/page.ts";
 import type { BorrowRequestsRepository } from "../repositories/borrowRequests.repository.ts";
 import type { NotificationsRepository } from "../repositories/notifications.repository.ts";
 import type { Actor } from "../types/member.ts";
@@ -50,10 +50,7 @@ export type QueuePosition = {
 export type HoldExpiryRun = { checked: number; expired: number };
 
 export type BorrowRequestsService = {
-  list(
-    query: BorrowRequestQuery,
-    viewer?: Actor,
-  ): Promise<BorrowRequestListItem[]>;
+  list(query: BorrowRequestQuery, viewer?: Actor): Promise<Page<BorrowRequest>>;
   getVisible(id: string, viewer: Actor): Promise<BorrowRequest>;
   findDueOn(date: string): Promise<BorrowRequest[]>;
   getById(id: string): Promise<BorrowRequest>;
@@ -112,7 +109,11 @@ const createBorrowRequestsService = (
   const now = () => (loanPolicy.now ? loanPolicy.now() : new Date());
   const today = () => todayIn(loanPolicy.timeZone, now());
 
-  const fineFor = (dueDate: string, finePerDay: number, returnedAt: Date | null) =>
+  const fineFor = (
+    dueDate: string,
+    finePerDay: number,
+    returnedAt: Date | null,
+  ) =>
     calculateFine(
       { dueDate, returnedAt, asOf: now() },
       {
@@ -205,12 +206,21 @@ const createBorrowRequestsService = (
 
   return {
     async list(query, viewer) {
-      const requests = await borrowRequestsRepository.findAll(
+      // a member only ever sees their own requests
+      const scoped =
         viewer && viewer.role === "user"
           ? { ...query, userId: viewer.id }
-          : query,
-      );
-      return requests.map(withFine);
+          : query;
+      const [requests, total] = await Promise.all([
+        borrowRequestsRepository.findAll(scoped),
+        borrowRequestsRepository.count(scoped),
+      ]);
+      return {
+        items: requests.map(withFine),
+        page: query.page,
+        limit: query.limit,
+        total,
+      };
     },
 
     async getVisible(id, viewer) {

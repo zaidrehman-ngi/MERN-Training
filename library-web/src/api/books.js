@@ -1,7 +1,7 @@
 import client from "./client";
 
-export function listBooks({ filter = "all", search = "" } = {}) {
-  const params = {};
+export function listBooks({ filter = "all", search = "", page = 1 } = {}) {
+  const params = { page };
 
   if (filter !== "all") {
     params.status = filter;

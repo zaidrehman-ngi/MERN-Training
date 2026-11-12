@@ -1,22 +1,27 @@
 import { useState } from "react";
 import { useUsers } from "../hooks/useUsers";
+import useDebounce from "../hooks/useDebounce";
 import UserCard from "../components/UserCard/UserCard";
+import Pagination from "../components/Pagination";
+import { ROLES } from "../constants/roles";
 
 function Users() {
-  const { users, status, error } = useUsers();
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("all");
-  const roles = [...new Set(users.map((user) => user.role).filter(Boolean))];
-  const query = search.trim().toLowerCase();
-  const filteredUsers = users.filter((user) => {
-    const matchesRole = role === "all" || user.role === role;
-    const matchesSearch =
-      !query ||
-      [user.name, user.email, user.branch]
-        .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(query));
-    return matchesRole && matchesSearch;
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebounce(search, 300);
+  const {
+    items: users,
+    total,
+    pageCount,
+    status,
+    error,
+  } = useUsers({
+    page,
+    search: debouncedSearch,
+    role,
   });
+  const filtered = debouncedSearch.trim() !== "" || role !== "all";
 
   return (
     <main>
@@ -27,17 +32,23 @@ function Users() {
         id="user-search"
         type="search"
         value={search}
-        onChange={(event) => setSearch(event.target.value)}
+        onChange={(event) => {
+          setSearch(event.target.value);
+          setPage(1);
+        }}
         placeholder="Name, email, or branch"
       />
       <label htmlFor="user-role">Role</label>
       <select
         id="user-role"
         value={role}
-        onChange={(event) => setRole(event.target.value)}
+        onChange={(event) => {
+          setRole(event.target.value);
+          setPage(1);
+        }}
       >
         <option value="all">All roles</option>
-        {roles.map((item) => (
+        {ROLES.map((item) => (
           <option key={item} value={item}>
             {item}
           </option>
@@ -52,18 +63,26 @@ function Users() {
         </p>
       )}
 
-      {status === "succeeded" && users.length === 0 && <p>No users found.</p>}
-
-      {status === "succeeded" && users.length > 0 && filteredUsers.length === 0 && (
-        <p>No users match these filters.</p>
+      {status === "succeeded" && users.length === 0 && (
+        <p>{filtered ? "No users match these filters." : "No users found."}</p>
       )}
 
-      {status === "succeeded" && filteredUsers.length > 0 && (
-        <div>
-          {filteredUsers.map((user) => (
-            <UserCard key={user.id} user={user} />
-          ))}
-        </div>
+      {status === "succeeded" && users.length > 0 && (
+        <>
+          <p>
+            Showing {users.length} of {total} users
+          </p>
+          <div>
+            {users.map((user) => (
+              <UserCard key={user.id} user={user} />
+            ))}
+          </div>
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            onPageChange={setPage}
+          />
+        </>
       )}
     </main>
   );

@@ -13,15 +13,6 @@ const initialValues = {
   branch: "",
 };
 
-const today = () => {
-  const now = new Date();
-  return [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-  ].join("-");
-};
-
 function Register() {
   const [branches, setBranches] = useState([]);
   const [branchesError, setBranchesError] = useState("");
@@ -66,7 +57,6 @@ function Register() {
         email: values.email,
         password: values.password,
         branch: values.branch,
-        joined: today(),
       });
       setSuccessMessage(response.data.message);
       resetForm();

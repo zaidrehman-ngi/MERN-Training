@@ -23,10 +23,10 @@
                   "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
                   "",
                   "pm.test(\"Logged in as the super admin\", () => {",
-                  "    pm.expect(pm.response.json().user.role).to.eql(\"super admin\");",
+                  "    pm.expect(pm.response.json().data.user.role).to.eql(\"super admin\");",
                   "});",
                   "",
-                  "const token = pm.response.json().accessToken;",
+                  "const token = pm.response.json().data.accessToken;",
                   "pm.environment.set(\"accessToken\", token);",
                   "pm.environment.set(\"adminToken\", token);"
                 ]
@@ -457,7 +457,7 @@
                   "    }, (err, res) => {",
                   "        pm.expect(err).to.be.null;",
                   "        pm.expect(res.code).to.eql(200);",
-                  "        pm.environment.set(\"newUserId\", res.json().user.id);",
+                  "        pm.environment.set(\"newUserId\", res.json().data.user.id);",
                   "        done();",
                   "    });",
                   "});"
@@ -618,7 +618,7 @@
                 "exec": [
                   "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
                   "",
-                  "const response = pm.response.json();",
+                  "const response = pm.response.json().data;",
                   "pm.environment.set(\"accessToken\", response.accessToken);",
                   "pm.environment.set(\"userToken\", response.accessToken);",
                   "pm.environment.set(\"userId\", response.user.id);"
@@ -1177,7 +1177,7 @@
                 "exec": [
                   "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
                   "",
-                  "pm.environment.set(\"saraToken\", pm.response.json().accessToken);"
+                  "pm.environment.set(\"saraToken\", pm.response.json().data.accessToken);"
                 ]
               }
             }
@@ -1220,7 +1220,7 @@
                 "exec": [
                   "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
                   "",
-                  "pm.environment.set(\"usmanToken\", pm.response.json().accessToken);"
+                  "pm.environment.set(\"usmanToken\", pm.response.json().data.accessToken);"
                 ]
               }
             }
@@ -1640,7 +1640,7 @@
                   "    const items = pm.response.json().data;",
                   "    pm.expect(items).to.be.an(\"array\");",
                   "    items.forEach((n) => {",
-                  "        pm.expect(n.memberId).to.eql(pm.environment.get(\"userId\"));",
+                  "        pm.expect(n.userId).to.eql(pm.environment.get(\"userId\"));",
                   "        pm.expect([\"due-reminder\", \"hold-ready\"]).to.include(n.kind);",
                   "    });",
                   "});"
@@ -1951,7 +1951,7 @@
                 "exec": [
                   "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
                   "",
-                  "pm.environment.set(\"librarianToken\", pm.response.json().accessToken);"
+                  "pm.environment.set(\"librarianToken\", pm.response.json().data.accessToken);"
                 ]
               }
             }
@@ -2327,7 +2327,7 @@
                   "",
                   "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
                   "",
-                  "const body = pm.response.json();",
+                  "const body = pm.response.json().data;",
                   "",
                   "pm.test(\"Got an access token and it is the member who registered\", () => {",
                   "    pm.expect(body.accessToken).to.be.a(\"string\").and.not.empty;",
@@ -2521,7 +2521,7 @@
                   "",
                   "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
                   "",
-                  "const newToken = pm.response.json().accessToken;",
+                  "const newToken = pm.response.json().data.accessToken;",
                   "",
                   "pm.test(\"Got a new access token for the same member\", () => {",
                   "    pm.expect(newToken).to.be.a(\"string\").and.not.eql(pm.environment.get(\"flowToken\"));",

@@ -14,6 +14,7 @@ export interface NotificationsRepository {
     memberId: string,
     page: { page: number; limit: number },
   ): Promise<Notification[]>;
+  countForMember(memberId: string): Promise<number>;
 }
 
 const notificationSelect = {
@@ -40,7 +41,7 @@ const toKind = (value: string): NotificationKind => {
 
 const toNotification = (row: NotificationRow): Notification => ({
   id: row.notification_id,
-  memberId: row.member_id,
+  userId: row.member_id,
   borrowRequestId: row.request_id,
   kind: toKind(row.kind),
   message: row.message,
@@ -78,6 +79,10 @@ const createNotificationsRepository = (
       take: limit,
     });
     return rows.map(toNotification);
+  },
+
+  countForMember(memberId) {
+    return prisma.notifications.count({ where: { member_id: memberId } });
   },
 });
 

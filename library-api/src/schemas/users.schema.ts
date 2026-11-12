@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ROLES } from "../types/member.ts";
+import { pageQuery } from "./common.ts";
 
 const userRoleSchema = z.enum(ROLES);
 
@@ -11,9 +12,10 @@ const password = z
     "Password must be at most 72 bytes.",
   );
 
-const userQuerySchema = z.object({
-  page: z.coerce.number().int().positive().optional(),
-  limit: z.coerce.number().int().positive().default(10),
+const userQuerySchema = z.strictObject({
+  q: z.string().trim().min(1).optional(),
+  role: userRoleSchema.optional(),
+  ...pageQuery,
 });
 
 const createUserSchema = z.object({
@@ -22,7 +24,6 @@ const createUserSchema = z.object({
   password,
   role: z.literal("user").default("user"),
   branch: z.string().min(1),
-  joined: z.string().min(1),
 });
 
 const updateUserSchema = z.object({

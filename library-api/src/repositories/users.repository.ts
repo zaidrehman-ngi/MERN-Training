@@ -23,6 +23,7 @@ export interface UsersRepository extends DeletableRepository<
   findByEmail(email: string): Promise<PublicMember | null>;
   findForAuth(id: string): Promise<AuthMember | null>;
   findCredentialsByEmail(email: string): Promise<MemberRecord | null>;
+  count(query: MemberQuery): Promise<number>;
 }
 
 const translateWriteError = (err: unknown) =>
@@ -102,15 +103,35 @@ const toRow = async (
   return row;
 };
 
+const toWhere = ({ q, role }: MemberQuery): Prisma.membersWhereInput => {
+  const where: Prisma.membersWhereInput = { is_active: true };
+  if (q) {
+    where.OR = [
+      { name: { contains: q, mode: "insensitive" } },
+      { email: { contains: q, mode: "insensitive" } },
+      { branches: { name: { contains: q, mode: "insensitive" } } },
+    ];
+  }
+  if (role) {
+    where.role = role;
+  }
+  return where;
+};
+
 const createUsersRepository = (prisma: Db): UsersRepository => ({
-  async findAll({ page, limit }: MemberQuery = {}): Promise<PublicMember[]> {
+  async findAll(query: MemberQuery): Promise<PublicMember[]> {
     const rows = await prisma.members.findMany({
-      where: { is_active: true },
+      where: toWhere(query),
       select: publicSelect,
       orderBy: [{ name: "asc" }, { member_id: "asc" }],
-      ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {}),
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
     });
     return rows.map(toUser);
+  },
+
+  count(query: MemberQuery): Promise<number> {
+    return prisma.members.count({ where: toWhere(query) });
   },
 
   async findById(id: string): Promise<PublicMember | null> {

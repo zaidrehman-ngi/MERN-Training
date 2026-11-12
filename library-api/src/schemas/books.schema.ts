@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BOOK_STATUSES } from "../types/book.ts";
+import { pageQuery } from "./common.ts";
 
 const isbn = z.string().regex(/^\d{13}$/, "ISBN must be 13 digits.");
 
@@ -17,7 +18,7 @@ const createBookSchema = z.object({
 
 const updateBookSchema = createBookSchema.partial();
 
-const booksQuerySchema = z.object({
+const booksQuerySchema = z.strictObject({
   q: z.string().trim().min(1).optional(),
   status: z.enum(BOOK_STATUSES).optional(),
   author: z.string().optional(),
@@ -28,8 +29,7 @@ const booksQuerySchema = z.object({
     .optional(),
   sort: z.enum(["title", "author", "year"]).optional(),
   order: z.enum(["asc", "desc"]).default("asc"),
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().default(10),
+  ...pageQuery,
 });
 
 export { createBookSchema, updateBookSchema, booksQuerySchema };

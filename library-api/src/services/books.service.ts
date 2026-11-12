@@ -6,6 +6,7 @@ import {
 import { DOMAIN_EVENTS } from "../events/domainEvents.ts";
 import type { BooksRepository } from "../repositories/books.repository.ts";
 import type { Book, BookQuery, NewBook } from "../types/book.ts";
+import type { Page } from "../types/page.ts";
 import type { Changes } from "../types/changes.ts";
 import type { Events } from "../types/events.ts";
 
@@ -23,12 +24,18 @@ const createBooksService = (
   };
 
   return {
-    list: ({
+    async list({
       page = 1,
       limit = PAGE_SIZE,
       ...filters
-    }: Partial<BookQuery> = {}): Promise<Book[]> =>
-      booksRepository.findAll({ ...filters, page, limit }),
+    }: Partial<BookQuery> = {}): Promise<Page<Book>> {
+      const query = { ...filters, page, limit };
+      const [items, total] = await Promise.all([
+        booksRepository.findAll(query),
+        booksRepository.count(query),
+      ]);
+      return { items, page, limit, total };
+    },
 
     async getById(id: string): Promise<Book> {
       const book = await booksRepository.findById(id);

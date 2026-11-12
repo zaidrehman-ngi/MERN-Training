@@ -236,7 +236,7 @@ const createSocketServer = (
     io.to(COUNTER_ROOM).emit(EVENTS.SERVER_BORROW_REQUEST_CREATED, {
       id: request.id,
       bookTitle: request.book.title,
-      memberName: request.member.name,
+      userName: request.user.name,
       requestedAt: request.requestedAt,
     });
   });
@@ -257,7 +257,7 @@ const createSocketServer = (
       io.to(memberRoom(memberId)).emit(EVENTS.SERVER_LOAN_DUE_SOON, {
         borrowRequestId,
         bookTitle,
-        dueOn,
+        dueDate: dueOn,
         message,
       });
     },

@@ -162,3 +162,144 @@ users don't land on pages they can't use.
 
 For the demo I run the API with `JWT_EXPIRES_IN=10s` so step 6 doesn't
 take 15 minutes.
+
+# Exercise 3 — The contract was wrong
+
+## Task 1: The mismatches
+
+**Frontend wrong**
+
+- The book form asks for a branch, but books don't have one.
+- Add Book never sends `year` or `finePerDay`, which the API requires.
+- The borrow request sent `userId` and dates. The API takes the user from
+  the token and sets the dates itself.
+- Create and update book thunks return `response.data` instead of
+  `response.data.data`.
+- Books without a cover pointed at `/covers/placeholder.jpg`, which only
+  json-server served.
+
+**Backend wrong**
+
+- Register requires `joined` from the client. The server should set the
+  join date.
+
+**Spec never said**
+
+- Response shape: the mock returned a plain array, the API returns
+  `{ data: [...] }`.
+- Pagination: the API returns 10 books by default with no total or page
+  info, so the frontend can't tell if there is a page 2.
+- Query params: the frontend sent `status` and `q`, the API had
+  `available` and `title`. Unknown params were ignored without an error.
+- Status values: `RESERVED_STACK` was never listed, so the card didn't
+  know it.
+- Dates: some fields are `YYYY-MM-DD` (`joined`, `dueDate`), others are
+  full ISO timestamps (`queuedAt`, `returnedAt`). Nothing says which, or
+  which time zone.
+- Error body: the API sends `{ error, message, details }`. The mock had no
+  error format, so the frontend made up its own 404 message.
+- Ids: the mock used ids like `bk-1`, the API uses UUIDs and returns `400`
+  for a bad one, not `404`.
+- Field names in general (`onShelf`, `totalCopies`) were never written
+  down, each side just guessed.
+
+## Task 2: Fixing them
+
+Rule: the side that owns the data or the rule moves. The API owns the data
+and has other clients (Postman, later mobile), so its names and shapes stay
+and the frontend adapts. The backend moves only when it is missing
+something only the server can know, or when it lets a mistake pass
+silently.
+
+The three biggest:
+
+1. **Pagination, backend.** Only the server knows how many books match.
+   `GET /books` now returns `{ data, meta: { page, limit, total } }`. `data`
+   stays an array so nothing else breaks. The catalogue shows
+   "Showing 10 of 25 titles" with Previous and Next.
+2. **Add/Edit book form, frontend.** The API's book shape is right, the
+   form was built for the mock. Removed the branch field, added `year` and
+   `finePerDay` to both forms, and the form now sends only its own fields.
+3. **`joined` date, backend.** The client shouldn't decide when someone
+   joined. The API sets it to today in the library's time zone and no
+   longer accepts it on register.
+
+The rest:
+
+- Thunks for create, update and borrow now read `response.data.data`
+  (frontend).
+- Unknown query params on `GET /books` now return `400` instead of being
+  ignored (backend), so a wrong name shows up right away.
+- Dates stay as they are: date-only fields are `YYYY-MM-DD`, timestamps are
+  ISO in UTC.
+
+## Task 3: Casing
+
+The database uses snake_case (`total_copies`, `joined_on`), JavaScript uses
+camelCase. The translation happens only in the repositories: each one has a
+`toBook` / `toUser` style function that turns a row into an object, and
+nothing above the repository sees a column name. The repository is the
+only layer that knows the database, so it is the only one that should know
+its naming.
+
+Then I checked every GET response for keys. All camelCase, but some
+endpoints still disagreed:
+
+- Login and refresh returned `{ accessToken, user }` while everything else
+  uses `{ data }`. Both now return `{ data: { accessToken, user } }`, and
+  refresh returns the same `user` fields as login (it was missing `email`).
+- The same person was `userId`, `memberId`, `member` and `memberName`
+  depending on the endpoint. The API calls them users, so it's `userId` and
+  `user` everywhere now.
+- `GET /borrow-requests` returned flat `memberName` and `bookTitle`, while
+  the detail and `/overdue` returned nested `user` and `book`. The list
+  now uses the same shape as the detail.
+- The due-reminder socket event sent `dueOn`, the REST API calls it
+  `dueDate`. The socket now sends `dueDate`.
+
+The frontend and the Postman tests were updated for the auth `data`
+envelope.
+
+## Task 4: Dates
+
+What arrives in the browser: `dueDate: "2026-11-12"` and
+`queuedAt: "2026-11-12T20:30:00.000Z"`. The cards rendered those strings
+as they were. The trap is formatting them with `new Date()`:
+
+- `new Date("2026-11-12")` is UTC midnight, so in New York it shows
+  11 Nov, a day early.
+- `20:30Z` is 01:30 on 13 Nov in Karachi. Shown raw, the member sees the
+  wrong time and the wrong day.
+
+Convention:
+
+- The API sends two kinds of dates. A library day (due date, hold until,
+  joined) is `YYYY-MM-DD`. A moment in time (queued, returned, created) is
+  ISO 8601 in UTC with `Z`.
+- The frontend shows a library day exactly as sent and never converts it.
+  `formatDay` in `src/utils/dates.js` formats it in UTC so it can't shift.
+  A moment in time is converted only for display.
+
+Whose job the time zone is: the library's time zone is the backend's job.
+"Today", due dates and overdue are worked out with `LIBRARY_TIME_ZONE`
+(`Asia/Karachi`), not the server clock. That matters once it's deployed:
+on a UTC server, `toISOString()` would give yesterday between midnight and
+5 am in Karachi. The member's own time zone is only a display concern, so
+it belongs to the frontend. The API never needs to know it.
+
+## Task 5: The spec
+
+`library-api/api-spec.md` now describes what both apps actually do:
+endpoints and roles, the `{ data }` envelope, paging `meta`, error codes,
+date formats, auth and refresh, socket events, jobs, and which endpoints
+the frontend calls.
+
+What I would do differently:
+
+I would write the spec from real example requests and responses, with
+every shape, date format, error body and paging rule written out, instead
+of a table of paths that left both sides guessing. I would build one thin
+slice end to end (log in, list books, borrow one) in the first week, so
+the contract gets tested by both apps before either side builds on top of
+it. And I would check the spec automatically, with Postman tests that
+assert the documented shapes, so it can't quietly go out of date again.

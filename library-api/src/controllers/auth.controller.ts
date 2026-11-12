@@ -45,12 +45,14 @@ const login = async (req: RequestWithBody<LoginBody>, res: Response) => {
   setRefreshTokenCookie(res, await auth.issueRefreshToken(user.id));
 
   res.status(200).json({
-    accessToken,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
+    data: {
+      accessToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     },
   });
 };
@@ -74,8 +76,15 @@ const refreshToken = async (req: Request, res: Response) => {
 
   setRefreshTokenCookie(res, newRefreshToken);
   res.status(200).json({
-    accessToken: auth.createAccessToken(member),
-    user: { id: member.id, name: member.name, role: member.role },
+    data: {
+      accessToken: auth.createAccessToken(member),
+      user: {
+        id: member.id,
+        name: member.name,
+        email: member.email,
+        role: member.role,
+      },
+    },
   });
 };
 

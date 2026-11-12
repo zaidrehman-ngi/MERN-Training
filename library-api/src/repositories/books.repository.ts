@@ -15,6 +15,7 @@ export interface BooksRepository extends DeletableRepository<
 > {
   findByIsbn(isbn: string): Promise<Book | null>;
   changeAvailableCopies(id: string, change: number): Promise<Book | null>;
+  count(query: BookQuery): Promise<number>;
 }
 
 const toBookStatus = (value: string): BookStatus => {
@@ -86,51 +87,51 @@ const toOrderBy = (
   return [{ title: order }, tieBreak];
 };
 
+const toWhere = ({
+  q,
+  status,
+  author,
+  title,
+  available,
+}: BookQuery): Prisma.booksWhereInput => {
+  const where: Prisma.booksWhereInput = { is_active: true };
+
+  if (q) {
+    where.OR = [
+      { title: { contains: q, mode: "insensitive" } },
+      { author: { contains: q, mode: "insensitive" } },
+    ];
+  }
+  if (status) {
+    where.status = status;
+  }
+  if (author) {
+    where.author = author;
+  }
+  if (title) {
+    where.title = title;
+  }
+  if (available !== undefined) {
+    where.available_copies = available ? { gt: 0 } : 0;
+  }
+  return where;
+};
+
 const createBooksRepository = (prisma: Db): BooksRepository => ({
-  async findAll({
-    q,
-    status,
-    author,
-    title,
-    available,
-    sort,
-    order = "asc",
-    page,
-    limit,
-  }: BookQuery): Promise<Book[]> {
-    const where: Prisma.booksWhereInput = { is_active: true };
-
-    if (q) {
-      where.OR = [
-        { title: { contains: q, mode: "insensitive" } },
-        { author: { contains: q, mode: "insensitive" } },
-      ];
-    }
-
-    if (status) {
-      where.status = status;
-    }
-
-    if (author) {
-      where.author = author;
-    }
-
-    if (title) {
-      where.title = title;
-    }
-
-    if (available !== undefined) {
-      where.available_copies = available ? { gt: 0 } : 0;
-    }
-
+  async findAll(query: BookQuery): Promise<Book[]> {
+    const { sort, order = "asc", page, limit } = query;
     const rows = await prisma.books.findMany({
-      where,
+      where: toWhere(query),
       orderBy: toOrderBy(sort, order),
       skip: (page - 1) * limit,
       take: limit,
     });
 
     return rows.map(toBook);
+  },
+
+  count(query: BookQuery): Promise<number> {
+    return prisma.books.count({ where: toWhere(query) });
   },
 
   async findById(id: string): Promise<Book | null> {

@@ -1,5 +1,5 @@
 import type { Prisma } from "../generated/prisma/client.ts";
-import type { AuthMember } from "../types/member.ts";
+import type { SessionUser } from "../types/member.ts";
 import { toRole } from "./users.repository.ts";
 
 type Db = Prisma.TransactionClient;
@@ -10,7 +10,7 @@ export type NewRefreshToken = {
   expiresAt: Date;
 };
 
-export type ValidRefreshToken = { tokenId: string; member: AuthMember };
+export type ValidRefreshToken = { tokenId: string; member: SessionUser };
 
 // only the SHA-256 hash is stored, never the token
 export interface RefreshTokensRepository {
@@ -43,7 +43,9 @@ const createRefreshTokensRepository = (
       },
       select: {
         token_id: true,
-        members: { select: { member_id: true, name: true, role: true } },
+        members: {
+          select: { member_id: true, name: true, email: true, role: true },
+        },
       },
     });
     if (!row) {
@@ -54,6 +56,7 @@ const createRefreshTokensRepository = (
       member: {
         id: row.members.member_id,
         name: row.members.name,
+        email: row.members.email,
         role: toRole(row.members.role),
       },
     };

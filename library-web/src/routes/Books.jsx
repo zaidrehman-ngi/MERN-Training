@@ -4,16 +4,21 @@ import BookCard from "../components/BookCard/BookCard";
 import SearchBox from "../components/SearchBox";
 import ResultCount from "../components/ResultCount";
 import FilterChips from "../components/FilterChips";
+import Pagination from "../components/Pagination";
 import { useDispatch, useSelector } from "react-redux";
 import useDebounce from "../hooks/useDebounce";
 import {
   fetchBooks,
   filterChanged,
+  pageChanged,
   selectAllBooks,
   selectBooksError,
   selectBooksStatus,
   selectFilter,
+  selectPage,
+  selectPageCount,
   selectSearch,
+  selectTotal,
   searchChanged,
 } from "../store/booksSlice";
 
@@ -26,10 +31,13 @@ function Books() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const books = useSelector(selectAllBooks);
+  const page = useSelector(selectPage);
+  const pageCount = useSelector(selectPageCount);
+  const total = useSelector(selectTotal);
 
   useEffect(() => {
-    dispatch(fetchBooks({ filter, search: debouncedSearchText }));
-  }, [dispatch, filter, debouncedSearchText]);
+    dispatch(fetchBooks({ filter, search: debouncedSearchText, page }));
+  }, [dispatch, filter, debouncedSearchText, page]);
 
   const handleSelect = useCallback(
     (selectedBook) => {
@@ -44,7 +52,7 @@ function Books() {
   );
 
   const handleRetry = () => {
-    dispatch(fetchBooks({ filter, search: debouncedSearchText }));
+    dispatch(fetchBooks({ filter, search: debouncedSearchText, page }));
   };
 
   return (
@@ -78,7 +86,7 @@ function Books() {
       {status !== "idle" && books.length > 0 && (
         <>
           {" "}
-          <ResultCount count={books.length} />{" "}
+          <ResultCount count={books.length} total={total} />{" "}
           <div>
             {" "}
             {books.map((book) => (
@@ -87,6 +95,11 @@ function Books() {
               </div>
             ))}{" "}
           </div>{" "}
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            onPageChange={(next) => dispatch(pageChanged(next))}
+          />
         </>
       )}{" "}
     </main>

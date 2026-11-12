@@ -4,10 +4,13 @@ import { createBorrowRequest } from "../api/borrowRequests";
 
 export const fetchBooks = createAsyncThunk(
   "books/fetchBooks",
-  async ({ filter = "all", search = "" } = {}, { rejectWithValue }) => {
+  async (
+    { filter = "all", search = "", page = 1 } = {},
+    { rejectWithValue },
+  ) => {
     try {
-      const response = await listBooks({ filter, search });
-      return response.data.data;
+      const response = await listBooks({ filter, search, page });
+      return response.data;
     } catch (error) {
       return rejectWithValue(error);
     }
@@ -19,7 +22,7 @@ export const createBookThunk = createAsyncThunk(
   async (book, { rejectWithValue }) => {
     try {
       const response = await createBook(book);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error);
     }
@@ -31,7 +34,7 @@ export const updateBookThunk = createAsyncThunk(
   async ({ id, book }, { rejectWithValue }) => {
     try {
       const response = await updateBook(id, book);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error);
     }
@@ -55,7 +58,7 @@ export const borrowBookThunk = createAsyncThunk(
   async ({ request }, { rejectWithValue }) => {
     try {
       const response = await createBorrowRequest(request);
-      return response.data;
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error);
     }
@@ -74,6 +77,9 @@ const initialState = {
   error: null,
   filter: "all",
   search: "",
+  page: 1,
+  total: 0,
+  limit: 10,
   currentRequestId: null,
   borrowStatusByBookId: {},
   borrowErrorByBookId: {},
@@ -128,10 +134,16 @@ const booksSlice = createSlice({
 
     filterChanged: (state, action) => {
       state.filter = action.payload;
+      state.page = 1;
     },
 
     searchChanged: (state, action) => {
       state.search = action.payload;
+      state.page = 1;
+    },
+
+    pageChanged: (state, action) => {
+      state.page = action.payload;
     },
   },
 
@@ -149,7 +161,9 @@ const booksSlice = createSlice({
         }
 
         state.status = "succeeded";
-        state.items = action.payload;
+        state.items = action.payload.data;
+        state.total = action.payload.meta.total;
+        state.limit = action.payload.meta.limit;
         state.currentRequestId = null;
       })
 
@@ -260,11 +274,16 @@ export const {
   resetBookMutation,
   filterChanged,
   searchChanged,
+  pageChanged,
 } = booksSlice.actions;
 
 export const selectAllBooks = (state) => state.books.items;
 export const selectFilter = (state) => state.books.filter;
 export const selectSearch = (state) => state.books.search;
+export const selectPage = (state) => state.books.page;
+export const selectTotal = (state) => state.books.total;
+export const selectPageCount = (state) =>
+  Math.max(1, Math.ceil(state.books.total / state.books.limit));
 export const selectBooksStatus = (state) => state.books.status;
 export const selectBooksError = (state) => state.books.error;
 

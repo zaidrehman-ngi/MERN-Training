@@ -3,7 +3,7 @@ export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 export type Notification = {
   id: string;
-  memberId: string;
+  userId: string;
   borrowRequestId: string | null;
   kind: NotificationKind;
   message: string;

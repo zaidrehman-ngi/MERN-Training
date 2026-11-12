@@ -17,6 +17,8 @@ import type {
   SignUp,
 } from "../types/member.ts";
 import { ADMIN_ROLES } from "../types/member.ts";
+import { todayIn } from "../utils/dates.ts";
+import type { Page } from "../types/page.ts";
 
 const isAdmin = (role: Role) => ADMIN_ROLES.includes(role);
 
@@ -25,9 +27,15 @@ const noEvents: Events = { emit: () => false };
 const createUsersService = (
   usersRepository: UsersRepository,
   events: Events = noEvents,
+  timeZone = "Asia/Karachi",
 ) => ({
-  list: (query: MemberQuery): Promise<PublicMember[]> =>
-    usersRepository.findAll(query),
+  async list(query: MemberQuery): Promise<Page<PublicMember>> {
+    const [items, total] = await Promise.all([
+      usersRepository.findAll(query),
+      usersRepository.count(query),
+    ]);
+    return { items, page: query.page, limit: query.limit, total };
+  },
 
   async getById(id: string): Promise<PublicMember> {
     const user = await usersRepository.findById(id);
@@ -59,7 +67,7 @@ const createUsersService = (
         name: signUp.name,
         email: signUp.email,
         branch: signUp.branch,
-        joined: signUp.joined,
+        joined: todayIn(timeZone),
         role: "user",
         passwordHash,
       });

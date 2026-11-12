@@ -45,7 +45,7 @@ client.interceptors.response.use(
     if (status === 401 && canRetryWithNewToken(error.config)) {
       try {
         const response = await refreshSession();
-        setAccessToken(response.data.accessToken);
+        setAccessToken(response.data.data.accessToken);
         return client({ ...error.config, retried: true });
       } catch {
         endSession();

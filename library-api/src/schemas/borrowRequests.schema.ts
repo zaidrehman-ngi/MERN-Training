@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { BORROW_REQUEST_STATUSES } from "../types/borrowRequest.ts";
+import { pageQuery } from "./common.ts";
 
-const borrowRequestQuerySchema = z.object({
+const borrowRequestQuerySchema = z.strictObject({
+  q: z.string().trim().min(1).optional(),
   userId: z.uuid().optional(),
   bookId: z.uuid().optional(),
   status: z.enum(BORROW_REQUEST_STATUSES).optional(),
-  page: z.coerce.number().int().positive().optional(),
-  limit: z.coerce.number().int().positive().default(10),
+  ...pageQuery,
 });
 
 // the member comes from the token, everything else is set by the service

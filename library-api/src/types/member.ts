@@ -22,25 +22,28 @@ export type MemberRecord = PublicMember & {
 };
 
 export type AuthMember = Pick<PublicMember, "id" | "name" | "role">;
+export type SessionUser = Pick<PublicMember, "id" | "name" | "email" | "role">;
 
 export type SignUp = {
   name: string;
   email: string;
   password: string;
   branch: string;
-  joined: string;
 };
 
-export type MemberChanges = Changes<SignUp & { role: Role }>;
+export type MemberChanges = Changes<SignUp & { role: Role; joined: string }>;
 
 export type NewMemberRow = Omit<SignUp, "password"> & {
   role: Role;
+  joined: string;
   passwordHash: string;
 };
 
 export type MemberRowInput = Changes<NewMemberRow>;
 
 export type MemberQuery = {
-  page?: number;
-  limit?: number;
+  q?: string | undefined;
+  role?: Role | undefined;
+  page: number;
+  limit: number;
 };
