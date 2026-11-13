@@ -60,7 +60,7 @@ Every error has the same shape:
 | 401 | `UNAUTHORIZED` | no token, expired, logged out, wrong login |
 | 403 | `FORBIDDEN` | logged in but not allowed |
 | 404 | `NOT_FOUND` | no such book, user, request, branch or route |
-| 409 | `CONFLICT`, `ISBN_TAKEN`, `EMAIL_TAKEN`, `BORROW_LIMIT_REACHED`, `REQUEST_CLOSED`, `REQUEST_QUEUED`, `NOT_CANCELLABLE`, `ALREADY_RETURNED`, `REQUEST_CHANGED` | the action clashes with the current state |
+| 409 | `CONFLICT`, `ISBN_TAKEN`, `EMAIL_TAKEN`, `BORROW_LIMIT_REACHED`, `REQUEST_CLOSED`, `REQUEST_QUEUED`, `NOT_CANCELLABLE`, `ALREADY_RETURNED`, `REQUEST_CHANGED`, `NOT_ON_LOAN`, `NO_FINE` | the action clashes with the current state |
 | 429 | `RATE_LIMIT_EXCEEDED` | too many requests |
 | 500 | `INTERNAL_SERVER_ERROR` | anything unexpected (no internals in production) |
 
@@ -108,10 +108,11 @@ All of `/api/v1`: 100 requests per 15 minutes. `POST /auth/login`: 5 per
 | POST | `/borrow-requests` | request a book | logged in |
 | GET | `/borrow-requests/overdue` | approved loans past their due date | staff |
 | GET | `/borrow-requests/:id` | one request | owner or staff |
-| PATCH | `/borrow-requests/:id` | approve, reject or reset to pending | staff |
+| PATCH | `/borrow-requests/:id` | approve, reject or reset to pending; or move a loan's due date | staff |
 | POST | `/borrow-requests/:id/cancel` | cancel a waiting request | owner |
 | GET | `/borrow-requests/:id/queue` | place in the queue for the book | owner or staff |
 | POST | `/borrow-requests/:id/return` | mark the book returned | staff |
+| POST | `/borrow-requests/:id/waive-fine` | set the fine of a returned loan to 0 | admin |
 | GET | `/notifications` | the caller's notifications | logged in |
 | POST | `/jobs/due-reminders/run` | run the due reminder job now | admin |
 
@@ -201,9 +202,20 @@ the token. The server sets the status, the dates and the fine. If a copy is
 on the shelf the request is `pending`; if not, it is `queued`. A member can
 have at most 5 open requests (`409 BORROW_LIMIT_REACHED`).
 
-`PATCH /borrow-requests/:id` body: `{ "status": "approved" | "rejected" | "pending" }`.
-Approving takes a copy off the shelf and sets `dueDate` to today + 14
-days. Staff can't decide their own request.
+`PATCH /borrow-requests/:id` takes one of two bodies:
+
+- `{ "status": "approved" | "rejected" | "pending" }`. Approving takes a
+  copy off the shelf and sets `dueDate` to today + 14 days. Staff can't
+  decide their own request.
+- `{ "dueDate": "YYYY-MM-DD" }`. Moves the due date of an approved loan.
+  It can't be in the past (`422`); a request that isn't out returns
+  `409 NOT_ON_LOAN`.
+
+Sending both, or neither, returns `400`.
+
+`POST /borrow-requests/:id/waive-fine` (admin) sets the fine of a returned
+loan to 0. If the request isn't returned or has no fine, it returns
+`409 NO_FINE`.
 
 Statuses: `pending` → `approved` → `returned`; `queued` → `held` (a copy
 is kept for 3 days) → `approved`; `rejected`, `cancelled` and `expired`
@@ -300,12 +312,18 @@ Client to server (each gets an ack `{ ok: true, ... }` or
 | --- | --- |
 | Register | `GET /branches`, `POST /auth/register` |
 | Login / Header | `POST /auth/login`, `/auth/refresh`, `/auth/logout`; socket connect |
+| Home (admin) | `POST /jobs/due-reminders/run` |
 | Books | `GET /books` with `q`, `status`, `page` |
-| Book detail | `GET /books/:id`, `POST /borrow-requests` |
+| Book detail | `GET /books/:id`, `POST /borrow-requests`; staff `PATCH`, admin `DELETE /books/:id` |
 | Add / Edit book (staff) | `POST /books`, `PATCH /books/:id` |
-| Borrow requests (logged in) | `GET /borrow-requests` with `q`, `status`, `page` |
-| Users (staff) | `GET /users` with `q`, `role`, `page` |
+| My borrow requests / Approval queue | `GET /borrow-requests` with `q`, `status`, `page`; `POST .../cancel` (own); staff `PATCH` (decide, due date) and `POST .../return`; admin `POST .../waive-fine` |
+| Members (staff) / Manage members (admin) | `GET /users` with `q`, `role`, `page`; admin `PATCH /users/:id` (role) and `DELETE /users/:id` for users and librarians |
+| Manage admins (super admin) | `GET /users?role=admin` or `super admin`; `PATCH /users/:id` (role) and `DELETE /users/:id` for admins |
 
-Not used by the frontend yet: approving, rejecting, cancelling and returning
-requests, the queue, notifications, overdue, user editing, and the socket
-events other than connect.
+What each role sees follows the Week 7 permission matrix, kept in
+`library-web/src/constants/permissions.js`. Hiding a button is only for
+convenience; the API checks every rule again.
+
+Not used by the frontend yet: the queue position, notifications, overdue,
+editing a member's name, email or branch, and the socket events other than
+connect.

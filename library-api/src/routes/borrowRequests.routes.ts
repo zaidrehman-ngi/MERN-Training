@@ -8,10 +8,11 @@ import {
   cancelBorrowRequest,
   getQueuePosition,
   returnBorrowedBook,
+  waiveFine,
 } from "../controllers/borrowRequests.controller.ts";
 import requireAuth from "../middleware/requireAuth.ts";
 import requireRole from "../middleware/requireRole.ts";
-import { STAFF_ROLES } from "../types/member.ts";
+import { ADMIN_ROLES, STAFF_ROLES } from "../types/member.ts";
 import validate from "../middleware/validate.ts";
 import { idParamsSchema } from "../schemas/common.ts";
 import {
@@ -80,6 +81,14 @@ router.post(
   requireRole(...STAFF_ROLES),
   validate(idParamsSchema, "params"),
   returnBorrowedBook,
+);
+
+router.post(
+  "/:id/waive-fine",
+  requireAuth,
+  requireRole(...ADMIN_ROLES),
+  validate(idParamsSchema, "params"),
+  waiveFine,
 );
 
 export default router;

@@ -15,10 +15,18 @@ const createBorrowRequestSchema = z.object({
   bookId: z.uuid(),
 });
 
-// staff only decide the status; dates and fine are set by the service
-const updateBorrowRequestSchema = z.strictObject({
-  status: z.enum(["pending", "approved", "rejected"]),
-});
+// staff either decide the status or move the due date of a loan
+const updateBorrowRequestSchema = z.union(
+  [
+    z.strictObject({
+      status: z.enum(["pending", "approved", "rejected"]),
+    }),
+    z.strictObject({
+      dueDate: z.iso.date(),
+    }),
+  ],
+  { error: "Send either a status or a new dueDate." },
+);
 
 export {
   borrowRequestQuerySchema,

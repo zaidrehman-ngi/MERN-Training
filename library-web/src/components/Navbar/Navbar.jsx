@@ -31,6 +31,11 @@ function Navbar() {
           {can("members:manage") ? "Manage members" : "Members"}
         </NavLink>
       )}
+      {can("admins:manage") && (
+        <NavLink to="/admins" className={linkClass}>
+          Manage admins
+        </NavLink>
+      )}
     </nav>
   );
 }

@@ -2,6 +2,7 @@ import {
   BorrowLimitReachedError,
   ConflictError,
   ForbiddenError,
+  InvalidValueError,
   NotFoundError,
 } from "../errors/domainErrors.ts";
 import { DOMAIN_EVENTS } from "../events/domainEvents.ts";
@@ -61,6 +62,8 @@ export type BorrowRequestsService = {
     changes: BorrowRequestChanges,
     actor?: Actor,
   ): Promise<BorrowRequest>;
+  changeDueDate(id: string, dueDate: string): Promise<BorrowRequest>;
+  waiveFine(id: string): Promise<BorrowRequest>;
   returnBook(id: string): Promise<BorrowRequest>;
   cancel(id: string, memberId: string): Promise<BorrowRequest>;
   queuePosition(id: string, viewer?: Actor): Promise<QueuePosition>;
@@ -370,6 +373,50 @@ const createBorrowRequestsService = (
           return withFine(borrowRequest);
         },
       );
+    },
+
+    async changeDueDate(id, dueDate) {
+      const before = await this.getById(id);
+      if (before.status !== "approved") {
+        throw new ConflictError(
+          "Only a book that is out can get a new due date.",
+          {
+            code: "NOT_ON_LOAN",
+          },
+        );
+      }
+      if (dueDate < today()) {
+        throw new InvalidValueError("The due date can't be in the past.", {
+          details: [{ field: "dueDate", message: "Must be today or later." }],
+        });
+      }
+      const borrowRequest = await borrowRequestsRepository.updateIfStatus(
+        id,
+        ["approved"],
+        { dueDate },
+      );
+      if (!borrowRequest) {
+        throw requestChanged();
+      }
+      return withFine(borrowRequest);
+    },
+
+    async waiveFine(id) {
+      const before = await this.getById(id);
+      if (before.status !== "returned" || !before.fine) {
+        throw new ConflictError("There is no fine on this request to waive.", {
+          code: "NO_FINE",
+        });
+      }
+      const borrowRequest = await borrowRequestsRepository.updateIfStatus(
+        id,
+        ["returned"],
+        { fine: 0 },
+      );
+      if (!borrowRequest) {
+        throw requestChanged();
+      }
+      return borrowRequest;
     },
 
     returnBook(id) {

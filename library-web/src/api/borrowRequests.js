@@ -26,3 +26,11 @@ export function cancelBorrowRequest(id) {
 export function returnBorrowRequest(id) {
   return client.post(`/borrow-requests/${id}/return`);
 }
+
+export function changeDueDate(id, dueDate) {
+  return client.patch(`/borrow-requests/${id}`, { dueDate });
+}
+
+export function waiveFine(id) {
+  return client.post(`/borrow-requests/${id}/waive-fine`);
+}

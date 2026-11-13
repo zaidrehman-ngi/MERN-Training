@@ -1,6 +1,5 @@
 import { ADMIN_ROLES, ROLES, STAFF_ROLES } from "./roles";
 
-// the Week 7 permission matrix; the API checks the same rules
 const PERMISSIONS = {
   "books:add": STAFF_ROLES,
   "books:edit": STAFF_ROLES,
@@ -9,8 +8,11 @@ const PERMISSIONS = {
   "requests:seeAll": STAFF_ROLES,
   "requests:decide": STAFF_ROLES,
   "requests:return": STAFF_ROLES,
+  "requests:changeDueDate": STAFF_ROLES,
+  "fines:waive": ADMIN_ROLES,
   "members:list": STAFF_ROLES,
   "members:manage": ADMIN_ROLES,
+  "admins:manage": ["super admin"],
   "jobs:run": ADMIN_ROLES,
 };
 

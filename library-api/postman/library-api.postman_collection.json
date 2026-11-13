@@ -5,7 +5,7 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "58028095",
     "_collection_link": "https://go.postman.co/collection/58028095-03fce204-e50f-4c80-806f-2d05258e8787?source=collection_link",
-    "description": "Seed the database once (npm run db:seed). After that the collection can be run again and again: it creates its own book, member and requests and cleans them up.\n\nStart the API with JWT_EXPIRES_IN=10s so the token-expiry step in the auth flow can pass.\n\nOne run uses about 55 of the API rate limit (RATE_LIMIT_MAX=100 per 15 minutes), so a second run straight away gets 429s: wait 15 minutes or raise the limit."
+    "description": "Seed the database once (npm run db:seed). After that the collection can be run again and again: it creates its own book, member and requests and cleans them up.\n\nStart the API with JWT_EXPIRES_IN=10s so the token-expiry step in the auth flow can pass.\n\nOne run uses about 60 of the API rate limit (RATE_LIMIT_MAX=100 per 15 minutes), so a second run straight away gets 429s: wait 15 minutes or raise the limit."
   },
   "item": [
     {
@@ -998,6 +998,122 @@
           "response": []
         },
         {
+          "name": "Move the due date",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const later = new Date(Date.now() + 30 * 86400000);",
+                  "pm.collectionVariables.set(\"newDueDate\", later.toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"The loan has the new due date\", () => {",
+                  "    pm.expect(pm.response.json().data.dueDate).to.eql(pm.collectionVariables.get(\"newDueDate\"));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dueDate\": \"{{newDueDate}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrow-requests/{{loanId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "borrow-requests", "{{loanId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Due date in the past (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 422\", () => pm.response.to.have.status(422));",
+                  "",
+                  "pm.test(\"Error VALIDATION_ERROR in the standard shape\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.all.keys(\"error\", \"message\", \"details\");",
+                  "    pm.expect(body.error).to.eql(\"VALIDATION_ERROR\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dueDate\": \"2000-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrow-requests/{{loanId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "borrow-requests", "{{loanId}}"]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Return the book",
           "event": [
             {
@@ -1074,6 +1190,52 @@
               "raw": "{{baseUrl}}/api/v1/borrow-requests/{{loanId}}/return",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "borrow-requests", "{{loanId}}", "return"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Nothing to waive (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 409\", () => pm.response.to.have.status(409));",
+                  "",
+                  "pm.test(\"Error NO_FINE in the standard shape\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.all.keys(\"error\", \"message\", \"details\");",
+                  "    pm.expect(body.error).to.eql(\"NO_FINE\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrow-requests/{{loanId}}/waive-fine",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "borrow-requests",
+                "{{loanId}}",
+                "waive-fine"
+              ]
             }
           },
           "response": []
@@ -1902,6 +2064,60 @@
           "response": []
         },
         {
+          "name": "Member can't change a due date (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 403\", () => pm.response.to.have.status(403));",
+                  "",
+                  "pm.test(\"Error FORBIDDEN in the standard shape\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.all.keys(\"error\", \"message\", \"details\");",
+                  "    pm.expect(body.error).to.eql(\"FORBIDDEN\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dueDate\": \"2099-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrow-requests/{{loanId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "borrow-requests", "{{loanId}}"]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Member can't run jobs (403)",
           "event": [
             {
@@ -2060,6 +2276,52 @@
               "raw": "{{baseUrl}}/api/v1/jobs/due-reminders/run",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "jobs", "due-reminders", "run"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Librarian can't waive a fine (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 403\", () => pm.response.to.have.status(403));",
+                  "",
+                  "pm.test(\"Error FORBIDDEN in the standard shape\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.all.keys(\"error\", \"message\", \"details\");",
+                  "    pm.expect(body.error).to.eql(\"FORBIDDEN\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{librarianToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/borrow-requests/{{loanId}}/waive-fine",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "borrow-requests",
+                "{{loanId}}",
+                "waive-fine"
+              ]
             }
           },
           "response": []

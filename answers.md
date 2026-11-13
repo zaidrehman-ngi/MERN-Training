@@ -351,5 +351,97 @@ What each role sees:
 - **Super admin:** everything an admin sees, and can also manage admins
   and give the admin or super admin role.
 
-Two rows of the matrix have no UI because the API has no endpoint for them
-yet: changing a due date (row 11) and waiving a fine (row 14).
+Two rows of the matrix had no endpoint, so I added them to the API first:
+
+- Row 11, change a due date: staff send `{ dueDate }` to
+  `PATCH /borrow-requests/:id`. It only works on a book that is out, and
+  the date can't be in the past. Approved loans in the queue show a date
+  field for it.
+- Row 14, waive a fine: `POST /borrow-requests/:id/waive-fine`, for admins
+  only, on a returned loan that has a fine. Admins see "Waive fine" on
+  those cards.
+
+## Task 3: Breaking my own interface
+
+Logged in as Sara, a plain member, and tried three things from dev tools.
+
+**1. Changed the role in the store.** I found the Redux store through
+React's root element in the console and dispatched
+`auth/login/fulfilled` with `role: "librarian"`. The frontend believed
+it:
+
+- The nav changed from "Home, Books, My requests" to "Home, Books,
+  Approval queue, Add Book, Members".
+- `/users` and the Approval queue opened, and the book page showed "Edit
+  book".
+
+The server didn't believe it. The Members page showed "You do not have
+permission to perform this action." and the Approval queue showed none of
+the other members' requests, because the API only returns your own to a
+`user`.
+
+**2. Called the API from the console** with Sara's real token (its role is
+still `user`):
+
+| Call | Result |
+|---|---|
+| `GET /users` | `403 FORBIDDEN` |
+| Approve someone else's request | `403 FORBIDDEN` |
+| Move a due date | `403 FORBIDDEN` |
+| Mark a book returned | `403 FORBIDDEN` |
+| `POST /books` | `403 FORBIDDEN` |
+| `DELETE /books/:id` | `403 FORBIDDEN` |
+| `GET /borrow-requests/overdue` | `403 FORBIDDEN` |
+| Read someone else's request | `403` "You can only see your own requests." |
+| `PATCH /users/<own id>` with `role: "librarian"` | `403` "You can't change your own role." |
+
+**3. Edited the role inside the JWT** to `librarian` and sent it:
+`401 "Invalid token."` The signature no longer matches, and only the
+server has the secret.
+
+So the frontend hid it, I could still make the frontend show it, and the
+backend refused it every time. The role the server trusts comes from the
+signed token and the database, never from anything the browser sends.
+
+## Task 4: Pages you're not allowed on
+
+I decided by who is asking, not just by the page:
+
+- **Logged out:** redirect to the login page, then back to the page they
+  wanted. They might be allowed once they log in.
+- **Member on a staff page** (`/users`, `/books/add`, `/admins`): pretend it
+  doesn't exist and show the normal "Page not found". A member has no
+  staff pages at all, so a refusal would only tell them where the admin
+  screens are and give them nothing they can act on.
+- **Staff on a page above their role** (a librarian or admin opening
+  `/admins`): a clear refusal, "This page is only for super admin accounts.
+  If you need something changed here, ask one of them." Staff already know
+  the page exists, so a 404 would look like a bug and they'd report it.
+
+For the second case to exist I added a super admin screen, `/admins`
+("Manage admins"), for matrix rows 21 and 22. Managing admins moved there,
+and `/users` now only manages members and librarians. All of this is in
+`RequireAuth`, and the API still answers `403` underneath whatever the page
+shows.
+
+## Task 5: Only your own request
+
+In the interface, Cancel only shows on a request whose `userId` is the
+logged-in user and that is still waiting (pending, queued or held). A
+member only gets their own requests from the API anyway. Staff see everyone's
+in the approval queue, but on someone else's card they get Approve and
+Reject, never Cancel.
+
+Then I tried it against the API. Sara asked for Dune, and three other
+people sent `POST /borrow-requests/:id/cancel` for her request with their
+own valid tokens:
+
+- Usman (member): `403 FORBIDDEN`
+- a librarian: `403 FORBIDDEN`
+- the super admin: `403 FORBIDDEN`
+
+Her request stayed `pending`, and only her own Cancel button changed it to
+`cancelled`. The service compares the request's owner with the id from the
+token, not with anything in the request body, so there's nothing to fake.
+No bug this time. Week 7's self-approve bug was the same kind of mistake
+(role checked, owner not checked), so I was half expecting one.

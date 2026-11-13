@@ -51,11 +51,11 @@ const updateBorrowRequest = async (
   req: RequestWithBody<UpdateBorrowRequestBody, IdParams>,
   res: Response,
 ) => {
-  const borrowRequest = await servicesFor(req).borrowRequests.update(
-    req.params.id,
-    req.body,
-    actorOf(req),
-  );
+  const { borrowRequests } = servicesFor(req);
+  const borrowRequest =
+    "dueDate" in req.body
+      ? await borrowRequests.changeDueDate(req.params.id, req.body.dueDate)
+      : await borrowRequests.update(req.params.id, req.body, actorOf(req));
   res.status(200).json({
     data: borrowRequest,
   });
@@ -77,6 +77,13 @@ const getQueuePosition = async (req: Request<IdParams>, res: Response) => {
   res.status(200).json({ data: position });
 };
 
+const waiveFine = async (req: Request<IdParams>, res: Response) => {
+  const borrowRequest = await servicesFor(req).borrowRequests.waiveFine(
+    req.params.id,
+  );
+  res.status(200).json({ data: borrowRequest });
+};
+
 const returnBorrowedBook = async (req: Request<IdParams>, res: Response) => {
   const borrowRequest = await servicesFor(req).borrowRequests.returnBook(
     req.params.id,
@@ -94,4 +101,5 @@ export {
   cancelBorrowRequest,
   getQueuePosition,
   returnBorrowedBook,
+  waiveFine,
 };

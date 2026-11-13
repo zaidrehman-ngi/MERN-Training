@@ -10,3 +10,9 @@ export function formatDay(value) {
   }
   return dayFormat.format(new Date(`${value}T00:00:00Z`));
 }
+
+export function todayInLibrary() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Karachi" }).format(
+    new Date(),
+  );
+}

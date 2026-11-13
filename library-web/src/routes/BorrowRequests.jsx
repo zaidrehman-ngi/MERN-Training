@@ -7,11 +7,43 @@ import { BORROW_REQUEST_STATUSES } from "../constants/borrowRequests";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import {
   cancelBorrowRequest,
+  changeDueDate,
   decideBorrowRequest,
   returnBorrowRequest,
+  waiveFine,
 } from "../api/borrowRequests";
+import { todayInLibrary } from "../utils/dates";
 
 const WAITING = ["pending", "queued", "held"];
+
+function DueDateForm({ request, disabled, onSave }) {
+  const [dueDate, setDueDate] = useState(request.dueDate ?? "");
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave(dueDate);
+      }}
+    >
+      <label htmlFor={`due-${request.id}`}>New due date</label>
+      <input
+        id={`due-${request.id}`}
+        type="date"
+        min={todayInLibrary()}
+        value={dueDate}
+        onChange={(event) => setDueDate(event.target.value)}
+        required
+      />
+      <button
+        type="submit"
+        disabled={disabled || !dueDate || dueDate === request.dueDate}
+      >
+        Change due date
+      </button>
+    </form>
+  );
+}
 
 function BorrowRequests() {
   const { user, can } = useCurrentUser();
@@ -105,6 +137,34 @@ function BorrowRequests() {
           }
         >
           Mark returned
+        </button>,
+      );
+    }
+    if (can("requests:changeDueDate") && request.status === "approved") {
+      buttons.push(
+        <DueDateForm
+          key="due-date"
+          request={request}
+          disabled={busy}
+          onSave={(dueDate) =>
+            runAction(request.id, () => changeDueDate(request.id, dueDate))
+          }
+        />,
+      );
+    }
+    if (
+      can("fines:waive") &&
+      request.status === "returned" &&
+      request.fine > 0
+    ) {
+      buttons.push(
+        <button
+          key="waive"
+          type="button"
+          disabled={busy}
+          onClick={() => runAction(request.id, () => waiveFine(request.id))}
+        >
+          Waive fine
         </button>,
       );
     }

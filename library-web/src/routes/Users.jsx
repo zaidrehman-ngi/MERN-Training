@@ -3,17 +3,20 @@ import { useUsers } from "../hooks/useUsers";
 import useDebounce from "../hooks/useDebounce";
 import UserCard from "../components/UserCard/UserCard";
 import Pagination from "../components/Pagination";
-import { ROLES } from "../constants/roles";
+import { ADMIN_ROLES, ROLES } from "../constants/roles";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { assignableRoles, canManageMember } from "../constants/permissions";
 import { deactivateUser, updateUser } from "../api/users";
 
-function Users() {
+// /users lists everyone and manages members and librarians,
+// /admins (super admin only) manages admins
+function Users({ adminsOnly = false }) {
+  const roleOptions = adminsOnly ? ADMIN_ROLES : ROLES;
   const { user: me, can } = useCurrentUser();
   const [busyId, setBusyId] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [search, setSearch] = useState("");
-  const [role, setRole] = useState("all");
+  const [role, setRole] = useState(adminsOnly ? "admin" : "all");
   const [page, setPage] = useState(1);
   const debouncedSearch = useDebounce(search, 300);
   const {
@@ -52,7 +55,10 @@ function Users() {
   };
 
   const manageControls = (member) => {
-    if (!canManageMember(me, member)) {
+    if (
+      !canManageMember(me, member) ||
+      ADMIN_ROLES.includes(member.role) !== adminsOnly
+    ) {
       return null;
     }
     const roles = [...new Set([member.role, ...assignableRoles(me.role)])];
@@ -92,7 +98,13 @@ function Users() {
 
   return (
     <main>
-      <h1>{can("members:manage") ? "Manage members" : "Members"}</h1>
+      <h1>
+        {adminsOnly
+          ? "Manage admins"
+          : can("members:manage")
+            ? "Manage members"
+            : "Members"}
+      </h1>
 
       <label htmlFor="user-search">Search users</label>
       <input
@@ -114,8 +126,8 @@ function Users() {
           setPage(1);
         }}
       >
-        <option value="all">All roles</option>
-        {ROLES.map((item) => (
+        {!adminsOnly && <option value="all">All roles</option>}
+        {roleOptions.map((item) => (
           <option key={item} value={item}>
             {item}
           </option>

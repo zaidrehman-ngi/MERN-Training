@@ -57,7 +57,11 @@ function App() {
         </Route>
 
         <Route element={<RequireAuth roles={STAFF_ROLES} />}>
-          <Route path="/users" element={<Users />} />
+          <Route path="/users" element={<Users key="users" />} />
+        </Route>
+
+        <Route element={<RequireAuth roles={["super admin"]} />}>
+          <Route path="/admins" element={<Users key="admins" adminsOnly />} />
         </Route>
       </Route>
 
