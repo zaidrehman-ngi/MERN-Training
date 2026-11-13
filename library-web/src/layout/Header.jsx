@@ -1,12 +1,10 @@
-import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import socket from "../api/socket";
+import LiveStatus from "../components/LiveStatus/LiveStatus";
 import { logout } from "../store/authSlice";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 
 export default function Header() {
-  const [live, setLive] = useState(socket.connected ? "connected" : "offline");
   const { user } = useCurrentUser();
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -15,25 +13,6 @@ export default function Header() {
     await dispatch(logout());
     navigate("/login");
   };
-
-  useEffect(() => {
-    const onConnect = () => setLive("connected");
-    const onDisconnect = () => setLive("disconnected");
-    const onError = (err) => {
-      console.error("socket connect_error:", err.message);
-      setLive(`error: ${err.message}`);
-    };
-
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-    socket.on("connect_error", onError);
-
-    return () => {
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
-      socket.off("connect_error", onError);
-    };
-  }, []);
 
   return (
     <header>
@@ -46,7 +25,7 @@ export default function Header() {
           <span>Library management</span>
         </span>
       </Link>
-      <span data-testid="live-status">Live: {live}</span>
+      {user && <LiveStatus />}
       {user ? (
         <span>
           {user.name} ({user.role}){" "}

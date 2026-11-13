@@ -34,3 +34,7 @@ export function changeDueDate(id, dueDate) {
 export function waiveFine(id) {
   return client.post(`/borrow-requests/${id}/waive-fine`);
 }
+
+export function getQueuePosition(id) {
+  return client.get(`/borrow-requests/${id}/queue`);
+}

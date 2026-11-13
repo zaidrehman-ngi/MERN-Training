@@ -156,6 +156,7 @@ const createBorrowRequestsService = (
       memberId: request.userId,
       id: request.id,
       bookId: request.bookId,
+      bookTitle: request.book.title,
       status: request.status,
     });
   };

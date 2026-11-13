@@ -284,10 +284,10 @@ Server to client:
 | `server:presence:changed` | everyone | `{ members, sockets }` |
 | `server:book:availability-changed` | watchers of the book | `{ bookId, available }` |
 | `server:borrow-request:created` | staff | `{ id, bookTitle, userName, requestedAt }` |
-| `server:borrow-request:status-changed` | the owner | `{ id, bookId, status }` |
+| `server:borrow-request:status-changed` | the owner and staff | `{ id, userId, bookId, bookTitle, status }` |
 | `server:loan:due-soon` | the owner | `{ borrowRequestId, bookTitle, dueDate, message }` |
 | `server:queue:position-changed` | the owner | `{ bookId, position }` |
-| `server:queue:promoted` | the owner and staff | `{ bookId, bookTitle, holdUntil }` |
+| `server:queue:promoted` | the owner and staff | `{ userId, bookId, bookTitle, holdUntil }` |
 | `server:session:expired` | the socket | none |
 
 Client to server (each gets an ack `{ ok: true, ... }` or
@@ -324,6 +324,13 @@ What each role sees follows the Week 7 permission matrix, kept in
 `library-web/src/constants/permissions.js`. Hiding a button is only for
 convenience; the API checks every rule again.
 
-Not used by the frontend yet: the queue position, notifications, overdue,
-editing a member's name, email or branch, and the socket events other than
-connect.
+Live updates: one socket for the whole app, opened at login. The book page
+joins its room for `availability-changed`. The borrow requests page reloads
+on `status-changed`, `promoted` and `created`, and shows the queue position
+from `GET /borrow-requests/:id/queue`, updated by `position-changed`. A
+notice in the corner tells a member when their own request changes or a
+copy is held for them, and tells staff about new requests. On reconnect the
+open page loads its data again.
+
+Not used by the frontend yet: notifications, overdue, editing a member's
+name, email or branch, and `client:borrow-request:decide`.

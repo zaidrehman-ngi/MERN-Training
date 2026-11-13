@@ -1,17 +1,10 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import { loginUser, logoutUser, refreshSession } from "../api/auth";
 import { setAccessToken } from "../api/session";
-import socket from "../api/socket";
 
 const startSession = ({ accessToken, user }) => {
   setAccessToken(accessToken);
-  socket.disconnect().connect();
   return user;
-};
-
-const endSession = () => {
-  setAccessToken(null);
-  socket.disconnect();
 };
 
 export const login = createAsyncThunk(
@@ -42,7 +35,7 @@ export const logout = createAsyncThunk("auth/logout", async () => {
   try {
     await logoutUser();
   } finally {
-    endSession();
+    setAccessToken(null);
   }
 });
 

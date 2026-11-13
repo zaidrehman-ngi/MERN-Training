@@ -445,3 +445,149 @@ Her request stayed `pending`, and only her own Cancel button changed it to
 token, not with anything in the request body, so there's nothing to fake.
 No bug this time. Week 7's self-approve bug was the same kind of mistake
 (role checked, owner not checked), so I was half expecting one.
+
+# Exercise 5 — The screen that updates itself
+
+## Task 1: One socket for the whole app
+
+There is one Socket.IO client, created once in `src/api/socket.js` with
+`autoConnect: false`. It sends the access token in `auth`, and it reads
+the token again on every reconnect, so the Week 7 middleware accepts it.
+
+Opening and closing the connection is now React's job. `SocketProvider`
+wraps the whole app in `main.jsx`. It connects when a user is logged in,
+disconnects on logout, and reconnects when a different user logs in.
+Components get the socket and its status through `useSocket()`, and the
+Header shows "Live: connected" from it. Before this, the Redux auth slice
+connected the socket as a side effect of login.
+
+I used Context here, not Redux, because a socket isn't data that can live
+in the store. That fits my Week 4 rule.
+
+Checked in the Network tab: after login there is one
+connection, and it is still the same one after moving through five pages.
+A reload closes it and opens one new one, and logout closes it. The server
+log never showed more than "1 sockets" for that user.
+
+## Task 2: Joining a book's room
+
+`BookDetail` has an effect on `[socket, id]`. It emits `client:book:watch`
+for the book, adds a handler for `server:book:availability-changed` that
+updates the copies on screen, and adds a `connect` handler that joins
+again after a reconnect (the server forgets rooms when a socket drops).
+The cleanup removes both handlers and emits `client:book:unwatch`.
+
+I went back and forth between two books five times and counted the
+handlers on the socket after each round:
+
+| | With cleanup | Without cleanup |
+|---|---|---|
+| After round 1 | 1 | 3 |
+| After round 5 | 1 | 11 |
+| Back on `/books` | 0 | 11 |
+| Server watch / unwatch | 11 / 11 | 11 / 0 |
+
+Without the cleanup every visit left a handler and a room behind, and
+StrictMode's double mount added an extra one on the first visit. With it,
+there's only ever one, for the page that's open.
+
+It's the same discipline as Week 3 Day 2, where the cleanup made a stale
+request's response get ignored. `useDebounce` uses it to clear a timer,
+and here it leaves a socket room.
+
+## Task 3: The live counter
+
+The handler from Task 2 already does it. When
+`server:book:availability-changed` arrives for the open book, it sets
+`onShelf` on the book in state and the Copies line re-renders. With the
+backend already emitting, that's about ten lines.
+
+Demo with two separate browsers, Sara and Usman, both members, both on the
+Dune page showing 3 / 5. A librarian approved Sara's request, and both
+screens changed to 2 / 5 without a refresh. When the book was marked
+returned they both went back to 3 / 5.
+
+## Task 4: When the socket drops
+
+I stopped the API with Sara on the Dune page (3 / 5). Within a couple of
+seconds the header said "Live: reconnecting" and the page showed "Live
+updates paused, reconnecting... The copies shown may be out of date." The
+copies stayed at 3 / 5, and the client tried again 4 times in about 10
+seconds. While it was down I changed Dune to 1 on the shelf in the
+database. When the API came back the socket reconnected by itself and the
+page showed 1 / 5 without a refresh.
+
+I went with refetch, not trusting the stream. The server doesn't keep
+events for clients that were away, so anything emitted during the gap is
+gone, and the only way to be right again is to ask. On every `connect` the
+book page joins its room again and loads the book once more. That's one
+request, and after that the stream takes over.
+
+During the gap the user sees the last numbers they had, a "reconnecting"
+label in the header and a warning that the copies may be out of date. Old
+data stays on the screen, but it doesn't pretend to be live.
+
+The socket also drops when the access token expires, since the server
+disconnects it. `SocketProvider` now handles that: on a server disconnect
+or an `UNAUTHORIZED` connect error it calls `/auth/refresh` and connects
+again with the new token. With `JWT_EXPIRES_IN=15s` the socket was dropped
+and reconnected twice in 30 seconds, and the page never left "connected".
+It only logs the user out if the refresh itself is refused.
+
+## Task 5: Connection indicator
+
+The header now has a `LiveStatus` badge for anyone who is logged in. It
+reads the status from `SocketProvider`:
+
+- **Live** (green): connected, changes show up straight away.
+- **Reconnecting...** (amber, blinking dot): the connection dropped and the
+  client is trying again. It also shows "Connecting..." for the moment
+  after login, so the page doesn't flash "offline" while it's still
+  connecting.
+- **Offline** (red): the browser has no network, so it doesn't pretend to
+  be retrying.
+
+To keep it honest I had to fix two cases where the status lied. If the
+token refresh failed because of a network error, the status said
+"reconnecting" but nothing was retrying. Now it tries again every 5
+seconds. And when the browser goes offline it says "Offline" instead of
+"Reconnecting...". The book page shows its "may be out of date" warning in
+both of those states.
+
+I checked it by stopping the API (Reconnecting), switching the browser to
+offline (Offline), going back online with the API still down
+(Reconnecting), and starting the API again (Live). A logged-out visitor
+sees no badge, because nothing on their screen claims to be live.
+
+## Task 6: The rest of the events
+
+Each event now has a place in the interface:
+
+- **Request approved or rejected** (`status-changed`): the member gets a
+  notice ("Your request for "Hyperion" was approved...") and their list
+  updates. It now goes to the staff counter as well, so a second
+  librarian's queue doesn't keep showing a request someone else already
+  approved.
+- **Queue position** (`position-changed`): queued cards show "Place in
+  queue: N". It's loaded once from `/borrow-requests/:id/queue` and then
+  updated by the event.
+- **Promoted to the front** (`promoted`): the member gets "A copy is held
+  for you until 16 Nov 2026" and the card turns to held. The counter's list
+  reloads.
+- **New request** (`created`): staff get a notice and the approval queue
+  reloads.
+
+Notices are toasts (`react-hot-toast`) raised from `LiveNotices` in the
+layout, so they show on any page. The
+lists listen through a small `useSocketEvent` hook that removes its
+listener on unmount, the same cleanup as Task 2.
+
+Who gets what is decided by the server's rooms. `status-changed` and
+`promoted` reach both the owner and the counter, so I added `userId` to
+both payloads, and the frontend only shows a notice when it's yours. I ran
+one book with 1 copy through three browsers: Usman borrows, Sara and Test
+User queue, Sara leaves, Usman returns, Test User gets the hold and is
+approved. Usman's socket only received his own two status events. Test
+User got their queue position (2, then 1), the hold and the approval. The
+librarian got the new requests and status changes but no queue positions.
+Every screen updated without a refresh.

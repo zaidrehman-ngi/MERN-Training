@@ -243,10 +243,11 @@ const createSocketServer = (
 
   domainEvents.on(
     DOMAIN_EVENTS.BORROW_REQUEST_STATUS_CHANGED,
-    ({ memberId, id, bookId, status }) => {
-      io.to(memberRoom(memberId)).emit(
+    ({ memberId, id, bookId, bookTitle, status }) => {
+      // staff see every request, so the counter hears about changes too
+      io.to([memberRoom(memberId), COUNTER_ROOM]).emit(
         EVENTS.SERVER_BORROW_REQUEST_STATUS_CHANGED,
-        { id, bookId, status },
+        { id, userId: memberId, bookId, bookTitle, status },
       );
     },
   );
@@ -278,7 +279,7 @@ const createSocketServer = (
     ({ memberId, bookId, bookTitle, holdUntil }) => {
       io.to([memberRoom(memberId), COUNTER_ROOM]).emit(
         EVENTS.SERVER_QUEUE_PROMOTED,
-        { bookId, bookTitle, holdUntil },
+        { userId: memberId, bookId, bookTitle, holdUntil },
       );
     },
   );

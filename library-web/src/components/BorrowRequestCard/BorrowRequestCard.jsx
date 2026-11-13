@@ -1,7 +1,7 @@
 import { formatDay } from "../../utils/dates";
 import styles from "./BorrowRequestCard.module.css";
 
-function BorrowRequestCard({ request, showMember, children }) {
+function BorrowRequestCard({ request, showMember, position, children }) {
   return (
     <article className={styles.card}>
       <h2 className={styles.bookTitle}>{request.book.title}</h2>
@@ -24,6 +24,9 @@ function BorrowRequestCard({ request, showMember, children }) {
         <p className={styles.detail}>Fine: Rs. {request.fine}</p>
       )}
       <p className={styles.status}>Status: {request.status}</p>
+      {request.status === "queued" && position && (
+        <p className={styles.detail}>Place in queue: {position}</p>
+      )}
       {children}
     </article>
   );

@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { getBook } from "../api/books";
 import { useCurrentUser } from "../hooks/useCurrentUser";
+import { useSocket } from "../hooks/useSocket";
+import { SOCKET_EVENTS } from "../constants/socketEvents";
 import {
   borrowBookThunk,
   deleteBookThunk,
@@ -14,6 +16,7 @@ function BookDetail() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user, can } = useCurrentUser();
+  const { socket, status: liveStatus } = useSocket();
 
   const [bookState, setBookState] = useState(null);
   const [attempt, setAttempt] = useState(0);
@@ -51,6 +54,43 @@ function BookDetail() {
       active = false;
     };
   }, [dispatch, id, attempt]);
+
+  useEffect(() => {
+    const watch = () => socket.emit(SOCKET_EVENTS.BOOK_WATCH, { bookId: id });
+    // events sent while we were offline are gone, so load the book again
+    const rejoin = () => {
+      watch();
+      getBook(id)
+        .then((response) =>
+          setBookState((current) =>
+            current?.id === id
+              ? { ...current, book: response.data.data }
+              : current,
+          ),
+        )
+        .catch(() => {});
+    };
+    const onAvailability = ({ bookId, available }) => {
+      if (bookId !== id) return;
+      setBookState((current) =>
+        current?.id === id && current.book
+          ? { ...current, book: { ...current.book, onShelf: available } }
+          : current,
+      );
+    };
+
+    if (socket.connected) watch();
+    socket.on("connect", rejoin);
+    socket.on(SOCKET_EVENTS.BOOK_AVAILABILITY_CHANGED, onAvailability);
+
+    return () => {
+      socket.off("connect", rejoin);
+      socket.off(SOCKET_EVENTS.BOOK_AVAILABILITY_CHANGED, onAvailability);
+      if (socket.connected) {
+        socket.emit(SOCKET_EVENTS.BOOK_UNWATCH, { bookId: id });
+      }
+    };
+  }, [socket, id]);
 
   const handleRetry = () => {
     setBookState(null);
@@ -109,6 +149,14 @@ function BookDetail() {
     <main>
       <section className="detailPanel">
         <h1>{book.title}</h1>
+        {user && ["reconnecting", "offline"].includes(liveStatus) && (
+          <p role="status">
+            {liveStatus === "reconnecting"
+              ? "Live updates paused, reconnecting..."
+              : "You are offline."}{" "}
+            The copies shown may be out of date.
+          </p>
+        )}
         <dl className="detailList">
           <div>
             <dt>Author</dt>

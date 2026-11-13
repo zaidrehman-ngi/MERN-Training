@@ -1,0 +1,52 @@
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline: var(--space-3);
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.connected {
+  color: var(--colour-success);
+  background: var(--colour-success-soft);
+}
+
+.connecting,
+.reconnecting {
+  color: var(--colour-warning);
+  background: var(--colour-warning-soft);
+}
+
+.connecting .dot,
+.reconnecting .dot {
+  animation: blink 1s ease-in-out infinite;
+}
+
+.offline {
+  color: var(--colour-danger);
+  background: var(--colour-danger-soft);
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connecting .dot,
+  .reconnecting .dot {
+    animation: none;
+  }
+}

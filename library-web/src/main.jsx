@@ -6,13 +6,16 @@ import "./styles/tokens.css";
 import App from "./App.jsx";
 import { Provider } from "react-redux";
 import { store } from "./store/store";
+import { SocketProvider } from "./context/SocketProvider";
 
 createRoot(document.getElementById("root")).render(
   <Provider store={store}>
     <StrictMode>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <SocketProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </SocketProvider>
     </StrictMode>
   </Provider>,
 );

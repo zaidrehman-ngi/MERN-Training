@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useBorrowRequests } from "../hooks/useBorrowRequests";
 import useDebounce from "../hooks/useDebounce";
 import BorrowRequestCard from "../components/BorrowRequestCard/BorrowRequestCard";
@@ -13,6 +13,9 @@ import {
   waiveFine,
 } from "../api/borrowRequests";
 import { todayInLibrary } from "../utils/dates";
+import { getQueuePosition } from "../api/borrowRequests";
+import { useSocketEvent } from "../hooks/useSocketEvent";
+import { SOCKET_EVENTS } from "../constants/socketEvents";
 
 const WAITING = ["pending", "queued", "held"];
 
@@ -67,6 +70,49 @@ function BorrowRequests() {
     status: requestStatus,
   });
   const filtered = debouncedSearch.trim() !== "" || requestStatus !== "all";
+  const [positions, setPositions] = useState({});
+
+  useEffect(() => {
+    let active = true;
+    const mine = requests.filter(
+      (request) => request.status === "queued" && request.userId === user.id,
+    );
+    Promise.all(
+      mine.map((request) =>
+        getQueuePosition(request.id).then((response) => [
+          request.id,
+          response.data.data.position,
+        ]),
+      ),
+    )
+      .then((pairs) => {
+        if (active) setPositions(Object.fromEntries(pairs));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [requests, user.id]);
+
+  useSocketEvent(SOCKET_EVENTS.REQUEST_STATUS_CHANGED, reload);
+  useSocketEvent(SOCKET_EVENTS.QUEUE_PROMOTED, reload);
+  useSocketEvent(SOCKET_EVENTS.REQUEST_CREATED, reload);
+  useSocketEvent(
+    SOCKET_EVENTS.QUEUE_POSITION_CHANGED,
+    ({ bookId, position }) => {
+      const request = requests.find(
+        (item) =>
+          item.bookId === bookId &&
+          item.status === "queued" &&
+          item.userId === user.id,
+      );
+      if (request) {
+        setPositions((current) => ({ ...current, [request.id]: position }));
+      } else {
+        reload();
+      }
+    },
+  );
 
   const runAction = async (id, action) => {
     setBusyId(id);
@@ -233,6 +279,7 @@ function BorrowRequests() {
                 key={request.id}
                 request={request}
                 showMember={staff}
+                position={positions[request.id]}
               >
                 {actionsFor(request)}
                 {actionError?.id === request.id && (
