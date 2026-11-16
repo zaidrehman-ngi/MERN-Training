@@ -737,3 +737,134 @@ server answers. A socket event beats any response to a request sent before
 the event arrived, and a fresh fetch beats events I may have missed (which
 is why I refetch on reconnect). All three write into the same place in the
 store, so that rule only has to be applied once.
+
+# Exercise 7 — The same page, rendered somewhere else
+
+## Task 1: A fresh Next.js app
+
+Scaffolded in its own folder, `nextjs-project/`, with
+`npx create-next-app@latest`.
+
+- **Version:** Next.js 16.4.6
+- **Router:** the App Router (`app/` folder with `layout.tsx` and
+  `page.tsx`), not the older Pages Router (`pages/`)
+
+The default page runs with `next dev` and loads at `localhost:3300`.
+
+## Task 2: Porting the book list and book detail
+
+Both pages read from library-api (`NEXT_PUBLIC_API_URL` in `.env.local`).
+`BookCard`, `FilterChips`, `SearchBox`, `ResultCount`, `Pagination` and
+`useDebounce` were copied as they are.
+
+What I had to change:
+
+- **Data fetching:** the `useEffect` + Redux thunk became an `async` page
+  that awaits `fetch` on the server (`app/books/page.jsx`,
+  `app/books/[id]/page.jsx`).
+- **Routing:** React Router became folders. `/books/:id` is now
+  `app/books/[id]/`. `useParams` became the `params` prop (a Promise), and
+  `useNavigate` became `useRouter` from `next/navigation`.
+- **Loading and errors:** the `status === "loading"` / `"failed"` checks
+  became `loading.jsx` and `error.jsx` files. The 404 case calls
+  `notFound()` and shows `not-found.jsx`.
+- **Filter, search and page:** these moved from the Redux store into the URL
+  (`?status=out&q=dune&page=2`), because the server reads them from there.
+- **Client parts:** anything with `onClick` or state needs `"use client"`.
+  The server page can't pass functions like `onSelect` down, so the list
+  UI (`components/Books.jsx`) is a client component and the page only
+  fetches.
+- **Env:** `import.meta.env.VITE_API_URL` became
+  `process.env.NEXT_PUBLIC_API_URL` (the only change in `BookCard`).
+- **Left out:** borrow, edit, delete, the live copy count and the gap
+  banner. They need login, the Redux store and the socket, which this app
+  doesn't have.
+
+## Task 3: Routing
+
+The book detail route is `app/books/[id]/page.jsx` from Task 2.
+
+| | React Router (library-web) | Next.js (nextjs-project) |
+| --- | --- | --- |
+| Where the route lives | `App.jsx`: `<Route path=":id" element={<BookDetail />} />` inside `<Route path="/books">` | the folder `app/books/[id]/` with a `page.jsx` in it |
+| The `:id` part | `:id` in the path string | the `[id]` folder name |
+| Reading it | `const { id } = useParams();` | `const { id } = await params;` |
+| Loading / error / 404 | `if` checks inside the component | `loading.jsx`, `error.jsx`, `not-found.jsx` next to the page |
+| Guards and layouts | wrapper routes like `<RequireAuth>` and `<AppLayout>` | `layout.jsx` in a folder (auth would go in the layout or proxy) |
+
+**With forty routes** I'd find Next easier. The folder tree is the route
+list, so I find a page by its URL without reading a long `App.jsx`, and
+each route keeps its loading and error files right next to it.
+
+**With four routes** React Router is easier. The whole app fits in one
+small block of JSX in one file, and I can see every route, guard and
+layout at once. In Next the same four routes are spread over several
+folders and files that I'd have to open one by one.
+
+## Task 4: The server/client boundary
+
+I added a "More details" button to the book detail page using my
+`useToggle` hook, straight inside `app/books/[id]/page.jsx`. The page
+returned 500 and the terminal showed:
+
+```
+You're importing a module that depends on `useState` into a React Server
+Component module. This API is only available in Client Components. To fix,
+mark the file (or its parent) with the "use client" directive.
+
+Import trace:
+  Server Component:
+    ./hooks/useToggle.js
+    ./app/books/[id]/page.jsx
+```
+
+**What decides it:** in the App Router every component is a server
+component unless its file starts with `"use client"` or it's imported by a
+file that does. Server components run once on the server and send HTML, so
+there is no state, no effects and no `onClick`.
+
+**Fix:** I moved the details list and the button into
+`components/BookDetails.jsx` with `"use client"` at the top. The page stays
+a server component, fetches the book and passes it down as a prop. The
+button's HTML still comes from the server, and the click works once the
+page loads in the browser.
+
+**My Week 3 hooks:**
+
+| Hook | Server component | Client component |
+| --- | --- | --- |
+| `useToggle` | no (`useState`) | yes |
+| `useForm` | no (`useState`) | yes |
+| `useDebounce` | no (`useState`, `useEffect`) | yes |
+| `useBookSearch` | no (`useState`, `useEffect`) | yes |
+| `useBranch` | no (`useContext`) | yes, under the provider |
+
+None of them work on the server side. In practice the server part fetches
+and renders the data, and anything the user clicks or types into goes in a
+small `"use client"` component under it.
+
+## Task 5: An API route in the frontend
+
+I added `app/api/health/route.js`. `GET /api/health` returns
+`{ "web": "up", "api": "up" }`, or `"api": "down"` when library-api doesn't
+answer. Any other method gets a 405 from Next.
+
+**When a frontend endpoint is the right place:** when the thing belongs to
+the frontend and not to the library:
+
+- checking the web app itself, like this health route
+- hiding a secret key the browser shouldn't see (a third-party API key)
+- setting cookies on the frontend's own domain, which would also get
+  around the cross-site cookie problem we have with the refresh token
+- small glue for one page, like reshaping data from library-api
+
+**Why not move the whole backend into it:**
+
+- **Sockets and cron:** route handlers answer one request and stop.
+  Socket.IO and the node-cron jobs need a server that stays running.
+- **More than one client:** library-api is also used by library-web,
+  Postman and the tests. It shouldn't depend on one frontend project.
+- **Deploys:** every frontend change would redeploy the backend too, and a
+  backend bug would take the website down with it.
+- **Rewrite:** the Express middleware (auth, roles, rate limit, error
+  handler) doesn't plug into route handlers and would have to be redone.
