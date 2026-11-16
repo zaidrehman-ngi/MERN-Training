@@ -6,9 +6,11 @@ import { useCurrentUser } from "../hooks/useCurrentUser";
 import { useSocket } from "../hooks/useSocket";
 import { SOCKET_EVENTS } from "../constants/socketEvents";
 import {
+  bookLoaded,
   borrowBookThunk,
   deleteBookThunk,
   resetBookMutation,
+  selectBookById,
 } from "../store/booksSlice";
 
 function BookDetail() {
@@ -18,11 +20,12 @@ function BookDetail() {
   const { user, can } = useCurrentUser();
   const { socket, status: liveStatus } = useSocket();
 
-  const [bookState, setBookState] = useState(null);
+  // the book itself lives in the store; this only tracks loading it
+  const [loadState, setLoadState] = useState(null);
   const [attempt, setAttempt] = useState(0);
-  const book = bookState?.id === id ? bookState.book : null;
-  const error = bookState?.id === id ? bookState.error : null;
-  const loadStatus = bookState?.id === id ? bookState.status : "loading";
+  const book = useSelector((state) => selectBookById(state, id));
+  const error = loadState?.id === id ? loadState.error : null;
+  const loadStatus = loadState?.id === id ? loadState.status : "loading";
   const borrowStatus = useSelector(
     (state) => state.books.borrowStatusByBookId[id] ?? "idle",
   );
@@ -38,15 +41,17 @@ function BookDetail() {
     let active = true;
     dispatch(resetBookMutation({ operation: "delete", id }));
 
+    const requestedAt = Date.now();
     getBook(id)
       .then((response) => {
         if (active) {
-          setBookState({ id, book: response.data.data, status: "succeeded" });
+          dispatch(bookLoaded(response.data.data, requestedAt));
+          setLoadState({ id, status: "succeeded" });
         }
       })
       .catch((error) => {
         if (active) {
-          setBookState({ id, error, status: "failed" });
+          setLoadState({ id, error, status: "failed" });
         }
       });
 
@@ -60,40 +65,28 @@ function BookDetail() {
     // events sent while we were offline are gone, so load the book again
     const rejoin = () => {
       watch();
+      const requestedAt = Date.now();
       getBook(id)
         .then((response) =>
-          setBookState((current) =>
-            current?.id === id
-              ? { ...current, book: response.data.data }
-              : current,
-          ),
+          dispatch(bookLoaded(response.data.data, requestedAt)),
         )
         .catch(() => {});
     };
-    const onAvailability = ({ bookId, available }) => {
-      if (bookId !== id) return;
-      setBookState((current) =>
-        current?.id === id && current.book
-          ? { ...current, book: { ...current.book, onShelf: available } }
-          : current,
-      );
-    };
 
+    // joining the room is all this page does; the events land in the store
     if (socket.connected) watch();
     socket.on("connect", rejoin);
-    socket.on(SOCKET_EVENTS.BOOK_AVAILABILITY_CHANGED, onAvailability);
 
     return () => {
       socket.off("connect", rejoin);
-      socket.off(SOCKET_EVENTS.BOOK_AVAILABILITY_CHANGED, onAvailability);
       if (socket.connected) {
         socket.emit(SOCKET_EVENTS.BOOK_UNWATCH, { bookId: id });
       }
     };
-  }, [socket, id]);
+  }, [socket, id, dispatch]);
 
   const handleRetry = () => {
-    setBookState(null);
+    setLoadState(null);
     setAttempt((current) => current + 1);
   };
 
@@ -137,7 +130,7 @@ function BookDetail() {
     );
   }
 
-  if (loadStatus === "idle" || loadStatus === "loading") {
+  if (loadStatus === "loading" || !book) {
     return (
       <main>
         <p role="status">Loading book...</p>
@@ -190,17 +183,19 @@ function BookDetail() {
             <button
               type="button"
               onClick={handleBorrow}
-              disabled={
-                borrowStatus === "pending" || borrowStatus === "succeeded"
-              }
+              disabled={["pending", "succeeded", "queued"].includes(
+                borrowStatus,
+              )}
             >
               {borrowStatus === "pending"
                 ? "Requesting..."
                 : borrowStatus === "succeeded"
                   ? "Request sent"
-                  : Number(book.onShelf) < 1
-                    ? "Join the queue"
-                    : "Borrow"}
+                  : borrowStatus === "queued"
+                    ? "You're in the queue"
+                    : Number(book.onShelf) < 1
+                      ? "Join the queue"
+                      : "Borrow"}
             </button>
           ) : (
             !user && (

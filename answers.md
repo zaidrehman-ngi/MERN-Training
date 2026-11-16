@@ -591,3 +591,149 @@ approved. Usman's socket only received his own two status events. Test
 User got their queue position (2, then 1), the hold and the approval. The
 librarian got the new requests and status changes but no queue positions.
 Every screen updated without a refresh.
+
+# Exercise 6 — Two sources of truth
+
+## Task 1: Reproducing it
+
+The catalogue lives in the Redux store (`state.books.items`) and is only
+filled by `GET /books`. The socket's `availability-changed` handler only
+updates the book page's own local state, so the store never hears about
+it.
+
+Sara loaded the catalogue (Hyperion 2 / 4), then opened Hyperion. From
+another browser Usman's request was approved:
+
+| | Book page | Store | Database |
+|---|---|---|---|
+| After the checkout | 1 / 4 | 2 / 4 | 1 / 4 |
+
+Then she went back to the catalogue on a slow connection. For 2.5 seconds
+the card said **2 / 4** under "Updating books...", with the header badge
+still green "Live". When the refetch came back it changed to 1 / 4.
+
+The worse version: the copy was returned (book page 2 / 4), and she went
+back to the catalogue while offline. The page showed "We couldn't connect
+to the server" above the full list, and Hyperion still said **1 / 4**. That
+was wrong, and it stayed wrong until the next successful fetch.
+
+The book page was right both times, because it matched the database. The
+catalogue was showing the store, and the store only knows what the last
+HTTP fetch said.
+
+## Task 2: One place for the truth
+
+Socket events now land in the store, and nowhere else. `store.js`
+registers the `availability-changed` handler once, next to the store, and
+it dispatches `availabilityChanged`. Components don't listen for data
+events any more.
+
+To make "one place" true, the books slice keeps each book once in `byId`.
+The catalogue keeps only the `ids` of its current page and reads the books
+from `byId` (through a memoised selector). The book page puts what it
+fetched into `byId` with `bookLoaded` and reads `byId[id]`. Both screens
+read the same object, so an event changes both at once. The book page
+still joins and leaves the room. That's its only socket job now.
+
+Same run as Task 1:
+
+| | Book page | Store | Catalogue card |
+|---|---|---|---|
+| After the checkout | 1 / 4 | 1 / 4 | 1 / 4 straight away, even before the refetch |
+| Copy returned, catalogue opened offline | 2 / 4 | 2 / 4 | 2 / 4, under the error |
+
+Why the Task 1 version breaks: a handler that writes component state only
+fixes the one component that happens to be mounted, and every other copy
+of that number keeps whatever its last fetch said.
+
+## Task 3: Ordering
+
+I made it happen on purpose by holding the book page's `GET /books/:id`
+response in the browser after the server had answered (1 on the shelf).
+While it was held, Usman's checkout went through and the socket event set
+the store to 0. When the held response was let go it wrote 1 back over
+the 0.
+
+What the user sees: the right number for a moment, then a wrong one that
+looks perfectly normal and stays wrong, because no new event is coming to
+correct it.
+
+How I stopped it: the store remembers when the last event for each book
+arrived (`eventAtById`). Each HTTP response carries the time its request
+was sent: the fetch thunk records it in `getPendingMeta`, and the book page
+passes it to `bookLoaded`. If an event arrived after the request was sent,
+the response is older than the event, so it keeps the event's `onShelf`
+and only takes the other fields. Same test after the fix: the response
+landed and the page stayed at 0 / 4.
+
+The fuller fix would be on the server: a version number on each book that
+goes up on every change and is sent in both responses and events, so the
+client keeps whichever is higher. That needs a migration, and the time
+check covers the case we actually hit.
+
+It's most like the Week 3 one. That was also a late response landing on
+top of newer data on the client, and the fix was the same idea: work out
+which answer is older and ignore it. The Week 6 double promotion was two
+writes racing on the server, and the fix there belonged in the database.
+
+## Task 4: Optimistic updates against the real API
+
+In Week 4 only borrowing was optimistic: the button switches to
+"Requesting..." straight away and rolls back with the API's message if the
+request fails. Deleting a book already waited for the server, and the
+filter chips only change the view, so there's nothing to roll back.
+
+Checked against the real API, borrowing had three problems the mock
+couldn't show:
+
+- **No copies left** doesn't fail. The API puts the request in the queue,
+  but the button still said "Request sent". It now uses the status the
+  server sends back and says "You're in the queue".
+- **The request ends later** (cancelled, rejected, expired, returned): the
+  button stayed on "Request sent" forever, so the member couldn't ask
+  again. The store now hears `status-changed` for the member's own request
+  and clears it.
+- **Another user logs in** in the same browser and saw the previous user's
+  "Request sent". Borrow state is now cleared on login, logout and session
+  end.
+
+Making the server refuse:
+
+1. Sara at 5 open requests asked for a sixth. The button went
+   "Requesting..." then back to "Borrow", with "Members can have at most 5
+   open borrow requests." shown under it.
+2. A book with no copies went "Requesting..." then "You're in the queue".
+   When she left the queue from another tab, it changed back to "Join the
+   queue" without a refresh.
+3. An admin deactivated Test User while they were on a book page. The
+   server dropped their socket, the refresh was refused, and they were on
+   the login page within a second. With the account switched off directly
+   in the database (no event), clicking Borrow went "Requesting...", got
+   `401`, and ended on the login page. Nothing stayed on "Request sent", and
+   no request was created.
+
+## Task 5: Three ways data gets in
+
+**HTTP responses.** Good for the full picture: first load, a page of the
+catalogue, catching up after a reconnect. Every field is there and it
+comes from the database. Bad at staying true. It's a snapshot of the
+moment the server read it, it's already old when it lands, and it only
+gets updated if I ask again.
+
+**Socket events.** Good for small changes that just happened ("Hyperion is
+now 1 on the shelf") without anyone asking, and that's what makes the
+screen live. Bad at being complete or guaranteed. An event only carries the
+field that changed, only reaches rooms I've joined, and anything sent while
+I was disconnected is lost for good.
+
+**Optimistic updates.** Good for feel: the button reacts the moment it's
+clicked. Bad at being true, because it's only a guess about what the server
+will say. It has to be rolled back when the server refuses, and the server
+can answer something I didn't guess (queued instead of pending).
+
+**The rule:** the server wins over my guess, and between two things the
+server said, the later one wins. An optimistic value only lasts until the
+server answers. A socket event beats any response to a request sent before
+the event arrived, and a fresh fetch beats events I may have missed (which
+is why I refetch on reconnect). All three write into the same place in the
+store, so that rule only has to be applied once.

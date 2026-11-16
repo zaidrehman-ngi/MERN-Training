@@ -1,4 +1,8 @@
-import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import {
+  createAsyncThunk,
+  createSelector,
+  createSlice,
+} from "@reduxjs/toolkit";
 import { createBook, listBooks, removeBook, updateBook } from "../api/books";
 import { createBorrowRequest } from "../api/borrowRequests";
 
@@ -15,6 +19,7 @@ export const fetchBooks = createAsyncThunk(
       return rejectWithValue(error);
     }
   },
+  { getPendingMeta: () => ({ startedAt: Date.now() }) },
 );
 
 export const createBookThunk = createAsyncThunk(
@@ -66,13 +71,28 @@ export const borrowBookThunk = createAsyncThunk(
   {
     condition: ({ bookId }, { getState }) => {
       const status = getState().books.borrowStatusByBookId[bookId];
-      return status !== "pending" && status !== "succeeded";
+      return !["pending", "succeeded", "queued"].includes(status);
     },
   },
 );
 
+// every book the app has seen, once, by id; the catalogue page keeps only its ids
+// a response for a request sent before the last event is older than that
+// event, so it doesn't get to overwrite the copies
+const saveBook = (state, book, requestedAt) => {
+  const eventAt = state.eventAtById[book.id];
+  const current = state.byId[book.id];
+  state.byId[book.id] =
+    current && eventAt > requestedAt
+      ? { ...book, onShelf: current.onShelf }
+      : book;
+};
+
 const initialState = {
-  items: [],
+  byId: {},
+  ids: [],
+  eventAtById: {},
+  requestStartedAt: null,
   status: "idle",
   error: null,
   filter: "all",
@@ -97,24 +117,31 @@ const booksSlice = createSlice({
   initialState,
 
   reducers: {
-    bookAdded: (state, action) => {
-      if (!state.items.some((book) => book.id === action.payload.id)) {
-        state.items.push(action.payload);
-      }
+    bookLoaded: {
+      reducer: (state, action) => {
+        saveBook(state, action.payload.book, action.payload.requestedAt);
+      },
+      prepare: (book, requestedAt) => ({ payload: { book, requestedAt } }),
     },
 
-    bookUpdated: (state, action) => {
-      const index = state.items.findIndex(
-        (book) => book.id === action.payload.id,
-      );
-
-      if (index !== -1) {
-        state.items[index] = action.payload;
-      }
+    availabilityChanged: {
+      reducer: (state, action) => {
+        const { bookId, available, receivedAt } = action.payload;
+        state.eventAtById[bookId] = receivedAt;
+        const book = state.byId[bookId];
+        if (book) {
+          book.onShelf = available;
+        }
+      },
+      prepare: (payload) => ({
+        payload: { ...payload, receivedAt: Date.now() },
+      }),
     },
 
-    bookRemoved: (state, action) => {
-      state.items = state.items.filter((book) => book.id !== action.payload);
+    // the request is over (cancelled, rejected, expired, returned), so the
+    // member can ask for the book again
+    borrowRequestClosed: (state, action) => {
+      delete state.borrowStatusByBookId[action.payload.bookId];
     },
 
     resetBookMutation: (state, action) => {
@@ -153,6 +180,7 @@ const booksSlice = createSlice({
         state.status = "loading";
         state.error = null;
         state.currentRequestId = action.meta.requestId;
+        state.requestStartedAt = action.meta.startedAt;
       })
 
       .addCase(fetchBooks.fulfilled, (state, action) => {
@@ -161,7 +189,10 @@ const booksSlice = createSlice({
         }
 
         state.status = "succeeded";
-        state.items = action.payload.data;
+        for (const book of action.payload.data) {
+          saveBook(state, book, state.requestStartedAt);
+        }
+        state.ids = action.payload.data.map((book) => book.id);
         state.total = action.payload.meta.total;
         state.limit = action.payload.meta.limit;
         state.currentRequestId = null;
@@ -180,15 +211,7 @@ const booksSlice = createSlice({
       .addCase(createBookThunk.fulfilled, (state, action) => {
         state.createStatus = "succeeded";
         state.createError = null;
-        const index = state.items.findIndex(
-          (book) => book.id === action.payload.id,
-        );
-
-        if (index === -1) {
-          state.items.push(action.payload);
-        } else {
-          state.items[index] = action.payload;
-        }
+        state.byId[action.payload.id] = action.payload;
       })
 
       .addCase(createBookThunk.pending, (state) => {
@@ -211,13 +234,7 @@ const booksSlice = createSlice({
         const { id } = action.meta.arg;
         state.updateStatusById[id] = "succeeded";
         delete state.updateErrorById[id];
-        const index = state.items.findIndex(
-          (book) => book.id === action.payload.id,
-        );
-
-        if (index !== -1) {
-          state.items[index] = action.payload;
-        }
+        state.byId[action.payload.id] = action.payload;
       })
 
       .addCase(updateBookThunk.rejected, (state, action) => {
@@ -235,7 +252,8 @@ const booksSlice = createSlice({
       .addCase(deleteBookThunk.fulfilled, (state, action) => {
         state.deleteStatusById[action.payload] = "succeeded";
         delete state.deleteErrorById[action.payload];
-        state.items = state.items.filter((book) => book.id !== action.payload);
+        delete state.byId[action.payload];
+        state.ids = state.ids.filter((id) => id !== action.payload);
       })
 
       .addCase(deleteBookThunk.rejected, (state, action) => {
@@ -252,7 +270,9 @@ const booksSlice = createSlice({
 
       .addCase(borrowBookThunk.fulfilled, (state, action) => {
         const { bookId } = action.meta.arg;
-        state.borrowStatusByBookId[bookId] = "succeeded";
+        // the server decides: pending if a copy was free, queued if not
+        state.borrowStatusByBookId[bookId] =
+          action.payload.status === "queued" ? "queued" : "succeeded";
       })
 
       .addCase(borrowBookThunk.rejected, (state, action) => {
@@ -263,21 +283,37 @@ const booksSlice = createSlice({
         const { bookId } = action.meta.arg;
         delete state.borrowStatusByBookId[bookId];
         state.borrowErrorByBookId[bookId] = action.payload;
-      });
+      })
+
+      // borrow state belongs to whoever was logged in, not to the next user
+      .addMatcher(
+        (action) =>
+          action.type === "auth/logout/pending" ||
+          action.type === "auth/sessionEnded" ||
+          action.type === "auth/login/fulfilled",
+        (state) => {
+          state.borrowStatusByBookId = {};
+          state.borrowErrorByBookId = {};
+        },
+      );
   },
 });
 
 export const {
-  bookAdded,
-  bookUpdated,
-  bookRemoved,
+  bookLoaded,
+  availabilityChanged,
+  borrowRequestClosed,
   resetBookMutation,
   filterChanged,
   searchChanged,
   pageChanged,
 } = booksSlice.actions;
 
-export const selectAllBooks = (state) => state.books.items;
+export const selectAllBooks = createSelector(
+  [(state) => state.books.ids, (state) => state.books.byId],
+  (ids, byId) => ids.map((id) => byId[id]).filter(Boolean),
+);
+export const selectBookById = (state, id) => state.books.byId[id];
 export const selectFilter = (state) => state.books.filter;
 export const selectSearch = (state) => state.books.search;
 export const selectPage = (state) => state.books.page;
