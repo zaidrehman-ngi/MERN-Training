@@ -1108,3 +1108,158 @@ rebuilding everything.
    "More details" toggle). In a Vite app nothing forces that, but the same
    shape keeps pages simple and means a click only re-renders the small
    part that changed.
+
+# Exercise 10 — The framework that does Week 7 for you
+
+## Task 1: Reading the scaffold
+
+Scaffolded with `npx @nestjs/cli new nestjs-project` (Nest 12). It runs on
+`PORT=3000 npm run start` and `GET /` returns "Hello World!".
+
+| Nest file | What it does | Our Week 7 equivalent |
+| --- | --- | --- |
+| `app.module.ts` | Lists the controllers and services and lets Nest create and connect them | `services/createServices.ts` plus the wiring in `server.ts` (`createServices(createRepositories(prisma), events)`), where we connect everything by hand |
+| `app.controller.ts` | Class with `@Controller()` and `@Get()`; handles the request and calls the service | `controllers/books.controller.ts` plus `routes/books.routes.ts`, since Nest puts the path on the controller method instead of in a separate router file |
+| `app.service.ts` | `@Injectable()` class with the logic | `services/books.service.ts` (`createBooksService(booksRepository, events)`) |
+
+## Task 2: A books resource
+
+Generated with `nest g resource books`, then filled in under
+`nestjs-project/src/books/`:
+
+- `dto/create-book.dto.ts`: `CreateBookDto` with class-validator rules,
+  the same ones as our zod `createBookSchema` (title 1 to 200 chars,
+  13-digit ISBN, whole numbers for year, copies and fine).
+- `dto/update-book.dto.ts`: `PartialType(CreateBookDto)`, so every field
+  is optional, like `createBookSchema.partial()`.
+- `books.service.ts`: CRUD on an in-memory array. Missing id throws
+  `NotFoundException` (404), duplicate ISBN throws `ConflictException`
+  (409).
+- `books.controller.ts`: `POST /books`, `GET /books`, `GET /books/:id`,
+  `PATCH /books/:id`, `DELETE /books/:id` (204). `ParseUUIDPipe` rejects a
+  bad id with 400.
+- `main.ts`: a global `ValidationPipe` with `whitelist` and
+  `forbidNonWhitelisted`. Without it the DTO decorators do nothing.
+
+A bad body gets a 400 listing every problem, and an unknown field like
+`price` is rejected.
+
+## Task 3: Where the injection happens
+
+**Who creates the service:** Nest does, inside `NestFactory.create(AppModule)`.
+It reads each module's `providers`, sees what each class's constructor
+asks for, creates them in the right order and passes them in. TypeScript
+makes that possible: with `emitDecoratorMetadata` the build leaves the
+constructor's types on the class, and `dist/books/books.controller.js`
+has `__metadata("design:paramtypes", [BooksService])`. That list is what
+Nest reads.
+
+**What `@Injectable()` is for:** it's what makes TypeScript write that
+metadata for the service's own constructor. I gave `BooksService` a
+`Clock` dependency and removed the decorator: the app still started, but
+`clock` was `undefined`, with no error. With the decorator, it got a real
+`Clock`. (With no constructor arguments it makes no difference, which is
+why removing it from the plain `BooksService` changed nothing.)
+
+**What `providers` does:** it's the list of things Nest is allowed to
+create in that module. When I removed `BooksService` from it, the app
+refused to start: "Nest can't resolve dependencies of the BooksController
+(?). Please make sure that the argument BooksService at index [0] is
+available in the BooksModule module." Each provider is created once and
+shared: the controller and `app.get(BooksService)` got the same object,
+and the constructor ran once.
+
+**Compared to Week 7:** we already had the idea. Our services get their
+repositories as arguments, and `server.ts` builds everything with
+`createServices(createRepositories(prisma), domainEvents)`. What Nest adds
+on top is the bookkeeping that grows with the number of services:
+
+- **Order.** In `createServices.ts` I have to build `books` and `users`
+  before `borrowRequests`, and `borrowRequests` before `reminders`. Nest
+  works the order out itself.
+- **Sharing.** I pass the same `books` variable into `borrowRequests` by
+  hand so there's one instance. Nest makes every provider a single shared
+  instance.
+- **Changing a dependency.** `createBorrowRequestsService` takes six
+  positional arguments and is called by hand in three places
+  (`createServices.ts` and both test files). Adding a seventh means
+  editing all three in the right position. In Nest I'd only change the
+  constructor.
+- **Mistakes found at startup.** A missing dependency stops the app with
+  a message naming the class and the argument, instead of an `undefined`
+  that fails later.
+
+With our seven services `createServices.ts` is 79 lines and still easy to
+follow. With fifty it's a long file that has to be kept in order by hand,
+and that's the part Nest takes over.
+
+## Task 4: class-validator against zod
+
+The same rules both ways (the zod one is our `createBookSchema`, trimmed
+to the shared fields):
+
+```ts
+// Nest: src/books/dto/create-book.dto.ts
+export class CreateBookDto {
+  @IsString() @IsNotEmpty() @MaxLength(200) title: string;
+  @IsOptional() @IsString() author?: string;
+  @IsInt() @Min(0) year: number;
+  @Matches(/^\d{13}$/, { message: 'isbn must be 13 digits' }) isbn: string;
+  @IsInt() @IsPositive() totalCopies: number;
+  @IsInt() @Min(0) finePerDay: number;
+}
+```
+
+```ts
+// library-api: src/schemas/books.schema.ts
+const createBookSchema = z.object({
+  title: z.string().min(1).max(200),
+  author: z.string().optional(),
+  year: z.number().int().nonnegative(),
+  isbn: z.string().regex(/^\d{13}$/, "ISBN must be 13 digits."),
+  totalCopies: z.number().int().positive(),
+  finePerDay: z.number().int().nonnegative(),
+});
+```
+
+| | class-validator | zod |
+| --- | --- | --- |
+| Where the rules live | Decorators on each property of a DTO class | A schema object |
+| Type produced | The class is the type, but the decorator and the type are written separately. `@IsString() year: number` compiles with no error. | `z.infer<typeof schema>` comes from the rules, so they can't disagree (`z.string()` then `year: 1965` is a compile error) |
+| Error | `{ message: [...strings], error, statusCode }`. The field name is only inside the sentence, and `year: "1965"` gave two messages, one of them "must not be less than 0". `price` was rejected (`forbidNonWhitelisted`). | Ours is `{ error, message, details: [{ field, message }] }`, a field per message, built by our `validate` middleware. One clear message for year ("expected number, received string"). `price` was silently dropped. |
+| How it's wired | One global `ValidationPipe` in `main.ts`; each route just types its body as `@Body() dto: CreateBookDto` | `validate(createBookSchema, "body")` added by hand to each route in `books.routes.ts` |
+
+**Which I prefer:** zod. The type comes from the rules so they can't
+drift apart, the same schema can be used in the React forms, and I can
+see on the route exactly what's checked. In a Nest project I'd still use
+class-validator, because the global pipe and DTO classes are how Nest is
+built and fighting that isn't worth it.
+
+## Task 5: Opinionated against hand-made
+
+**Better with Nest:**
+
+- **Everyone's code looks the same.** A new developer opens `books/` and
+  finds a module, controller, service and DTO in the place they expect.
+  Ours took three weeks of decisions (layers, `createServices`,
+  `servicesFor(req)`, where validation goes) that someone new has to learn
+  from our code.
+- **The wiring scales without effort.** Adding a service or a dependency
+  is a constructor change, and a missing one fails at startup (Task 3).
+  Ours is a hand-kept `createServices.ts` that grows with every service.
+
+**Worse with Nest:**
+
+- **Unusual things get harder.** Our transaction trick rebuilds all the
+  services with the transaction's repositories and an emitter that holds
+  events back. That's a few lines with plain functions; in Nest, with one
+  shared instance of each service, it needs a different design.
+- **More hidden behaviour to learn.** Decorators, metadata, pipes and
+  modules do a lot out of sight, and a mistake can fail silently, like
+  the missing `@Injectable()` that left `clock` as `undefined`.
+
+**For five people over two years:** Nest. With five people the biggest
+risk is everyone wiring things their own way, and over two years the
+service count only grows. The rules Nest forces are close to what we
+chose by hand anyway, so we'd lose little and every new teammate could
+find their way around on day one.
