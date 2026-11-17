@@ -1037,3 +1037,74 @@ product page, most new customers arrive from a Google search like "buy
 Dune paperback", and a page that Google can't read properly is a sale lost
 to a competitor. There server rendering (or static pages) would be the
 reason to pick the framework.
+
+# Exercise 9 — Would you migrate?
+
+## Task 1: What a migration would touch
+
+| Area | What would change | Size |
+| --- | --- | --- |
+| Routing | The 11 paths in `App.jsx` become folders under `app/`. `RequireAuth` and `AppLayout` become layouts or client guard components, `NavLink`/`useNavigate` become `Link`, `usePathname` and `useRouter`. Mechanical, but every page is touched. | A day |
+| Data fetching | The thunks, `usePagedList` and `api/*` all run in the browser with the bearer token. They keep working as they are inside `"use client"` components. Moving them to the server, which is the point of Next, runs into the auth problem below. | An hour as is, a rethink to use the server |
+| Redux store | `store.js` creates one store when it's imported and wires the socket listeners there. On a Next server that module is shared by every visitor's request, so it has to become a `makeStore()` per request inside a client provider, with the socket wiring moved into an effect. | A day |
+| Socket connection | `api/socket.js` and `SocketProvider` only make sense in the browser (they use `window` and a long-lived connection). They need `"use client"` and must never run on the server. | An hour |
+| Auth token | The access token lives in browser memory (`session.js`) and the refresh cookie is `httpOnly`, `sameSite: strict` and set by library-api on its own domain. The Next server never sees either, so every server-rendered page renders as logged out. To server-render anything private the login flow has to move to cookies the Next server can read (same domain, or Next routes in front of `/auth`), and the role checks move from `RequireAuth` to the server. | A rethink |
+| Styling (Week 4) | We kept CSS Modules plus the global `tokens.css`/`index.css`. Next supports CSS Modules as they are, and the global files just get imported once in the root layout. I did this for Exercise 7 in a few minutes. | An hour |
+
+## Task 2: Gains and losses
+
+**Gains:**
+
+- A shared book link shows the book's title in WhatsApp instead of
+  "library-web".
+- On a slow phone the public catalogue and book pages show the book about
+  0.7 s sooner.
+
+**Losses:**
+
+- **Hosting:** today the frontend is a folder of static files that any
+  free file host can serve. With Next it needs a Node server running all
+  the time (~110 MB RAM, work on every page view), which costs money and is
+  one more thing that can go down.
+- Pages become usable a little later (~0.15 s), since more JS has to load
+  and hydrate.
+- The auth rethink and rewrite time, for pages members and staff already
+  use without complaint.
+
+## Task 3: Recommendation
+
+To the committee,
+
+My recommendation is not to rebuild the library frontend in Next.js.
+
+I spent a day porting two of our pages to it. Rebuilding the whole app
+would take about 8 working days for one developer: a day for routing, a
+day for the Redux store, 3 to 4 days to redo login so the server can see
+who is logged in, and 2 days to test every page again.
+
+What we would get for that is small. A shared book link would show the
+book's title, and the public book pages would appear about 0.7 seconds
+sooner on a slow phone. Most of the library is behind a login, where
+server rendering doesn't help members or staff at all.
+
+What we would lose is cheap hosting. Today the frontend is a set of static
+files that can be hosted for free. Next needs a server running all the
+time, which costs money and is one more thing to keep up.
+
+The current app works and nobody has complained about its speed. If
+shared links become important later, we can fix that one page without
+rebuilding everything.
+
+## Task 4: What I'd take back to Vite
+
+1. **What you're looking at belongs in the URL.** When I ported the
+   catalogue, the filter, search and page had to move out of Redux into
+   `?status=out&q=dune&page=2`. That turned out better on its own: refresh
+   keeps your place, the back button works, and a filtered list can be
+   shared as a link. I'd do the same in library-web with `useSearchParams`.
+
+2. **Keep state at the leaves.** The server/client split made me write the
+   page as "fetch and show" and put the state in one small component (the
+   "More details" toggle). In a Vite app nothing forces that, but the same
+   shape keeps pages simple and means a click only re-renders the small
+   part that changed.
