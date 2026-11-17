@@ -1000,3 +1000,40 @@ able to use it.
   library-api for each visitor. More visitors means more server, and if
   that server is down the page is down too, not just the data.
 - **Another thing to deploy and watch,** next to library-api.
+
+## Task 4: Three ways to render
+
+- **Static generation:** the HTML is built once at build time and served
+  as a file to everyone, so it's fast and cheap but only as fresh as the
+  last build.
+- **Server rendering:** the HTML is built on the server for every request,
+  so it's always fresh and can be different per visitor, but every visit
+  costs server work.
+- **Client rendering:** the server sends an empty shell and the browser
+  fetches the data and builds the page, so it's per user and live but shows
+  nothing until the JS has run.
+
+| Page | Pick | Why |
+| --- | --- | --- |
+| Public catalogue | Static, rebuilt every few minutes | Same for every visitor and public, so crawlers and link previews should get real HTML. Titles and authors barely change, so a few minutes old is fine. The copy counts are the only part that goes stale, and those can be fetched in the browser after load. |
+| Book detail | Server rendering | Also public and the page people share, so it needs the book in the HTML and in `<title>`. Unlike the list, the copy count is the main thing on the page and changes with every loan, so it should be right when the page loads. New books also show up without a rebuild. After that the socket keeps it live. |
+| Member's own borrow list | Client rendering | Private and behind login, so there's nothing for a crawler or a preview, and it must never be built once and served to everyone. Our access token lives in the browser, not in a cookie the Next server could read, so the browser is where the data can be fetched anyway. |
+| Librarian approval queue | Client rendering | Staff only, changes every few minutes, and the page is all buttons (approve, reject). A server-rendered first paint would be out of date as soon as the socket sends the next request, and only a handful of staff ever load it, on a fast library connection. |
+
+## Task 5: Does the search engine argument apply?
+
+Mostly no. Borrowing, requests, members, approvals and fines are all
+behind a login, and a crawler can't log in, so server rendering does
+nothing for search there. The only public pages are the catalogue and book
+detail. Even those won't get much search traffic: people looking for a
+book search Google and land on Amazon or Goodreads, not on one city
+library's catalogue. Our users are members and staff who already know the
+site and come straight to it. The small real gain is link previews when a
+member shares a book, and that only needs the `<title>` and `og:` tags on
+the detail page.
+
+Where it would decide things: an **online bookshop**. Each book is a public
+product page, most new customers arrive from a Google search like "buy
+Dune paperback", and a page that Google can't read properly is a sale lost
+to a competitor. There server rendering (or static pages) would be the
+reason to pick the framework.
