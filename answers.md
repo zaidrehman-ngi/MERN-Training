@@ -1263,3 +1263,165 @@ risk is everyone wiring things their own way, and over two years the
 service count only grows. The rules Nest forces are close to what we
 chose by hand anyway, so we'd lose little and every new teammate could
 find their way around on day one.
+
+# Exercise 11 — Guards, pipes and interceptors
+
+## Task 1: Our middleware in Nest's terms
+
+Nest runs them in this order: middleware → guards → interceptors (before)
+→ pipes → handler → interceptors (after), with exception filters catching
+anything thrown.
+
+| Our file (`src/middleware/`) | Nest concept | Why |
+| --- | --- | --- |
+| `requestId.ts` | Middleware | Runs on every request before routing and doesn't care which handler it reaches |
+| `requestLog.ts` | Middleware (ambiguous) | See below |
+| `requireAuth.ts` | Guard | Answers "may this request go on?" and sets `req.user` for later |
+| `requireRole.ts` | Guard | A yes/no on the role, the textbook guard (with a `@Roles()` decorator instead of `requireRole(...STAFF_ROLES)`) |
+| `validate.ts` | Pipe | Checks `body`/`query`/`params` and replaces them with the parsed data, which is exactly validate-and-transform |
+| `apiRateLimiter.ts`, `bookSearchRateLimiter.ts` | Guard | Allow or refuse before the handler runs (Nest's own `ThrottlerGuard` is one) |
+| `loginRateLimiter.ts` | Guard + interceptor (ambiguous) | See below |
+| `errorHandler.ts` | None of the four, an exception filter | See below |
+
+**Ambiguous ones:**
+
+- **`requestLog.ts`:** it logs status and duration when the response
+  finishes, which sounds like an interceptor (it wraps the handler). But
+  an interceptor runs after the guards, so it would never see a request
+  refused by `requireAuth`, a rate limit or a 404, and those are exactly
+  the ones I want in the log. Middleware sees everything, so I'd keep it
+  as middleware.
+- **`loginRateLimiter.ts`:** the first half is a guard (refuse when there
+  are too many failed attempts). The second half waits for the response
+  and only counts the attempt if the status was 401, which is
+  interceptor work. In Nest it would split into two.
+- **`errorHandler.ts`:** turning errors into `{ error, message, details }`
+  with the right status isn't any of the four. Nest has a fifth thing for
+  it, the exception filter. An interceptor's `catchError` is the closest
+  of the four, but it wouldn't catch errors thrown by guards or
+  middleware.
+
+## Task 2: A roles guard
+
+In `nestjs-project/src/auth/`:
+
+- `roles.decorator.ts`: `Roles = Reflector.createDecorator<Role[]>()`, so a
+  route says `@Roles(STAFF_ROLES)`.
+- `roles.guard.ts`: `RolesGuard` reads the roles for the handler (or its
+  class) with `reflector.getAllAndOverride`. No roles means open, no user
+  is 401, wrong role is 403, same messages as our `requireRole`.
+- `app.module.ts`: the guard is registered once for the whole app with
+  `APP_GUARD`. A small `DemoUserMiddleware` sets `req.user` from an
+  `X-Role` header, standing in for `requireAuth` since this app has no
+  login.
+
+The books routes use the same roles as ours: `POST` and `PATCH` are staff,
+`DELETE` is admin. No header gets 401, `user` gets 403, a librarian can
+create and update but gets 403 on delete, an admin can delete (204), and
+`GET` is open to anyone.
+
+**Comparison:** `requireRole(...STAFF_ROLES)` is a function that returns
+middleware, put into the route's middleware list, and the roles are
+locked inside that closure. `@Roles(STAFF_ROLES)` only stores the roles
+on the method, and one guard reads them on each request. That makes
+these easier:
+
+- **One check, registered once.** Routes only declare what they need, and
+  a route with no `@Roles` is open. I can't forget to put the role check
+  after `requireAuth` in the right order on one route.
+- **Defaults on the class.** `@Roles(STAFF_ROLES)` on the controller
+  covers every route, and a method can override it.
+- **The rules can be read without running a request.** A short script
+  reading the metadata listed every route and its roles (`create`:
+  librarian, admin, super admin; `findAll`: anyone; `remove`: admin,
+  super admin). With our closures, the only way to find out is to read
+  every routes file or send requests.
+
+## Task 3: Pipes, and route parameters as strings
+
+In `nestjs-project/src/common/pipes/`:
+
+- `dto-validation.pipe.ts`: `DtoValidationPipe` turns the body into the
+  DTO class with `plainToInstance`, runs class-validator on it (unknown
+  fields rejected) and throws a 400 in the same
+  `{ error, message, details }` shape as our API. It replaces Nest's
+  built-in `ValidationPipe` as the global pipe in `main.ts`. For plain
+  types like `string` or `number` it passes the value through.
+- `parse-positive-int.pipe.ts`: `ParsePositiveIntPipe` turns a route
+  parameter into a number, and gives a 400 for anything that isn't a
+  positive whole number (`abc`, `0`, `19.5`). It's used on the new
+  `GET /books/year/:year`.
+
+**The strings problem:** everything in a URL is a string. In Week 4 and
+Week 5 that broke comparisons, because `"1965" === 1965` is false. I
+removed the pipe from `/books/year/:year` to check. The handler is
+written as `year: number`, but it got `"1965"` (a string) and returned
+`[]` with a 200, with no error anywhere. The `number` type is only for
+TypeScript and nothing checks it at runtime.
+
+**Nest vs our zod coercion:**
+
+- In our API the conversion is in the schema: `z.coerce.number()` in
+  `schemas/common.ts`, run by the `validate` middleware. After that,
+  `req.query.page` really is a number, and the type comes from the
+  schema, so they can't disagree.
+- In Nest the conversion is a pipe on the parameter itself:
+  `@Param('year', ParsePositiveIntPipe)`. The `number` in the signature
+  is just written by hand. If the pipe is missing, TypeScript still
+  says `number` and the value is still a string. Zod would at least
+  make the type `string` without the coercion. (The built-in
+  `ValidationPipe` with `transform: true` can also convert using the
+  declared type, but it's off by default.)
+
+## Task 4: Timing and envelope interceptors
+
+In `nestjs-project/src/common/interceptors/`, both registered for the
+whole app with `APP_INTERCEPTOR`:
+
+- `timing.interceptor.ts`: notes the time before the handler, and after it
+  logs `POST /books 201 4.7ms`. Errors are logged with their status too
+  (`GET /books/<id> 404 0.6ms`). A request refused by the guard (401)
+  never shows up, because guards run before interceptors.
+- `envelope.interceptor.ts`: wraps whatever the handler returns in
+  `{ data }`, so a book is `{ "data": { ... } }` and the list is
+  `{ "data": [ ... ] }`. A `204` with nothing returned stays empty, and
+  errors don't pass through it.
+
+**Is an envelope better?** For: one fixed shape means the client always
+reads `body.data`, and there is room next to it for `meta` (paging)
+without breaking anyone, which is how our list endpoints ended up as
+`{ data, meta }` in Exercise 3. Against: raw objects are simpler to read
+and test, the status code already says success or failure, and adding
+an envelope later is a breaking change for every client (the Nest e2e
+test for `GET /` failed the moment I added it). I'd go with the
+envelope, because paging needs `meta` anyway and one shape everywhere is
+easier than remembering which endpoints are wrapped. Our Express API
+already does this by hand since Exercise 3, so the Week 1 specification
+is the part that's out of date, and in Nest one interceptor does it for
+every route.
+
+## Task 5: Twelve endpoints or two hundred
+
+**Twelve endpoints: Express.** The whole API fits in a few route files
+and one person can hold it in their head. Hand-wiring the services is a
+handful of lines, and putting `requireAuth, requireRole(...), validate(...)`
+on each route is easy to check by reading. Nest's modules, decorators,
+DI and rxjs would be more to learn than the app itself.
+
+**Two hundred endpoints: Nest.** Our Express API has about 25 endpoints
+and `createServices.ts` is already 79 lines with the same positional
+arguments in three places. At 200 that file, and the middleware lists on
+every route, become the part that breaks.
+
+**What changes the answer:** Nest's cost is mostly fixed: you learn
+modules, DI, guards, pipes and interceptors once, and it's the same at 12
+endpoints or 200. Express's cost grows with every route, because every
+route repeats its own auth, role and validation middleware in the right
+order, and every new service has to be wired by hand. In Nest those are
+declared once (`APP_GUARD`, a global pipe, `APP_INTERCEPTOR`, `providers`)
+and each route only says what it needs, like `@Roles(STAFF_ROLES)`. More
+endpoints also means more people, and with Nest every module has the
+same shape, so someone new knows where things go without our own
+conventions being explained. So the turning point isn't an exact number.
+It's when the repeated per-route wiring and the number of people working
+on it cost more than learning Nest once.

@@ -34,6 +34,10 @@ export class BooksService {
     return this.books;
   }
 
+  findByYear(year: number): Book[] {
+    return this.books.filter((b) => b.year === year);
+  }
+
   findOne(id: string): Book {
     const book = this.books.find((b) => b.id === id);
     if (!book) {
