@@ -30,6 +30,7 @@ const accessLogStream = logger.isEnabled("info")
 // services come from outside, so the caller picks the real or a fake database
 const createApp = (services: Services) => {
   const app = express();
+  app.set("trust proxy", config.trustProxy);
   app.locals.services = services;
 
   app.use(helmet());

@@ -2,10 +2,16 @@
   "name": "library-api",
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node src/server.ts",
     "dev": "nodemon --exec node --ext ts,js,json src/server.ts",
+    "build": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
     "test": "node --test \"test/*.test.js\"",
     "typecheck": "tsc"

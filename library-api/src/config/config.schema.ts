@@ -54,6 +54,8 @@ const envSchema = z.object({
       (origin) => new URL(origin).origin === origin,
       "must be only the origin, like https://app.example.com (no path or trailing slash)",
     ),
+  COOKIE_SAME_SITE: z.enum(["strict", "lax", "none"]).default("strict"),
+  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
   ACCESS_LOG_PATH: z.string().trim().min(1).default("logs/access.log"),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive(),
   RATE_LIMIT_MAX: z.coerce.number().int().positive(),
@@ -107,6 +109,13 @@ const configSchema = envSchema.superRefine((env, ctx) => {
       path: ["CORS_ORIGIN"],
       message:
         "must be the https address of the deployed frontend in production",
+    });
+  }
+  if (env.COOKIE_SAME_SITE === "none" && env.NODE_ENV !== "production") {
+    ctx.addIssue({
+      code: "custom",
+      path: ["COOKIE_SAME_SITE"],
+      message: "can only be none in production, because it needs https",
     });
   }
 });

@@ -1508,3 +1508,26 @@ overlaps with Ex13, so it doesn't add much on top, but the code fixes
 are small and don't need a host, deploy first thing tomorrow, then
 Ex14. Ex15's rehearsals, the break-and-fix practice and the recording
 move to Friday morning before the panel.
+
+## Fixes done before Exercise 13
+
+From the list above, the ones that didn't need a host yet:
+
+- **API can start on a host:** `library-api/package.json` now has
+  `start` (`node src/server.ts`), `build` (`prisma generate`) and
+  `db:migrate` (`prisma migrate deploy`), and `engines` asks for Node 24
+  since it runs the `.ts` files directly.
+- **Refresh cookie across sites:** `sameSite` now comes from a new
+  `COOKIE_SAME_SITE` variable. It stays `strict` locally and is `none`
+  (with `secure`) in production, because the frontend on Vercel and the
+  API on Render are different sites. The config refuses `none` outside
+  production. Logout clears the cookie with the same options, otherwise
+  the browser ignores the clear.
+- **Rate limits behind Render's proxy:** new `TRUST_PROXY` variable (`1`
+  in production) so `req.ip` is the visitor's IP and not the proxy's.
+  Without it every visitor would share one login limit.
+- **Deep links:** `library-web/vercel.json` rewrites every path to
+  `index.html`, so refreshing `/books/<id>` loads the app instead of a
+  404.
+
+Both new variables are in `.env.example` and `.env.production.example`.

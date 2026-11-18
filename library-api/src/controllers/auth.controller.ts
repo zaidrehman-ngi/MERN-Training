@@ -12,14 +12,16 @@ const registrationResponse = {
     "Registration received. If this email wasn't already registered, the account has been created and you can log in.",
 };
 
-const REFRESH_COOKIE_PATH = "/api/v1/auth";
+const refreshCookieOptions = {
+  httpOnly: true,
+  sameSite: config.cookieSameSite,
+  secure: config.nodeEnv === "production",
+  path: "/api/v1/auth",
+};
 
 const setRefreshTokenCookie = (res: Response, refreshToken: string) => {
   res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    sameSite: "strict",
-    secure: config.nodeEnv === "production",
-    path: REFRESH_COOKIE_PATH,
+    ...refreshCookieOptions,
     maxAge: config.refreshExpiresInMs,
   });
 };
@@ -63,7 +65,7 @@ const logout = async (req: Request, res: Response) => {
   }
   await servicesFor(req).auth.logout(req.token, refreshTokenCookie(req));
 
-  res.clearCookie("refreshToken", { path: REFRESH_COOKIE_PATH });
+  res.clearCookie("refreshToken", refreshCookieOptions);
   res.status(200).json({
     message: "Logged out successfully.",
   });
