@@ -1425,3 +1425,86 @@ same shape, so someone new knows where things go without our own
 conventions being explained. So the turning point isn't an exact number.
 It's when the repeated per-route wiring and the number of people working
 on it cost more than learning Nest once.
+
+# Exercise 12 — Express or Nest
+
+## Task 1: The comparison
+
+| | Express (our `library-api`) | Nest (our `nestjs-project`) |
+| --- | --- | --- |
+| **Setup cost** | `npm i express` and one file, running in minutes. But the structure (layers, `createServices`, error handler, validation, tests) took us weeks to decide and build. | `nest new` gives modules, a test setup, lint and a build in a minute, and `nest g resource` makes a full CRUD skeleton. More packages and config to start with (decorator flags, class-validator, rxjs). |
+| **Structure** | Whatever we decide. Ours is routes → controllers → services → repositories, held together by convention and code review. | Fixed: module, controller, service, DTO for each feature, wired by DI. Guards, pipes, interceptors and filters each have their own place instead of one `middleware` folder. |
+| **Learning curve** | Small API (`req`, `res`, `next`). The hard part is the decisions, not the framework. | Steeper: modules, providers, decorators, metadata, the request pipeline order and some rxjs. Mistakes can fail silently (a missing `@Injectable()` gave `undefined`). |
+| **TypeScript support** | Added on top: `@types/express`, our own `RequestWithBody<T>`, declaring `req.user`. Zod gives types that always match the rules. | Built for TypeScript, and DI reads the constructor types. But types aren't checked at runtime: `year: number` was still `"1965"` without the pipe, and a DTO's type and its rules can disagree. |
+| **Testing** | Our services take their dependencies as arguments, so tests pass fakes in directly with `node --test`. No framework involved. | `Test.createTestingModule` builds the module and `overrideProvider` swaps in fakes. Spec files are generated with each class. More setup per test, but the same pattern everywhere. |
+| **Team onboarding** | A new developer has to learn our conventions from our code (`servicesFor(req)`, where validation goes, the error shape). | Anyone who knows Nest knows where things are on day one, and the official docs describe our app's layout. |
+| **Something the framework didn't anticipate** | Easy: it's plain functions, so we just write it. Our transaction trick rebuilds the services with the transaction's repositories in a few lines. | Harder: you work inside its model (one shared instance of each service), so the same trick needs request-scoped providers or a different design. You can still drop down to the raw Express `req`/`res`. |
+
+## Task 2: The recommendation
+
+- **Weekend prototype: Express.** I want something running in an hour,
+  not a structure. A few routes in one file and zod is enough, and if
+  the idea fails nothing was spent on setup.
+- **The library system as it stands today: Express.** It already works,
+  with about 25 endpoints, tests, its own error shape and the
+  transaction trick. Its structure is close to what Nest would force
+  anyway. Rewriting it in Nest would cost weeks and the users would see
+  no difference.
+- **Six developers and a five-year roadmap: Nest.** With six people the
+  risk is everyone wiring things their own way, and over five years the
+  endpoints and services keep growing. Nest's one-time learning cost is
+  small next to that, every module looks the same, and new hires can
+  find their way around without us explaining our conventions.
+
+## Task 3: Was Week 7 wasted?
+
+No. The case for "wasted" is that Nest gives the layers, the wiring and
+the validation for free, so that week could have gone into features.
+But before Week 7 I only made a route, a controller and a model, and put
+all the logic in the controller. Splitting it into routes, controllers,
+services and repositories by hand is how I learned why each layer
+exists, and that is also why Nest was easy to understand and I could
+see what it actually saves.
+
+## Task 4: What's still outstanding
+
+Ordered by what would hurt most to be missing at the panel:
+
+1. **It isn't deployed.** No live URL for the API, the database or the
+   frontend yet.
+2. **The API won't start on a host as it is.** There is no `start`
+   script, `prisma generate` isn't part of a build (`src/generated/` is
+   git-ignored), and nothing runs `prisma migrate deploy` on the hosted
+   database.
+3. **Login won't survive a reload in production.** The refresh cookie is
+   `sameSite: "strict"`, so if the frontend and API are on different
+   sites the browser never sends it and everyone gets logged out after
+   15 minutes or on refresh. `CORS_ORIGIN` also has to be the real
+   frontend URL.
+4. **Deep links 404 on a static host.** The frontend uses
+   `BrowserRouter`, so refreshing `/books/<id>` needs a rewrite to
+   `index.html`, which we don't have.
+5. **No demo data or accounts on the hosted database.** The seed is
+   blocked by `ALLOW_SEED=false`, so we need a one-time seed and a login
+   for each role (member, librarian, admin, super admin) to show the
+   panel.
+6. **Free hosting sleeps.** The first request can take 30+ seconds, and
+   while it's asleep the cron jobs (hold expiry, due reminders) don't run
+   and sockets drop. It has to be woken before the demo.
+7. **READMEs don't have the live URLs, deploy steps or demo logins.**
+   Postman also needs a production environment.
+
+**Does it fit in tomorrow?** No, not all of it.
+
+| Tomorrow | Sheet | Realistic |
+| --- | --- | --- |
+| Ex13 Both halves, in production | 85 min | 3-4 hours, since it's my first deploy and items 1-6 above all land here |
+| Ex14 README, architecture, decisions | 50 min | about 2 hours (the clone-and-follow test alone needs a fresh database) |
+| Ex15 Demo and being broken | 60 min | about 2 hours, and the "broken on purpose" part needs another person twice |
+
+That's 7-8 hours against a 195-minute sheet. The list above mostly
+overlaps with Ex13, so it doesn't add much on top, but the code fixes
+(items 2-4) do. So the plan is: do items 2-4 this evening since they
+are small and don't need a host, deploy first thing tomorrow, then
+Ex14. Ex15's rehearsals, the break-and-fix practice and the recording
+move to Friday morning before the panel.
