@@ -59,6 +59,7 @@ const envSchema = z.object({
     ),
   COOKIE_SAME_SITE: z.enum(["strict", "lax", "none"]).default("strict"),
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
+  CLIENT_IP_HEADER: z.string().trim().toLowerCase().min(1).optional(),
   ACCESS_LOG_PATH: z.string().trim().min(1).default("logs/access.log"),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive(),
   RATE_LIMIT_MAX: z.coerce.number().int().positive(),

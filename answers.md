@@ -1573,3 +1573,38 @@ Deployed to Railway: https://karachi-library-api.up.railway.app
 - **Postman against production:** 124 of 126 assertions passed. The 2
   failures are the "Let it expire" step, which only works when the API
   runs with `JWT_EXPIRES_IN=10s`, and production uses `15m`.
+
+## Task 3: The frontend
+
+Deployed to Vercel: https://karachi-library.vercel.app, with
+`VITE_API_URL=https://karachi-library-api.up.railway.app/api/v1` set in
+Vercel before the build.
+
+- **CORS:** `CORS_ORIGIN` on the API is set to
+  `https://karachi-library.vercel.app` (exact origin, no trailing slash),
+  so requests from the deployed site get
+  `Access-Control-Allow-Origin` back.
+- **Socket:** the socket URL comes from the same `VITE_API_URL`, and the
+  Socket.IO server has its own `cors` setting, also set from
+  `CORS_ORIGIN`. But CORS doesn't apply to WebSockets, so another site
+  could still open a socket straight over WebSocket. I added an
+  `allowRequest` check in `socketServer.ts` that only accepts the
+  frontend's origin. Now the deployed site connects (one socket, `101`)
+  and another origin is refused.
+
+## Task 4: The deep link
+
+Vercel's setting for this is a rewrite in `vercel.json` (in `library-web`):
+
+```json
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+Vercel serves real files (`/assets/...`) first, and every other path
+gets `index.html`, so React Router picks the page. I refreshed and
+pasted every route on the deployed site: `/`, `/books`, `/books/<id>`,
+`/books/<id>/edit`, `/books/add`, `/borrow-requests`, `/users`,
+`/admins`, `/login`, `/register`. All load the app, and an unknown path
+shows our own Not Found page instead of Vercel's 404.

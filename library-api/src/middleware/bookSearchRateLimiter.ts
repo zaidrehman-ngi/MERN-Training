@@ -1,4 +1,5 @@
-import { ipKeyGenerator, rateLimit } from "express-rate-limit";
+import { rateLimit } from "express-rate-limit";
+import clientIpKey from "../utils/clientIp.ts";
 import config from "../config/config.ts";
 import { tooManyRequests } from "../errors/ApiError.ts";
 
@@ -7,7 +8,7 @@ const bookSearchRateLimiter = rateLimit({
   limit: config.searchRateLimitMax,
   standardHeaders: "draft-8",
   legacyHeaders: false,
-  keyGenerator: (req) => ipKeyGenerator(req.ip ?? ""),
+  keyGenerator: clientIpKey,
   handler: (req, res, next) =>
     next(tooManyRequests("Too many book searches. Please try again later.")),
 });

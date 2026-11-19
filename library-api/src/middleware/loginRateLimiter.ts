@@ -1,5 +1,5 @@
 import type { Request, RequestHandler } from "express";
-import { ipKeyGenerator } from "express-rate-limit";
+import clientIpKey from "../utils/clientIp.ts";
 import config from "../config/config.ts";
 import { tooManyRequests } from "../errors/ApiError.ts";
 
@@ -14,7 +14,7 @@ const failedAttempts = new Map<string, Attempt[]>();
 const keyFor = (req: Request) => {
   const email: unknown = req.body?.email;
   const account = typeof email === "string" ? email.trim().toLowerCase() : "";
-  return `${account}\u0000${ipKeyGenerator(req.ip ?? "")}`;
+  return `${account}\u0000${clientIpKey(req)}`;
 };
 
 const recentAttempts = (key: string, now: number) =>
