@@ -138,7 +138,6 @@ const booksSlice = createSlice({
       }),
     },
 
-    // the member already has an open request for this book, e.g. after a reload
     borrowStatusLoaded: (state, action) => {
       const { bookId, status } = action.payload;
       if (state.borrowStatusByBookId[bookId] !== "pending") {

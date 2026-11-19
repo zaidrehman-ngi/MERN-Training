@@ -1630,3 +1630,26 @@ shows our own Not Found page instead of Vercel's 404.
 - **Frontend bundle:** the only value from the environment is the API
   URL, which is public anyway. No secrets, no database URL, no demo
   passwords, and no public source maps.
+
+## Task 6: The eight steps in production
+
+I ran the flow from Exercise 2 on my phone on mobile data, against
+https://karachi-library.vercel.app. What behaved differently from
+localhost:
+
+1. **Refresh logged me out on the phone.** Login worked, but after a
+   refresh I was back on the login page. The frontend (`vercel.app`) and
+   the API (`railway.app`) are different sites, and the phone's browser
+   didn't keep the API's refresh cookie. On localhost both are
+   `localhost`, so this never showed up. Fixed by sending login, refresh
+   and logout through the frontend's own domain (`vercel.json` forwards
+   `/api/v1/auth/*` to the API), so the cookie belongs to the site
+   itself.
+2. **Rate limits are shared on one network.** Everything from the same
+   Wi-Fi counts as one IP, so my own testing from the laptop used up the
+   100 requests per 15 minutes and the laptop got `429`s while the phone
+   on mobile data was fine. Locally I never hit the limit.
+3. **The database sleeps.** After a quiet period the first request can
+   be slow or fail once while Neon wakes up.
+
+After the fix all eight steps worked on the phone.
