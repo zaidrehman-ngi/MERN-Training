@@ -67,6 +67,9 @@ const createSocketServer = (
     SocketData
   >(httpServer, {
     cors: { origin: config.corsOrigin, credentials: true },
+    allowRequest: (req, callback) => {
+      callback(null, req.headers.origin === config.corsOrigin);
+    },
   });
 
   // same token check as requireAuth; if it fails the socket never connects
