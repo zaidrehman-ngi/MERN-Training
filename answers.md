@@ -1558,3 +1558,18 @@ What I had to change about the connection:
 - **The database sleeps.** Neon's free compute stops when idle. The
   first connection after a break was dropped ("terminating connection
   due to administrator command") and the retry worked.
+
+## Task 2: The backend
+
+Deployed to Railway: https://karachi-library-api.up.railway.app
+
+- **Environment variables:** I first deployed with only `NODE_ENV` and
+  `DATABASE_URL`. The build stopped with `Invalid environment
+  configuration:` and listed every missing variable by name (`PORT`,
+  `JWT_SECRET`, `CORS_ORIGIN`, the rate limits...). After adding them
+  all it started.
+- **Health check:** `GET /` on that URL returns `200` with
+  `{ "message": "Library API is running" }`.
+- **Postman against production:** 124 of 126 assertions passed. The 2
+  failures are the "Let it expire" step, which only works when the API
+  runs with `JWT_EXPIRES_IN=10s`, and production uses `15m`.
