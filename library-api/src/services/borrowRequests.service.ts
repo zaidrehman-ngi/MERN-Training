@@ -255,6 +255,18 @@ const createBorrowRequestsService = (
       await usersService.getById(memberId);
       const book = await booksService.getById(bookId);
 
+      const openForBook = await borrowRequestsRepository.countForMember(
+        memberId,
+        OPEN_STATUSES,
+        book.id,
+      );
+      if (openForBook > 0) {
+        throw new ConflictError(
+          "You already have an open request for this book.",
+          { code: "ALREADY_REQUESTED" },
+        );
+      }
+
       const open = await borrowRequestsRepository.countForMember(
         memberId,
         OPEN_STATUSES,

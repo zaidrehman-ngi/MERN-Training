@@ -98,3 +98,12 @@ test("approving sets the due date from the Karachi date, not UTC", async () => {
   assert.equal(approved.requestedAt, "2026-11-02");
   assert.equal(approved.dueDate, "2026-11-16");
 });
+
+test("a member can't open a second request for the same book", async () => {
+  const { borrowRequests, requests } = setUp(1);
+
+  await assert.rejects(borrowRequests.create("m-1", "bk-1"), {
+    code: "ALREADY_REQUESTED",
+  });
+  assert.equal(requests.length, 1);
+});

@@ -138,6 +138,14 @@ const booksSlice = createSlice({
       }),
     },
 
+    // the member already has an open request for this book, e.g. after a reload
+    borrowStatusLoaded: (state, action) => {
+      const { bookId, status } = action.payload;
+      if (state.borrowStatusByBookId[bookId] !== "pending") {
+        state.borrowStatusByBookId[bookId] = status;
+      }
+    },
+
     // the request is over (cancelled, rejected, expired, returned), so the
     // member can ask for the book again
     borrowRequestClosed: (state, action) => {
@@ -303,6 +311,7 @@ export const {
   bookLoaded,
   availabilityChanged,
   borrowRequestClosed,
+  borrowStatusLoaded,
   resetBookMutation,
   filterChanged,
   searchChanged,

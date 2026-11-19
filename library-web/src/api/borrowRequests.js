@@ -11,6 +11,10 @@ export function listBorrowRequests({
   return client.get("/borrow-requests", { params });
 }
 
+export function listMyRequestsForBook(userId, bookId) {
+  return client.get("/borrow-requests", { params: { userId, bookId } });
+}
+
 export function createBorrowRequest(request) {
   return client.post("/borrow-requests", request);
 }

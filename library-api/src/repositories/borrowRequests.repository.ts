@@ -21,6 +21,7 @@ export interface BorrowRequestsRepository extends Repository<
   countForMember(
     memberId: string,
     statuses: BorrowRequestStatus[],
+    bookId?: string,
   ): Promise<number>;
   findOverdue(today: string): Promise<BorrowRequest[]>;
   findDueOn(date: string): Promise<BorrowRequest[]>;
@@ -228,11 +229,12 @@ const createBorrowRequestsRepository = (
     }
   },
 
-  countForMember(memberId, statuses) {
+  countForMember(memberId, statuses, bookId) {
     return prisma.borrow_requests.count({
       where: {
         member_id: memberId,
         status: { in: statuses },
+        ...(bookId ? { book_id: bookId } : {}),
       },
     });
   },

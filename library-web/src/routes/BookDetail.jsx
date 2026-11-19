@@ -2,16 +2,20 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { getBook } from "../api/books";
+import { listMyRequestsForBook } from "../api/borrowRequests";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { useSocket } from "../hooks/useSocket";
 import { SOCKET_EVENTS } from "../constants/socketEvents";
 import {
   bookLoaded,
   borrowBookThunk,
+  borrowStatusLoaded,
   deleteBookThunk,
   resetBookMutation,
   selectBookById,
 } from "../store/booksSlice";
+
+const OPEN_STATUSES = ["pending", "queued", "held", "approved"];
 
 function BookDetail() {
   const { id } = useParams();
@@ -36,6 +40,33 @@ function BookDetail() {
     (state) => state.books.deleteStatusById[id] ?? "idle",
   );
   const deleteError = useSelector((state) => state.books.deleteErrorById[id]);
+  const userId = user?.id;
+  const canBorrow = can("requests:create");
+
+  useEffect(() => {
+    if (!userId || !canBorrow) {
+      return;
+    }
+    let active = true;
+    listMyRequestsForBook(userId, id)
+      .then((response) => {
+        const open = response.data.data.find((request) =>
+          OPEN_STATUSES.includes(request.status),
+        );
+        if (active && open) {
+          dispatch(
+            borrowStatusLoaded({
+              bookId: id,
+              status: open.status === "queued" ? "queued" : "succeeded",
+            }),
+          );
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [dispatch, id, userId, canBorrow]);
 
   useEffect(() => {
     let active = true;

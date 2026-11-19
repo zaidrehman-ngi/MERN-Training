@@ -60,7 +60,7 @@ Every error has the same shape:
 | 401 | `UNAUTHORIZED` | no token, expired, logged out, wrong login |
 | 403 | `FORBIDDEN` | logged in but not allowed |
 | 404 | `NOT_FOUND` | no such book, user, request, branch or route |
-| 409 | `CONFLICT`, `ISBN_TAKEN`, `EMAIL_TAKEN`, `BORROW_LIMIT_REACHED`, `REQUEST_CLOSED`, `REQUEST_QUEUED`, `NOT_CANCELLABLE`, `ALREADY_RETURNED`, `REQUEST_CHANGED`, `NOT_ON_LOAN`, `NO_FINE` | the action clashes with the current state |
+| 409 | `CONFLICT`, `ISBN_TAKEN`, `EMAIL_TAKEN`, `BORROW_LIMIT_REACHED`, `ALREADY_REQUESTED`, `REQUEST_CLOSED`, `REQUEST_QUEUED`, `NOT_CANCELLABLE`, `ALREADY_RETURNED`, `REQUEST_CHANGED`, `NOT_ON_LOAN`, `NO_FINE` | the action clashes with the current state |
 | 429 | `RATE_LIMIT_EXCEEDED` | too many requests |
 | 500 | `INTERNAL_SERVER_ERROR` | anything unexpected (no internals in production) |
 
@@ -200,7 +200,8 @@ Login and refresh return the same shape. Logout returns
 `POST /borrow-requests` body: `{ "bookId": "<uuid>" }`. The user comes from
 the token. The server sets the status, the dates and the fine. If a copy is
 on the shelf the request is `pending`; if not, it is `queued`. A member can
-have at most 5 open requests (`409 BORROW_LIMIT_REACHED`).
+have at most 5 open requests (`409 BORROW_LIMIT_REACHED`), and only one open
+request per book (`409 ALREADY_REQUESTED`).
 
 `PATCH /borrow-requests/:id` takes one of two bodies:
 

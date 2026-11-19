@@ -47,9 +47,12 @@ const createFakeBorrowRequestsRepository = (requests) => ({
     return request;
   },
 
-  countForMember: async (memberId, statuses) =>
+  countForMember: async (memberId, statuses, bookId) =>
     requests.filter(
-      (r) => r.userId === memberId && statuses.includes(r.status),
+      (r) =>
+        r.userId === memberId &&
+        statuses.includes(r.status) &&
+        (!bookId || r.bookId === bookId),
     ).length,
 });
 
