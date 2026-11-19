@@ -1663,3 +1663,19 @@ the project is in two sentences, the stack, install, configure, the
 database with migrations and seed (the frontend points to the API's
 README for that), how to start it, the deployed URLs, and the demo
 accounts for all four roles.
+
+## Task 2: Following my own README
+
+I cloned the `week8` branch into a new folder (`D:\karachi-library-test`)
+and followed both READMEs step by step. The API, the seed, the tests and
+the frontend all came up, and all four demo accounts logged in with their
+own menus. Two things I had to work around, now fixed in
+`library-api/README.md`:
+
+- **`createdb` wasn't found.** On Windows the PostgreSQL tools aren't on
+  the PATH. It turned out `npm run db:migrate` creates the database
+  itself when it doesn't exist, so I removed that step and wrote that
+  down instead.
+- **npm warned that Prisma's install scripts were skipped.** Nothing
+  broke because of it, so the README now says the warning can be
+  ignored, otherwise a new person would stop there.

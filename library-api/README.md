@@ -43,6 +43,9 @@ cd library-api
 npm install
 ```
 
+Newer npm versions may warn that the install scripts of `prisma` and
+`@prisma/engines` were not run. That's fine, nothing needs to be approved.
+
 ## Configure
 
 Copy the example file and fill it in:
@@ -67,21 +70,16 @@ missing or wrong, the API stops at startup and names it.
 
 ## Database, migrations and seed
 
-Create an empty database (once):
-
-```bash
-createdb -U postgres karachi_library
-```
-
-Or create `karachi_library` in pgAdmin or DBeaver.
-
-Then create the Prisma client, the tables, and the demo data:
+Create the Prisma client, the database and its tables, and the demo data:
 
 ```bash
 npm run build
 npm run db:migrate
 npm run db:seed
 ```
+
+`db:migrate` creates the database named in `DATABASE_URL` if it doesn't
+exist yet, so there is nothing to create by hand.
 
 The seed empties the books, members, borrow requests, notifications and
 tokens, and puts the demo data back. Run it again whenever you want a clean
