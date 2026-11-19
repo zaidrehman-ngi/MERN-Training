@@ -1531,3 +1531,30 @@ From the list above, the ones that didn't need a host yet:
   404.
 
 Both new variables are in `.env.example` and `.env.production.example`.
+
+# Exercise 13 — Both halves, in production
+
+## Task 1: The hosted database
+
+I used Neon (free Postgres), region AWS Singapore since it's the closest
+to Karachi. I ran `prisma migrate deploy` against it from my machine,
+and all 16 migrations applied. Then I ran the seed from my machine with
+the Neon URL, since the seed refuses to run with `NODE_ENV=production`:
+18 books (enough for two pages), 10 members (with a login for each of
+the four roles) and 3 borrow requests.
+
+What I had to change about the connection:
+
+- **Two connection strings.** Neon gives a pooled one (host ends in
+  `-pooler`) and a direct one. The app uses the pooled one, and
+  migrations use the direct one, because the pooler runs in transaction
+  mode and Prisma's migrate needs a normal session. I added an optional
+  `DIRECT_DATABASE_URL` that `prisma.config.js` uses. Locally it isn't
+  set, so it falls back to `DATABASE_URL`.
+- **SSL.** Neon only accepts SSL connections. Its string has
+  `sslmode=require`, and `pg` printed a warning that it treats that as
+  `verify-full`. So I put `sslmode=verify-full` in the URL to say what
+  actually happens.
+- **The database sleeps.** Neon's free compute stops when idle. The
+  first connection after a break was dropped ("terminating connection
+  due to administrator command") and the retry worked.

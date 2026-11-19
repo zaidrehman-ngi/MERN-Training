@@ -30,14 +30,17 @@ const duration = z
     return ms !== null && Number.isSafeInteger(ms);
   }, "must be a supported duration");
 
+const postgresUrl = z
+  .string()
+  .regex(/^postgres(ql)?:\/\//, "must be a postgresql:// connection string");
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
   PORT: z.coerce.number().int().min(1).max(65535),
-  DATABASE_URL: z
-    .string()
-    .regex(/^postgres(ql)?:\/\//, "must be a postgresql:// connection string"),
+  DATABASE_URL: postgresUrl,
+  DIRECT_DATABASE_URL: postgresUrl.optional(),
   JWT_SECRET: z
     .string()
     .min(32, "must be at least 32 characters long")
