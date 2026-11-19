@@ -20,10 +20,14 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
+export const authRequest = {
+  baseURL: import.meta.env.VITE_AUTH_URL || import.meta.env.VITE_API_URL,
+};
+
 let refreshing = null;
 
 export function refreshSession() {
-  refreshing ??= client.post("/auth/refresh").finally(() => {
+  refreshing ??= client.post("/auth/refresh", null, authRequest).finally(() => {
     refreshing = null;
   });
   return refreshing;

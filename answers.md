@@ -1608,3 +1608,25 @@ pasted every route on the deployed site: `/`, `/books`, `/books/<id>`,
 `/books/<id>/edit`, `/books/add`, `/borrow-requests`, `/users`,
 `/admins`, `/login`, `/register`. All load the app, and an unknown path
 shows our own Not Found page instead of Vercel's 404.
+
+## Task 5: Securing what is public
+
+- **Rate limits:** the headers were there, but 62 searches in a minute
+  never got a `429`. Railway has more than one proxy in front of the
+  app, so with `TRUST_PROXY=1` `req.ip` was a proxy's address and changed
+  between requests. Railway sets `X-Real-IP` to the visitor's IP on
+  every request, so I added `CLIENT_IP_HEADER=x-real-ip` and the three
+  limiters now key on it. After that, searches got `429` after the limit
+  (`"Too many book searches. Please try again later."`), and sending a
+  fake `X-Real-IP` didn't get around it.
+- **Stack traces:** broken JSON, a bad token, a bad id and an unknown
+  route all return our `{ error, message, details }` body. The error
+  handler only shows the real message and stack in `development`.
+- **NODE_ENV:** set to `production` on Railway. The refresh cookie comes
+  back `Secure`, which only happens in production.
+- **Secrets in the repos:** no `.env` file was ever committed on any
+  branch, only the `.env.example` files. The Neon password and the JWT
+  secrets don't appear anywhere in the history.
+- **Frontend bundle:** the only value from the environment is the API
+  URL, which is public anyway. No secrets, no database URL, no demo
+  passwords, and no public source maps.
