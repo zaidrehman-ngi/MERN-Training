@@ -27,9 +27,11 @@ export const authRequest = {
 let refreshing = null;
 
 export function refreshSession() {
-  refreshing ??= client.post("/auth/refresh", null, authRequest).finally(() => {
-    refreshing = null;
-  });
+  refreshing ??= client
+    .post("/auth/refresh", undefined, authRequest)
+    .finally(() => {
+      refreshing = null;
+    });
   return refreshing;
 }
 

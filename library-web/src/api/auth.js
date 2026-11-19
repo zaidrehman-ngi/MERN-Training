@@ -7,5 +7,5 @@ export function loginUser(credentials) {
 }
 
 export function logoutUser() {
-  return client.post("/auth/logout", null, authRequest);
+  return client.post("/auth/logout", undefined, authRequest);
 }
