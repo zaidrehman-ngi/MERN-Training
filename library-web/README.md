@@ -1,40 +1,89 @@
-# Library Web
+# library-web
 
-A React and Vite frontend for the library catalogue. It reads its data from `library-api`.
+The frontend of the Karachi Central Library system. Members search the
+catalogue and borrow books, librarians approve requests, and admins manage
+members, each seeing their own pages, with availability updating live.
 
-## Install dependencies
+It needs the API in [`../library-api`](../library-api/README.md) running.
+
+## Deployed
+
+- Frontend: https://karachi-library.vercel.app
+- API: https://karachi-library-api.up.railway.app
+
+## Demo accounts
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Member (user) | `sara.malik@lib.pk` | `Library@2026` |
+| Librarian | `librarian@lib.pk` | `Librarian@2026` |
+| Admin | `admin@lib.pk` | `Admin@2026` |
+| Super admin | `admin-test@lib.pk` | `LibraryAdminTest2026!` |
+
+A second member, `usman.tariq@lib.pk` / `Library@2026`, is there for the
+queue demo.
+
+## Stack
+
+- React 19 with Vite
+- React Router, Redux Toolkit
+- Axios (token refresh in an interceptor), Socket.IO client
+- CSS Modules, react-hot-toast
+
+## Install
+
+You need Node.js 24 or newer.
 
 ```bash
 cd library-web
 npm install
 ```
 
-Copy `.env.example` to `.env`. `VITE_API_URL` must point at the running API.
+## Configure
 
-## Start the API
+```bash
+cp .env.example .env
+```
 
-The API is in `library-api`. Follow its README to set up the database, then run:
+On Windows Command Prompt use `copy .env.example .env`.
+
+`VITE_API_URL` must point at the API, `http://localhost:3000/api/v1` when it
+runs locally. Anything starting with `VITE_` ends up in the browser, so no
+secrets go in this file.
+
+## Database, migrations and seed
+
+The frontend has no database of its own. Set up the API first: its README
+covers the database, the migrations and the seed.
+
+## Start
+
+Start the API in one terminal:
 
 ```bash
 cd library-api
 npm run dev
 ```
 
-It listens at `http://localhost:3000`.
-
-## Start the app
-
-In a second terminal:
+Then the app in a second terminal:
 
 ```bash
 cd library-web
 npm run dev
 ```
 
-Open `http://localhost:5173`. The API only accepts requests from this origin (`CORS_ORIGIN` in the API's `.env`), so keep the app on port 5173.
+Open http://localhost:5173 and log in with one of the demo accounts. The API
+only accepts this origin (`CORS_ORIGIN` in the API's `.env`), so keep the
+app on port 5173.
 
-## If the catalogue does not load
+## Production
 
-Make sure the API is running, then click **Retry** or refresh the page.
+Deployed on Vercel with root directory `library-web`. Set these before the
+build, because Vite writes them into the bundle:
 
-If the page says **No books found**, the request worked but the search or filter matched nothing. Clear the search or pick another filter.
+- `VITE_API_URL=https://karachi-library-api.up.railway.app/api/v1`
+- `VITE_AUTH_URL=/api/v1`
+
+`vercel.json` sends every route to `index.html` so a refresh on
+`/books/<id>` works, and forwards `/api/v1/auth/*` to the API so the
+refresh cookie belongs to this site.

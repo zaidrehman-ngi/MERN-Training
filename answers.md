@@ -1653,3 +1653,13 @@ localhost:
    be slow or fail once while Neon wakes up.
 
 After the fix all eight steps worked on the phone.
+
+# Exercise 14 — The README somebody else can follow
+
+## Task 1: The READMEs
+
+Rewrote `library-api/README.md` and `library-web/README.md`. Each has what
+the project is in two sentences, the stack, install, configure, the
+database with migrations and seed (the frontend points to the API's
+README for that), how to start it, the deployed URLs, and the demo
+accounts for all four roles.
