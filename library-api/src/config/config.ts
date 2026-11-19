@@ -49,9 +49,7 @@ const toMs = (duration: string) => durationToMs(duration) ?? 0;
 const config = Object.freeze({
   nodeEnv: values.NODE_ENV,
   port: values.PORT,
-  databaseUrl: values.DATABASE_URL,
-  directDatabaseUrl: values.DIRECT_DATABASE_URL ?? values.DATABASE_URL,
-  jwtSecret: values.JWT_SECRET,
+  databaseUrl: values.DATABASE_URL,  jwtSecret: values.JWT_SECRET,
   jwtExpiresInMs: toMs(values.JWT_EXPIRES_IN),
   refreshExpiresInMs: toMs(values.JWT_REFRESH_EXPIRES_IN),
   corsOrigin: values.CORS_ORIGIN,
