@@ -79,7 +79,8 @@ app on port 5173.
 
 ## Production
 
-Deployed on Vercel with root directory `library-web`. Set these before the
+Deployed on Vercel from the `master` branch with root directory
+`week8/library-web`. Set these before the
 build, because Vite writes them into the bundle:
 
 - `VITE_API_URL=https://karachi-library-api.up.railway.app/api/v1`
