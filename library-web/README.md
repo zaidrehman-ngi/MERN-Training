@@ -5,6 +5,7 @@ catalogue and borrow books, librarians approve requests, and admins manage
 members, each seeing their own pages, with availability updating live.
 
 It needs the API in [`../library-api`](../library-api/README.md) running.
+How the pieces fit together is in [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
 
 ## Deployed
 

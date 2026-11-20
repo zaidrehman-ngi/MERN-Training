@@ -5,7 +5,8 @@ librarians approve loans, overdue loans build up fines, and a queue forms
 when no copy is on the shelf. Changes are pushed to open screens in real
 time.
 
-The frontend is in [`../library-web`](../library-web/README.md).
+The frontend is in [`../library-web`](../library-web/README.md). How the
+pieces fit together is in [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
 
 ## Deployed
 

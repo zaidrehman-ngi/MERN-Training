@@ -1679,3 +1679,35 @@ own menus. Two things I had to work around, now fixed in
 - **npm warned that Prisma's install scripts were skipped.** Nothing
   broke because of it, so the README now says the warning can be
   ignored, otherwise a new person would stop there.
+
+## Task 3: Architecture
+
+Written in `ARCHITECTURE.md` at the repo root, with a block diagram, and
+linked from both READMEs. It covers the layers, the path of one request,
+where the socket fits (services emit domain events, the socket server
+sends them to rooms) and where the scheduled jobs sit (node-cron in the
+same process, calling the same services).
+
+## Task 4: The decisions document
+
+The ten main decisions are at the end of `decisions.md`, each with what I
+chose, what I rejected and why: database, ORM, IDs, soft delete,
+cascades, token storage, state management, styling, backend structure and
+fines.
+
+## Task 5: The history
+
+**What the log says about how I work:** I commit once at the end of each
+exercise, with a branch per day or week. Most messages are just "exercise
+N completed", which shows steady progress but not what changed. The recent
+ones, from Exercise 13 on, say what changed and why.
+
+**What's in the tree:**
+
+- **node_modules:** never committed, on any branch.
+- **Secrets:** no `.env` file was ever committed, only `.env.example`
+  files. The only tokens in the history are the made-up JWTs in the
+  Week 1 and Week 5 `jwt-demo.js` exercises.
+- **Big files:** no CSV (`catalogue.csv` is ignored). The one big file is
+  a 40 MB `week4-day3/demo.mp4` screen recording on `master`, which I'm
+  leaving since it was part of that exercise.
