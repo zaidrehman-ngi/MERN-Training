@@ -1711,3 +1711,151 @@ ones, from Exercise 13 on, say what changed and why.
 - **Big files:** no CSV (`catalogue.csv` is ignored). The one big file is
   a 40 MB `week4-day3/demo.mp4` screen recording on `master`, which I'm
   leaving since it was part of that exercise.
+
+# Exercise 15 — The demo, and being broken on purpose
+
+## Task 1: Running order
+
+Before: re-seed the hosted database, open the site once so the API and
+database are awake, Chrome for the member and an Edge private window for
+the librarian, side by side.
+
+| # | What I show | Where | Time |
+| --- | --- | --- | --- |
+| 1 | One line on what the system is, then log in as Sara (member) | Chrome | 0:45 |
+| 2 | Browse the catalogue, filter "Available", search "dune" | Chrome | 0:45 |
+| 3 | Open Dune (3 / 5 on the shelf), click Borrow, "Request sent" | Chrome | 0:45 |
+| 4 | Log in as the librarian, approval queue, approve Sara's request | Edge | 1:30 |
+| 5 | Sara's screen updates by itself: toast "was approved", copies 3 / 5 to 2 / 5 | Chrome | 1:00 |
+| 6 | Filter back to "All", open Neuromancer (0 / 2), "Join the queue", My requests shows "Place in queue: 1" | Chrome | 1:30 |
+| 7 | Librarian sets the status filter to "Approved": Omar's loan, due 21 Feb, "Fine: Rs. 600" | Edge | 1:15 |
+| 8 | Refused by role: the librarian opens `/admins` and gets "Not allowed", Sara opens `/users` and gets Not Found | Edge, Chrome | 1:00 |
+| 9 | End on something that works: librarian marks Sara's Dune loan returned, Sara's screen goes back to 3 / 5 | Edge, Chrome | 1:00 |
+| 10 | Wrap up: where it's deployed, and what I'd change with another week | | 1:00 |
+| | **Total** | | **10:30** |
+
+**Timing:** my first run came to about 12 and a half minutes. The app
+itself is quick (about 16 seconds of waiting in the whole flow), so the
+time was all talking and clicking around. I cut page 2 from the browsing
+step and the Postman `403` from the refusal step, and I talk while the
+next page loads instead of after.
+
+## Task 2: Rehearsals
+
+I ran the order twice out loud against the deployed site, with both
+browsers side by side. The first run took about 12 and a half minutes, the
+second about 10. Most of the time saved was from knowing what to say at
+each step and not explaining the same thing twice (the live update in
+step 5 and the return in step 9 make the same point).
+
+## Task 3: Answers for the questions
+
+**Why PostgreSQL?** The library's data is relational: every loan belongs
+to a real member and a real book, and foreign keys make the database check
+that for me. Reports like overdue loans and fines are simple joins, which
+would be harder to keep correct in MongoDB.
+
+**Why Prisma?** It turns the schema into readable SQL migrations that run
+on an empty database, and its typed client catches wrong field names
+before the query runs. I gave up some control over the SQL, but all
+database code is in the repositories, so changing the ORM would only touch
+that one layer.
+
+**Why Redux for state?** The current user comes from the server and can be
+ended from outside React, by the Axios interceptor when a refresh fails,
+which Context can't do. Socket events and HTTP responses also update the
+same books, so they need one store to land in.
+
+**Why do the tokens live where they do?** The access token is only in
+memory, so no script can read it from storage, and it's sent as a header,
+so write routes don't need CSRF protection. The refresh token is an
+httpOnly cookie that only goes to the auth routes, so a reload gets a new
+access token without the user logging in again.
+
+**How are roles enforced?** On the API, `requireAuth` checks the token and
+`requireRole` checks the role on every protected route, and services check
+ownership, like a member cancelling only their own request. The frontend
+only hides what a role can't use; the API refuses it with `403` even when
+the frontend is bypassed.
+
+**What would I change with another week?** I'd add tests that run against
+a real database and the real routes, because now only the borrowing rules
+are tested with fakes. Two bugs this week, a second request for the same
+book and a broken refresh request, were found by hand on the deployed site
+and a route test would have caught both.
+
+## Task 4: Being broken on purpose
+
+I asked Claude to break something in my local setup without telling me
+what, then fixed it while talking through each step. Two rounds:
+
+1. **Changed environment variable (about 3 minutes).** The catalogue
+   wouldn't load and the console showed a CORS error. My guess was that
+   the API's allowed origin didn't match the app, so I checked the
+   response header: `Access-Control-Allow-Origin: http://localhost:5137`
+   while the app runs on `5173`. `CORS_ORIGIN` in `library-api/.env` had
+   two digits swapped. Fixed it, restarted the API, and the header matched.
+2. **Renamed field (about 4 minutes).** The book page showed
+   "Copies: undefined / 5". I looked at the API response in the Network
+   tab and the field was `copiesOnShelf` instead of `onShelf`, which is
+   what the components read. Searching for it led to `toBook` in
+   `books.repository.ts`, and `tsc` pointed at the same line. Renamed it
+   back, and the copies showed again.
+
+Both times the error message pointed at where to look, and checking one
+guess at a time was quicker than changing things to see what happens.
+
+## Task 5: The fallback
+
+- **Recording:** a three-minute screen capture of the full flow on the
+  deployed site is in the repo root as `demo-recording.mp4`.
+- **Running locally:** the API and the app run on my laptop against a
+  freshly seeded local database, so the same flow works without the hosts.
+  On demo day both are started before I begin, with the local tab open.
+- **What I say:** "The deployment is slow right now, the free host sleeps
+  when nobody uses it. Instead of waiting, let me show you the same app
+  running locally." Then I carry on from the same step. If the internet is
+  gone completely, I play the recording.
+
+## Task 6: Looking back
+
+**What I can do now that I couldn't eight weeks ago.** In Week 1 I was
+working out why a `var` in a loop printed `undefined` three times. Before
+Week 7, a backend for me was a route, a controller and a model, with all
+the logic in the controller. Now I can design a relational database with
+migrations, split an API into routes, controllers, services and
+repositories, add login with refresh tokens and roles, push live updates
+over sockets, run jobs on a schedule, connect a React app to all of it,
+and deploy the three parts to three different hosts and get them talking.
+
+Before this I had mostly used MongoDB, so designing a SQL database with
+tables, relations and migrations, and using Prisma, was new for me. The
+two awareness days helped too: I revised my Next.js concepts, and NestJS
+was a good intro. It isn't part of the app, but seeing it made the
+architecture we built by hand much clearer.
+
+**The three things I found hardest.**
+
+1. **Sockets and events.** Emitting and listening was easy to write but
+   hard to picture: who sends what to which room, and why services should
+   only emit an event and never touch the socket. It only clicked when I
+   saw two browsers and one approval change the other screen.
+2. **The borrow queue.** Holds, promotions and expiry all change the same
+   rows, and two things can happen at the same moment. Getting it right
+   needed transactions and conditional updates, not just `if` checks.
+3. **Auth in production.** Tokens worked on localhost for weeks, then the
+   phone logged out on every refresh because the browser blocked the
+   cookie between two domains. Understanding why, and fixing it, taught me
+   more about cookies than all the earlier exercises.
+
+**The part I'm most pleased with.** The live book page. A member looks at
+a book, a librarian approves a loan in another browser, and the copies
+change on the member's screen without a refresh. It goes through every
+layer: the service applies the rule, emits an event, the socket server
+sends it to that book's room, and the Redux store updates the page.
+
+**Reading my Week 1 answers.** In Week 1 I wrote that the JWT should go in
+an `httpOnly` cookie with CSRF protection, because that's what I had read.
+The final answer is different (access token in memory, refresh token in a
+cookie, sent through the frontend's own domain), and this time I know why
+each part is there, because I saw each one fail first.
