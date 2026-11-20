@@ -1,0 +1,77 @@
+.card {
+  min-width: 0;
+  padding: var(--space-4);
+  border: var(--border-width-card) solid var(--colour-line);
+  border-radius: var(--radius-md);
+  background: var(--colour-surface-raised);
+  box-shadow: var(--shadow-card);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.card:hover {
+  border-color: var(--colour-accent);
+  box-shadow: var(--shadow-float);
+  transform: translateY(-2px);
+}
+
+.bookTitle {
+  margin: 0 0 var(--space-2);
+  color: var(--colour-ink);
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+
+.detail,
+.status {
+  margin: var(--space-1) 0;
+  color: var(--colour-body);
+  font-size: var(--text-sm);
+}
+
+.status {
+  font-weight: 600;
+  display: inline-flex;
+  width: fit-content;
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  background: var(--colour-info-soft);
+  color: var(--colour-info);
+}
+
+.status[data-status="queued"] {
+  background: var(--colour-warning-soft);
+  color: var(--colour-warning);
+}
+
+.status[data-status="approved"] {
+  background: var(--colour-success-soft);
+  color: var(--colour-success);
+}
+
+.status[data-status="rejected"],
+.status[data-status="cancelled"],
+.status[data-status="expired"] {
+  background: var(--colour-danger-soft);
+  color: var(--colour-danger);
+}
+
+.status[data-status="returned"] {
+  background: var(--colour-surface-sunk);
+  color: var(--colour-body);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.actions > p {
+  flex-basis: 100%;
+  margin: 0;
+}

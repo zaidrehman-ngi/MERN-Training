@@ -1,0 +1,110 @@
+.dialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: 0;
+  border: var(--border-width-card) solid var(--colour-line);
+  border-radius: var(--radius-lg);
+  background: var(--colour-surface);
+  box-shadow: var(--shadow-float);
+  color: var(--colour-ink);
+  font-family: var(--font-body);
+}
+
+.dialog::backdrop {
+  background: rgba(28, 43, 36, 0.45);
+}
+
+.dialog[open] {
+  animation: pop 160ms ease-out;
+}
+
+.body {
+  padding: var(--space-5);
+}
+
+.dialog .title {
+  margin: 0 0 var(--space-2);
+  color: var(--colour-ink);
+  font-family: "Manrope", "Segoe UI", sans-serif;
+  font-size: var(--text-lg);
+  font-weight: 800;
+}
+
+.dialog .message {
+  margin: 0;
+  color: var(--colour-body);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.dialog .button {
+  min-height: 42px;
+  padding: 9px 18px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transform: none;
+  box-shadow: none;
+}
+
+.dialog .cancel,
+.dialog .cancel:hover:not(:disabled) {
+  border-color: var(--colour-line);
+  background: var(--colour-surface);
+  color: var(--colour-body);
+}
+
+.dialog .cancel:hover:not(:disabled) {
+  background: var(--colour-surface-sunk);
+  transform: none;
+  box-shadow: none;
+}
+
+.dialog .confirm,
+.dialog .confirm:hover:not(:disabled) {
+  border-color: var(--colour-accent);
+  background: var(--colour-accent);
+  color: var(--colour-accent-contrast);
+}
+
+.dialog .confirm:hover:not(:disabled) {
+  background: var(--colour-accent-hover);
+  transform: none;
+}
+
+.dialog .danger,
+.dialog .danger:hover:not(:disabled) {
+  border-color: var(--colour-danger);
+  background: var(--colour-danger);
+  color: var(--colour-on-overdue);
+  transform: none;
+}
+
+.dialog .danger:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+@media (max-width: 480px) {
+  .actions {
+    flex-direction: column-reverse;
+  }
+
+  .dialog .button {
+    width: 100%;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}

@@ -1,0 +1,89 @@
+import type { Prisma } from "../generated/prisma/client.ts";
+import type {
+  NewNotification,
+  Notification,
+  NotificationKind,
+} from "../types/notification.ts";
+import { NOTIFICATION_KINDS } from "../types/notification.ts";
+
+type Db = Prisma.TransactionClient;
+
+export interface NotificationsRepository {
+  createOnce(notification: NewNotification): Promise<Notification | null>;
+  findForMember(
+    memberId: string,
+    page: { page: number; limit: number },
+  ): Promise<Notification[]>;
+  countForMember(memberId: string): Promise<number>;
+}
+
+const notificationSelect = {
+  notification_id: true,
+  kind: true,
+  message: true,
+  for_date: true,
+  created_at: true,
+  member_id: true,
+  request_id: true,
+} satisfies Prisma.notificationsSelect;
+
+type NotificationRow = Prisma.notificationsGetPayload<{
+  select: typeof notificationSelect;
+}>;
+
+const toKind = (value: string): NotificationKind => {
+  const kind = NOTIFICATION_KINDS.find((known) => known === value);
+  if (kind) {
+    return kind;
+  }
+  throw new Error(`Unknown notification kind in the database: ${value}`);
+};
+
+const toNotification = (row: NotificationRow): Notification => ({
+  id: row.notification_id,
+  userId: row.member_id,
+  borrowRequestId: row.request_id,
+  kind: toKind(row.kind),
+  message: row.message,
+  forDate: row.for_date.toISOString().slice(0, 10),
+  createdAt: row.created_at.toISOString(),
+});
+
+const createNotificationsRepository = (
+  prisma: Db,
+): NotificationsRepository => ({
+  async createOnce(notification) {
+    const rows = await prisma.$queryRaw<{ notification_id: string }[]>`
+      INSERT INTO notifications (member_id, request_id, kind, message, for_date)
+      VALUES (${notification.memberId}::uuid, ${notification.borrowRequestId}::uuid,
+        ${notification.kind}, ${notification.message}, ${notification.forDate}::date)
+      ON CONFLICT (request_id, kind, for_date) DO NOTHING
+      RETURNING notification_id`;
+    const inserted = rows[0];
+    if (!inserted) {
+      return null;
+    }
+    const row = await prisma.notifications.findUniqueOrThrow({
+      where: { notification_id: inserted.notification_id },
+      select: notificationSelect,
+    });
+    return toNotification(row);
+  },
+
+  async findForMember(memberId, { page, limit }) {
+    const rows = await prisma.notifications.findMany({
+      where: { member_id: memberId },
+      select: notificationSelect,
+      orderBy: [{ created_at: "desc" }, { notification_id: "asc" }],
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    return rows.map(toNotification);
+  },
+
+  countForMember(memberId) {
+    return prisma.notifications.count({ where: { member_id: memberId } });
+  },
+});
+
+export default createNotificationsRepository;

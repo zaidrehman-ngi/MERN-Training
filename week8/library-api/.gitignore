@@ -1,0 +1,13 @@
+catalogue.csv
+node_modules/
+/postman/*
+!/postman/library-api.postman_collection.json
+!/postman/library-api.postman_environment.json
+/.postman/
+.env
+.env.*
+!.env.example
+!.env.production.example
+library-spreadsheet.csv
+src/generated/
+logs/*.log

@@ -1,0 +1,80 @@
+import "dotenv/config";
+import path from "node:path";
+import configSchema, { durationToMs } from "./config.schema.ts";
+
+const result = configSchema.safeParse({
+  NODE_ENV: process.env.NODE_ENV,
+  PORT: process.env.PORT,
+  DATABASE_URL: process.env.DATABASE_URL,
+  DIRECT_DATABASE_URL: process.env.DIRECT_DATABASE_URL,
+  JWT_SECRET: process.env.JWT_SECRET,
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN,
+  JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN,
+  CORS_ORIGIN: process.env.CORS_ORIGIN,
+  COOKIE_SAME_SITE: process.env.COOKIE_SAME_SITE,
+  TRUST_PROXY: process.env.TRUST_PROXY,
+  CLIENT_IP_HEADER: process.env.CLIENT_IP_HEADER,
+  ACCESS_LOG_PATH: process.env.ACCESS_LOG_PATH,
+  RATE_LIMIT_WINDOW_MS: process.env.RATE_LIMIT_WINDOW_MS,
+  RATE_LIMIT_MAX: process.env.RATE_LIMIT_MAX,
+  LOGIN_RATE_LIMIT_WINDOW_MS: process.env.LOGIN_RATE_LIMIT_WINDOW_MS,
+  LOGIN_RATE_LIMIT_MAX: process.env.LOGIN_RATE_LIMIT_MAX,
+  SEARCH_RATE_LIMIT_WINDOW_MS: process.env.SEARCH_RATE_LIMIT_WINDOW_MS,
+  SEARCH_RATE_LIMIT_MAX: process.env.SEARCH_RATE_LIMIT_MAX,
+  LOG_LEVEL: process.env.LOG_LEVEL,
+  DB_QUERY_LOG: process.env.DB_QUERY_LOG,
+  BCRYPT_COST: process.env.BCRYPT_COST,
+  LOAN_PERIOD_DAYS: process.env.LOAN_PERIOD_DAYS,
+  FINE_PER_DAY: process.env.FINE_PER_DAY,
+  FINE_MAX_DAYS: process.env.FINE_MAX_DAYS,
+  HOLD_DAYS: process.env.HOLD_DAYS,
+  HOLD_EXPIRY_SCHEDULE: process.env.HOLD_EXPIRY_SCHEDULE,
+  ALLOW_SEED: process.env.ALLOW_SEED,
+  LIBRARY_TIME_ZONE: process.env.LIBRARY_TIME_ZONE,
+  DUE_REMINDER_SCHEDULE: process.env.DUE_REMINDER_SCHEDULE,
+});
+
+if (!result.success) {
+  const issues = result.error.issues.map((issue) => {
+    const variable = String(issue.path[0] ?? "CONFIGURATION");
+    return `${variable}: ${issue.message}`;
+  });
+  console.error(`Invalid environment configuration:\n${issues.join("\n")}`);
+  process.exit(1);
+}
+
+const values = result.data;
+// already validated by the schema, so never null here
+const toMs = (duration: string) => durationToMs(duration) ?? 0;
+
+const config = Object.freeze({
+  nodeEnv: values.NODE_ENV,
+  port: values.PORT,
+  databaseUrl: values.DATABASE_URL,  jwtSecret: values.JWT_SECRET,
+  jwtExpiresInMs: toMs(values.JWT_EXPIRES_IN),
+  refreshExpiresInMs: toMs(values.JWT_REFRESH_EXPIRES_IN),
+  corsOrigin: values.CORS_ORIGIN,
+  cookieSameSite: values.COOKIE_SAME_SITE,
+  trustProxy: values.TRUST_PROXY,
+  clientIpHeader: values.CLIENT_IP_HEADER,
+  accessLogPath: path.resolve(process.cwd(), values.ACCESS_LOG_PATH),
+  rateLimitWindowMs: values.RATE_LIMIT_WINDOW_MS,
+  rateLimitMax: values.RATE_LIMIT_MAX,
+  loginRateLimitWindowMs: values.LOGIN_RATE_LIMIT_WINDOW_MS,
+  loginRateLimitMax: values.LOGIN_RATE_LIMIT_MAX,
+  searchRateLimitWindowMs: values.SEARCH_RATE_LIMIT_WINDOW_MS,
+  searchRateLimitMax: values.SEARCH_RATE_LIMIT_MAX,
+  logLevel: values.LOG_LEVEL,
+  dbQueryLog: values.DB_QUERY_LOG === "true",
+  bcryptCost: values.BCRYPT_COST,
+  loanPeriodDays: values.LOAN_PERIOD_DAYS,
+  finePerDay: values.FINE_PER_DAY,
+  fineMaxDays: values.FINE_MAX_DAYS,
+  holdDays: values.HOLD_DAYS,
+  holdExpirySchedule: values.HOLD_EXPIRY_SCHEDULE,
+  allowSeed: values.ALLOW_SEED === "true",
+  libraryTimeZone: values.LIBRARY_TIME_ZONE,
+  dueReminderSchedule: values.DUE_REMINDER_SCHEDULE,
+});
+
+export default config;

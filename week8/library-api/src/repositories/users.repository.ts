@@ -1,0 +1,225 @@
+import type { Prisma } from "../generated/prisma/client.ts";
+import { EmailTakenError, NotFoundError } from "../errors/domainErrors.ts";
+import translateDbError from "./dbErrors.ts";
+import type { DeletableRepository } from "./repository.ts";
+import type {
+  AuthMember,
+  MemberQuery,
+  MemberRecord,
+  MemberRowInput,
+  NewMemberRow,
+  PublicMember,
+  Role,
+} from "../types/member.ts";
+import { ROLES } from "../types/member.ts";
+
+type Db = Prisma.TransactionClient;
+
+export interface UsersRepository extends DeletableRepository<
+  PublicMember,
+  NewMemberRow,
+  MemberQuery
+> {
+  findByEmail(email: string): Promise<PublicMember | null>;
+  findForAuth(id: string): Promise<AuthMember | null>;
+  findCredentialsByEmail(email: string): Promise<MemberRecord | null>;
+  count(query: MemberQuery): Promise<number>;
+}
+
+const translateWriteError = (err: unknown) =>
+  translateDbError(err, {
+    members_active_email_unique: () => new EmailTakenError(),
+  });
+
+// no password_hash here, so it never leaves the database
+const publicSelect = {
+  member_id: true,
+  name: true,
+  email: true,
+  role: true,
+  joined_on: true,
+  branches: { select: { name: true } },
+} satisfies Prisma.membersSelect;
+
+const credentialsSelect = {
+  ...publicSelect,
+  password_hash: true,
+} satisfies Prisma.membersSelect;
+
+type PublicMemberRow = Prisma.membersGetPayload<{
+  select: typeof publicSelect;
+}>;
+type CredentialsRow = Prisma.membersGetPayload<{
+  select: typeof credentialsSelect;
+}>;
+
+export const toRole = (value: string): Role => {
+  const role = ROLES.find((known) => known === value);
+  if (role) {
+    return role;
+  }
+  throw new Error(`Unknown role in the database: ${value}`);
+};
+
+const toUser = (row: PublicMemberRow): PublicMember => ({
+  id: row.member_id,
+  name: row.name,
+  email: row.email,
+  role: toRole(row.role),
+  branch: row.branches.name,
+  joined: row.joined_on ? row.joined_on.toISOString().slice(0, 10) : null,
+});
+
+const toRecord = (row: CredentialsRow): MemberRecord => ({
+  ...toUser(row),
+  passwordHash: row.password_hash,
+});
+
+const findBranchId = async (prisma: Db, name: string): Promise<string> => {
+  const branch = await prisma.branches.findFirst({ where: { name } });
+  if (!branch) {
+    throw new NotFoundError("Branch not found.", {
+      details: [{ field: "branch", message: "No branch with this name." }],
+    });
+  }
+  return branch.branch_id;
+};
+
+// the API sends the branch by name
+const toRow = async (
+  prisma: Db,
+  member: MemberRowInput,
+): Promise<Prisma.membersUncheckedUpdateInput> => {
+  const row: Prisma.membersUncheckedUpdateInput = {};
+  if (member.name !== undefined) row.name = member.name;
+  if (member.email !== undefined) row.email = member.email;
+  if (member.role !== undefined) row.role = member.role;
+  if (member.passwordHash !== undefined)
+    row.password_hash = member.passwordHash;
+  if (member.joined !== undefined) row.joined_on = new Date(member.joined);
+  if (member.branch !== undefined) {
+    row.branch_id = await findBranchId(prisma, member.branch);
+  }
+  return row;
+};
+
+const toWhere = ({ q, role }: MemberQuery): Prisma.membersWhereInput => {
+  const where: Prisma.membersWhereInput = { is_active: true };
+  if (q) {
+    where.OR = [
+      { name: { contains: q, mode: "insensitive" } },
+      { email: { contains: q, mode: "insensitive" } },
+      { branches: { name: { contains: q, mode: "insensitive" } } },
+    ];
+  }
+  if (role) {
+    where.role = role;
+  }
+  return where;
+};
+
+const createUsersRepository = (prisma: Db): UsersRepository => ({
+  async findAll(query: MemberQuery): Promise<PublicMember[]> {
+    const rows = await prisma.members.findMany({
+      where: toWhere(query),
+      select: publicSelect,
+      orderBy: [{ name: "asc" }, { member_id: "asc" }],
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+    });
+    return rows.map(toUser);
+  },
+
+  count(query: MemberQuery): Promise<number> {
+    return prisma.members.count({ where: toWhere(query) });
+  },
+
+  async findById(id: string): Promise<PublicMember | null> {
+    const row = await prisma.members.findFirst({
+      where: { member_id: id, is_active: true },
+      select: publicSelect,
+    });
+    return row ? toUser(row) : null;
+  },
+
+  async findByEmail(email: string): Promise<PublicMember | null> {
+    const row = await prisma.members.findFirst({
+      where: { email, is_active: true },
+      select: publicSelect,
+    });
+    return row ? toUser(row) : null;
+  },
+
+  // runs on every protected request, so it reads only what auth needs
+  async findForAuth(id: string): Promise<AuthMember | null> {
+    const row = await prisma.members.findFirst({
+      where: { member_id: id, is_active: true },
+      select: { member_id: true, name: true, role: true },
+    });
+    return row
+      ? { id: row.member_id, name: row.name, role: toRole(row.role) }
+      : null;
+  },
+
+  // the only place the password hash is read
+  async findCredentialsByEmail(email: string): Promise<MemberRecord | null> {
+    const row = await prisma.members.findFirst({
+      where: { email, is_active: true },
+      select: credentialsSelect,
+    });
+    return row ? toRecord(row) : null;
+  },
+
+  async create(member: NewMemberRow): Promise<PublicMember> {
+    const data: Prisma.membersUncheckedCreateInput = {
+      name: member.name,
+      email: member.email,
+      role: member.role,
+      password_hash: member.passwordHash,
+      joined_on: new Date(member.joined),
+      branch_id: await findBranchId(prisma, member.branch),
+    };
+    try {
+      const row = await prisma.members.create({ data, select: publicSelect });
+      return toUser(row);
+    } catch (err) {
+      throw translateWriteError(err);
+    }
+  },
+
+  async updateById(
+    id: string,
+    changes: MemberRowInput,
+  ): Promise<PublicMember | null> {
+    const existing = await prisma.members.findFirst({
+      where: { member_id: id, is_active: true },
+      select: { member_id: true },
+    });
+    if (!existing) {
+      return null;
+    }
+
+    const data = await toRow(prisma, changes);
+    try {
+      const row = await prisma.members.update({
+        where: { member_id: existing.member_id },
+        data,
+        select: publicSelect,
+      });
+      return toUser(row);
+    } catch (err) {
+      throw translateWriteError(err);
+    }
+  },
+
+  // soft delete: members with loan history can't be removed
+  async deleteById(id: string): Promise<boolean> {
+    const result = await prisma.members.updateMany({
+      where: { member_id: id, is_active: true },
+      data: { is_active: false },
+    });
+    return result.count > 0;
+  },
+});
+
+export default createUsersRepository;

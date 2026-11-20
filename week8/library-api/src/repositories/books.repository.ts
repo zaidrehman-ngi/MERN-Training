@@ -1,0 +1,216 @@
+import type { Prisma, books } from "../generated/prisma/client.ts";
+import { IsbnTakenError } from "../errors/domainErrors.ts";
+import translateDbError from "./dbErrors.ts";
+import type { DeletableRepository } from "./repository.ts";
+import type { Changes } from "../types/changes.ts";
+import type { Book, BookQuery, BookStatus, NewBook } from "../types/book.ts";
+import { BOOK_STATUSES } from "../types/book.ts";
+
+type Db = Prisma.TransactionClient;
+
+export interface BooksRepository extends DeletableRepository<
+  Book,
+  NewBook,
+  BookQuery
+> {
+  findByIsbn(isbn: string): Promise<Book | null>;
+  changeAvailableCopies(id: string, change: number): Promise<Book | null>;
+  count(query: BookQuery): Promise<number>;
+}
+
+const toBookStatus = (value: string): BookStatus => {
+  const status = BOOK_STATUSES.find((known) => known === value);
+  if (status) {
+    return status;
+  }
+  throw new Error(`Unknown book status in the database: ${value}`);
+};
+
+const toBook = (row: books): Book => ({
+  id: row.book_id,
+  title: row.title,
+  author: row.author,
+  year: row.publication_year,
+  isbn: row.isbn,
+  coverUrl: row.cover_url,
+  onShelf: row.available_copies,
+  totalCopies: row.total_copies,
+  finePerDay: row.fine_per_day,
+  status: toBookStatus(row.status),
+});
+
+const toCreateRow = (book: NewBook): Prisma.booksUncheckedCreateInput => ({
+  title: book.title,
+  author: book.author ?? null,
+  publication_year: book.year,
+  isbn: book.isbn,
+  cover_url: book.coverUrl ?? null,
+  available_copies: book.onShelf,
+  total_copies: book.totalCopies,
+  fine_per_day: book.finePerDay,
+  status: book.status,
+});
+
+const toUpdateRow = (
+  changes: Changes<NewBook>,
+): Prisma.booksUncheckedUpdateInput => {
+  const row: Prisma.booksUncheckedUpdateInput = {};
+  if (changes.title !== undefined) row.title = changes.title;
+  if (changes.author !== undefined) row.author = changes.author;
+  if (changes.year !== undefined) row.publication_year = changes.year;
+  if (changes.isbn !== undefined) row.isbn = changes.isbn;
+  if (changes.coverUrl !== undefined) row.cover_url = changes.coverUrl;
+  if (changes.onShelf !== undefined) row.available_copies = changes.onShelf;
+  if (changes.totalCopies !== undefined) row.total_copies = changes.totalCopies;
+  if (changes.finePerDay !== undefined) row.fine_per_day = changes.finePerDay;
+  if (changes.status !== undefined) row.status = changes.status;
+  return row;
+};
+
+const translateWriteError = (err: unknown) =>
+  translateDbError(err, {
+    books_active_isbn_unique: () => new IsbnTakenError(),
+  });
+
+// title by default; book_id last breaks ties, so pages never repeat or skip a book
+const toOrderBy = (
+  sort: BookQuery["sort"],
+  order: "asc" | "desc",
+): Prisma.booksOrderByWithRelationInput[] => {
+  const tieBreak = { book_id: "asc" as const };
+  if (sort === "author") {
+    return [{ author: { sort: order, nulls: "last" } }, tieBreak];
+  }
+  if (sort === "year") {
+    return [{ publication_year: { sort: order, nulls: "last" } }, tieBreak];
+  }
+  return [{ title: order }, tieBreak];
+};
+
+const toWhere = ({
+  q,
+  status,
+  author,
+  title,
+  available,
+}: BookQuery): Prisma.booksWhereInput => {
+  const where: Prisma.booksWhereInput = { is_active: true };
+
+  if (q) {
+    where.OR = [
+      { title: { contains: q, mode: "insensitive" } },
+      { author: { contains: q, mode: "insensitive" } },
+    ];
+  }
+  if (status) {
+    where.status = status;
+  }
+  if (author) {
+    where.author = author;
+  }
+  if (title) {
+    where.title = title;
+  }
+  if (available !== undefined) {
+    where.available_copies = available ? { gt: 0 } : 0;
+  }
+  return where;
+};
+
+const createBooksRepository = (prisma: Db): BooksRepository => ({
+  async findAll(query: BookQuery): Promise<Book[]> {
+    const { sort, order = "asc", page, limit } = query;
+    const rows = await prisma.books.findMany({
+      where: toWhere(query),
+      orderBy: toOrderBy(sort, order),
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return rows.map(toBook);
+  },
+
+  count(query: BookQuery): Promise<number> {
+    return prisma.books.count({ where: toWhere(query) });
+  },
+
+  async findById(id: string): Promise<Book | null> {
+    const row = await prisma.books.findFirst({
+      where: { book_id: id, is_active: true },
+    });
+    return row ? toBook(row) : null;
+  },
+
+  async findByIsbn(isbn: string): Promise<Book | null> {
+    const row = await prisma.books.findFirst({
+      where: { isbn, is_active: true },
+    });
+    return row ? toBook(row) : null;
+  },
+
+  async create(bookData: NewBook): Promise<Book> {
+    try {
+      const row = await prisma.books.create({ data: toCreateRow(bookData) });
+      return toBook(row);
+    } catch (err) {
+      throw translateWriteError(err);
+    }
+  },
+
+  async updateById(
+    id: string,
+    changes: Changes<NewBook>,
+  ): Promise<Book | null> {
+    const existing = await prisma.books.findFirst({
+      where: { book_id: id, is_active: true },
+    });
+    if (!existing) {
+      return null;
+    }
+
+    try {
+      const row = await prisma.books.update({
+        where: { book_id: existing.book_id },
+        data: toUpdateRow(changes),
+      });
+      return toBook(row);
+    } catch (err) {
+      throw translateWriteError(err);
+    }
+  },
+
+  // the CHECK (available_copies >= 0) stops it going below zero
+  async changeAvailableCopies(
+    id: string,
+    change: number,
+  ): Promise<Book | null> {
+    const existing = await prisma.books.findFirst({
+      where: { book_id: id, is_active: true },
+      select: { book_id: true },
+    });
+    if (!existing) {
+      return null;
+    }
+
+    try {
+      const row = await prisma.books.update({
+        where: { book_id: existing.book_id },
+        data: { available_copies: { increment: change } },
+      });
+      return toBook(row);
+    } catch (err) {
+      throw translateWriteError(err);
+    }
+  },
+
+  // soft delete: books with loan history can't be removed
+  async deleteById(id: string): Promise<boolean> {
+    const result = await prisma.books.updateMany({
+      where: { book_id: id, is_active: true },
+      data: { is_active: false },
+    });
+    return result.count > 0;
+  },
+});
+
+export default createBooksRepository;

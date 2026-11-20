@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/v1/auth/:path*",
+      "destination": "https://karachi-library-api.up.railway.app/api/v1/auth/:path*"
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
