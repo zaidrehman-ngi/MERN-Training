@@ -12,6 +12,15 @@ const createFakeBooksRepository = (books) => ({
     book.onShelf += change;
     return book;
   },
+
+  async updateById(id, changes) {
+    const book = books.find((b) => b.id === id);
+    if (!book) {
+      return null;
+    }
+    Object.assign(book, changes);
+    return book;
+  },
 });
 
 const createFakeUsersRepository = (users) => ({

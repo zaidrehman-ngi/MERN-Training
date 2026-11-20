@@ -5,17 +5,32 @@ import {
 } from "../errors/domainErrors.ts";
 import { DOMAIN_EVENTS } from "../events/domainEvents.ts";
 import type { BooksRepository } from "../repositories/books.repository.ts";
-import type { Book, BookQuery, NewBook } from "../types/book.ts";
+import type { Book, BookQuery, BookStatus, NewBook } from "../types/book.ts";
 import type { Page } from "../types/page.ts";
 import type { Changes } from "../types/changes.ts";
 import type { Events } from "../types/events.ts";
 
 const PAGE_SIZE = 10;
 
+const statusForShelf = (book: Book): BookStatus => {
+  if (book.status !== "available" && book.status !== "out") {
+    return book.status;
+  }
+  return book.onShelf > 0 ? "available" : "out";
+};
+
 const createBooksService = (
   booksRepository: BooksRepository,
   events: Events,
 ) => {
+  const syncStatus = async (book: Book): Promise<Book> => {
+    const status = statusForShelf(book);
+    if (status === book.status) {
+      return book;
+    }
+    return (await booksRepository.updateById(book.id, { status })) ?? book;
+  };
+
   const announceAvailability = (book: Book) => {
     events.emit(DOMAIN_EVENTS.BOOK_AVAILABILITY_CHANGED, {
       bookId: book.id,
@@ -52,7 +67,7 @@ const createBooksService = (
       if (existingBook) {
         throw new IsbnTakenError();
       }
-      return booksRepository.create(bookData);
+      return syncStatus(await booksRepository.create(bookData));
     },
 
     async update(id: string, changes: Changes<NewBook>): Promise<Book> {
@@ -66,10 +81,11 @@ const createBooksService = (
         }
       }
 
-      const book = await booksRepository.updateById(id, changes);
-      if (!book) {
+      const updated = await booksRepository.updateById(id, changes);
+      if (!updated) {
         throw new NotFoundError("Book not found.");
       }
+      const book = await syncStatus(updated);
       if (book.onShelf !== before.onShelf) {
         announceAvailability(book);
       }
@@ -84,10 +100,11 @@ const createBooksService = (
         });
       }
 
-      const book = await booksRepository.changeAvailableCopies(id, change);
-      if (!book) {
+      const changed = await booksRepository.changeAvailableCopies(id, change);
+      if (!changed) {
         throw new NotFoundError("Book not found.");
       }
+      const book = await syncStatus(changed);
       announceAvailability(book);
       return book;
     },

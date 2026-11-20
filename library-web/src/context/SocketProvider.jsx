@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useDispatch } from "react-redux";
 import socket from "../api/socket";
 import { refreshSession } from "../api/client";
 import { endSession, setAccessToken } from "../api/session";
 import { useCurrentUser } from "../hooks/useCurrentUser";
+import { sessionRefreshed } from "../store/authSlice";
 import { SocketContext } from "./socketContext";
 
 // one connection for the whole app, open while someone is logged in
@@ -10,6 +12,7 @@ export function SocketProvider({ children }) {
   const { user } = useCurrentUser();
   const userId = user?.id;
   const [status, setStatus] = useState("offline");
+  const dispatch = useDispatch();
 
   useEffect(() => {
     let refreshing = false;
@@ -23,6 +26,7 @@ export function SocketProvider({ children }) {
       try {
         const response = await refreshSession();
         setAccessToken(response.data.data.accessToken);
+        dispatch(sessionRefreshed(response.data.data.user));
         socket.connect();
       } catch (error) {
         refreshing = false;
@@ -76,7 +80,7 @@ export function SocketProvider({ children }) {
       window.removeEventListener("offline", onBrowserOffline);
       window.removeEventListener("online", onBrowserOnline);
     };
-  }, []);
+  }, [dispatch]);
 
   useEffect(() => {
     if (!userId) {

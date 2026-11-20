@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import LiveStatus from "../components/LiveStatus/LiveStatus";
 import { logout } from "../store/authSlice";
@@ -8,6 +8,7 @@ export default function Header() {
   const { user } = useCurrentUser();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   const handleLogout = async () => {
     await dispatch(logout());
@@ -25,17 +26,32 @@ export default function Header() {
           <span>Library management</span>
         </span>
       </Link>
-      {user && <LiveStatus />}
-      {user ? (
-        <span>
-          {user.name} ({user.role}){" "}
-          <button type="button" onClick={handleLogout}>
-            Log out
-          </button>
-        </span>
-      ) : (
-        <Link to="/login">Log in</Link>
-      )}
+      <div className="headerActions">
+        {user ? (
+          <>
+            <LiveStatus />
+            <span className="headerUser">
+              <strong>{user.name}</strong>
+              <span>{user.role}</span>
+            </span>
+            <button
+              type="button"
+              className="headerButton headerButtonOutline"
+              onClick={handleLogout}
+            >
+              Log out
+            </button>
+          </>
+        ) : pathname === "/login" ? (
+          <Link className="headerButton headerButtonOutline" to="/register">
+            Register
+          </Link>
+        ) : (
+          <Link className="headerButton" to="/login">
+            Log in
+          </Link>
+        )}
+      </div>
     </header>
   );
 }

@@ -45,7 +45,10 @@ function BookCard({ book, onSelect, variant = "default" }) {
         <p className={styles.detail}>
           Copies: {book.onShelf} / {book.totalCopies}
         </p>
-        <p className={styles.detail}>Fine per day: Rs. {book.finePerDay}</p>
+        <p className={styles.detail}>
+          Fine per day:{" "}
+          {book.finePerDay == null ? "Not set" : `Rs. ${book.finePerDay}`}
+        </p>
 
         <p className={`${styles.status} ${statusClass}`}>{status}</p>
 

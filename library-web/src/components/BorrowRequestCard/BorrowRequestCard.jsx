@@ -1,3 +1,4 @@
+import { Children } from "react";
 import { formatDay } from "../../utils/dates";
 import styles from "./BorrowRequestCard.module.css";
 
@@ -23,11 +24,15 @@ function BorrowRequestCard({ request, showMember, position, children }) {
       {request.fine > 0 && (
         <p className={styles.detail}>Fine: Rs. {request.fine}</p>
       )}
-      <p className={styles.status}>Status: {request.status}</p>
+      <p className={styles.status} data-status={request.status}>
+        Status: {request.status}
+      </p>
       {request.status === "queued" && position && (
         <p className={styles.detail}>Place in queue: {position}</p>
       )}
-      {children}
+      {Children.count(children) > 0 && (
+        <div className={styles.actions}>{children}</div>
+      )}
     </article>
   );
 }

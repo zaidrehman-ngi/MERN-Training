@@ -3,6 +3,7 @@ import uiReducer from "./uiSlice";
 import booksReducer, {
   availabilityChanged,
   borrowRequestClosed,
+  borrowStatusLoaded,
 } from "./booksSlice";
 import authReducer, { sessionEnded } from "./authSlice";
 import { setOnSessionEnd } from "../api/session";
@@ -25,11 +26,23 @@ socket.on(SOCKET_EVENTS.BOOK_AVAILABILITY_CHANGED, (payload) =>
 );
 
 const CLOSED = ["cancelled", "rejected", "expired", "returned"];
+const isMine = (payload) => payload.userId === store.getState().auth.user?.id;
+
 socket.on(SOCKET_EVENTS.REQUEST_STATUS_CHANGED, (payload) => {
-  if (
-    payload.userId === store.getState().auth.user?.id &&
-    CLOSED.includes(payload.status)
-  ) {
+  if (!isMine(payload)) return;
+  if (CLOSED.includes(payload.status)) {
     store.dispatch(borrowRequestClosed(payload));
+  } else if (payload.status === "approved") {
+    store.dispatch(
+      borrowStatusLoaded({ bookId: payload.bookId, status: "approved" }),
+    );
+  }
+});
+
+socket.on(SOCKET_EVENTS.QUEUE_PROMOTED, (payload) => {
+  if (isMine(payload)) {
+    store.dispatch(
+      borrowStatusLoaded({ bookId: payload.bookId, status: "held" }),
+    );
   }
 });

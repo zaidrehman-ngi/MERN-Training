@@ -45,7 +45,9 @@ textarea {
 
 header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: var(--space-3) var(--space-4);
   min-height: 84px;
   padding: var(--space-4) max(var(--space-5), calc((100vw - var(--page-max)) / 2));
   border-bottom: 1px solid var(--colour-line);
@@ -88,6 +90,68 @@ header {
 .brandText span {
   color: var(--colour-muted);
   font-size: var(--text-xs);
+}
+
+.brandText strong {
+  white-space: nowrap;
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-left: auto;
+}
+
+.headerUser {
+  display: grid;
+  line-height: var(--leading-tight);
+  text-align: right;
+}
+
+.headerUser strong {
+  color: var(--colour-ink);
+  font-size: var(--text-sm);
+}
+
+.headerUser span {
+  color: var(--colour-muted);
+  font-size: var(--text-xs);
+  text-transform: capitalize;
+}
+
+.headerButton {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  padding: 8px 18px;
+  border: 1px solid var(--colour-accent);
+  border-radius: var(--radius-sm);
+  background: var(--colour-accent);
+  color: var(--colour-accent-contrast);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.headerButton:hover {
+  border-color: var(--colour-accent-hover);
+  background: var(--colour-accent-hover);
+  color: var(--colour-accent-contrast);
+}
+
+.headerButton:focus-visible {
+  outline: 3px solid var(--colour-focus);
+  outline-offset: 3px;
+}
+
+.headerButtonOutline {
+  background: var(--colour-surface);
+  color: var(--colour-accent);
 }
 
 main {
@@ -377,6 +441,110 @@ main [role="alert"] {
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
 
+main button.borrowDone:disabled {
+  border-color: var(--colour-success-soft);
+  background: var(--colour-success-soft);
+  color: var(--colour-success);
+  cursor: default;
+}
+
+.backLink {
+  display: inline-block;
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+main a.secondaryButton {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 16px;
+  border: 1px solid var(--colour-accent);
+  border-radius: var(--radius-sm);
+  background: var(--colour-surface);
+  color: var(--colour-accent);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+main a.secondaryButton:hover {
+  background: var(--colour-accent-soft);
+}
+
+.dueDateForm {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--colour-line);
+}
+
+main .dueDateForm label {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+main .dueDateForm input {
+  width: auto;
+  flex: 1 1 160px;
+  max-width: 220px;
+}
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.pagination span {
+  min-width: 96px;
+  color: var(--colour-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: center;
+}
+
+main .pagination button {
+  min-width: 104px;
+}
+
+.adminTools {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.adminTools h2 {
+  margin: 0;
+}
+
+main .adminTools [role="status"],
+main .adminTools [role="alert"] {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+main .adminTools [role="status"] {
+  border-color: var(--colour-success-soft);
+  background: var(--colour-success-soft);
+  color: var(--colour-success);
+}
+
+.homeLinks + section {
+  margin-top: var(--space-7);
+}
+
 .homeLinks a:hover {
   border-color: var(--colour-accent);
   box-shadow: var(--shadow-card);
@@ -387,6 +555,23 @@ main [role="alert"] {
   header {
     min-height: 72px;
     padding-inline: var(--space-4);
+  }
+
+  .brandMark {
+    width: 38px;
+  }
+
+  .brandText strong {
+    font-size: var(--text-sm);
+  }
+
+  .brandText span {
+    display: none;
+  }
+
+  .headerButton {
+    min-height: 36px;
+    padding: 6px 14px;
   }
 
   main {

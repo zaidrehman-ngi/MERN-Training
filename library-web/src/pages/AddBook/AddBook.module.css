@@ -1,5 +1,5 @@
 .page {
-  width: min(calc(100% - 48px), 720px);
+  width: min(calc(100% - 48px), 560px);
   margin: var(--space-6) auto;
   box-sizing: border-box;
   padding: clamp(var(--space-4), 4vw, var(--space-6));
@@ -24,7 +24,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  max-width: 560px;
 }
 
 .label {
@@ -44,7 +43,9 @@
   color: var(--colour-ink);
   font: inherit;
   font-size: var(--text-sm);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .control:focus-visible {
@@ -60,15 +61,20 @@
 }
 
 .submit {
-  align-self: flex-start;
-  margin-top: var(--space-3);
+  display: inline-flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-4);
   padding: var(--space-2) var(--space-4);
   border: var(--border-width-card) solid var(--colour-accent);
   border-radius: var(--radius-sm);
   background: var(--colour-accent);
-  color: var(--colour-surface);
+  color: var(--colour-accent-contrast);
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
+  font-weight: 700;
   cursor: pointer;
 }
 

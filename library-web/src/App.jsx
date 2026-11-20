@@ -63,11 +63,11 @@ function App() {
         <Route element={<RequireAuth roles={["super admin"]} />}>
           <Route path="/admins" element={<Users key="admins" adminsOnly />} />
         </Route>
-      </Route>
 
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="*" element={<NotFound />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="*" element={<NotFound />} />
+      </Route>
     </Routes>
   );
 }

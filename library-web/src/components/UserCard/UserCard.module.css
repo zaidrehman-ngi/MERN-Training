@@ -5,7 +5,10 @@
   border-radius: var(--radius-md);
   background: var(--colour-surface-raised);
   box-shadow: var(--shadow-card);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .card:hover {
@@ -30,4 +33,32 @@
 
 .status {
   font-weight: 600;
+}
+
+.actions {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: var(--border-width-card) solid var(--colour-line);
+}
+
+.actions > * {
+  margin: 0;
+}
+
+.actions select {
+  width: 100%;
+}
+
+.actions > div {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.actions label {
+  margin: 0;
 }

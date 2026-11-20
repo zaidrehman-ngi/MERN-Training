@@ -1,6 +1,6 @@
 .page {
-  width: min(calc(100% - 48px), 720px);
-  margin: var(--space-6) auto;
+  width: min(calc(100% - 48px), 480px);
+  margin: var(--space-7) auto;
   box-sizing: border-box;
   padding: clamp(var(--space-4), 4vw, var(--space-6));
   border: var(--border-width-card) solid var(--colour-line);
@@ -24,7 +24,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  max-width: 560px;
 }
 
 .label {
@@ -92,16 +91,30 @@
 }
 
 .submit {
-  align-self: flex-start;
-  margin-top: var(--space-3);
+  display: inline-flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-4);
   padding: var(--space-2) var(--space-4);
   border: var(--border-width-card) solid var(--colour-accent);
   border-radius: var(--radius-sm);
   background: var(--colour-accent);
-  color: var(--colour-surface);
+  color: var(--colour-accent-contrast);
   font: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
+  font-weight: 700;
   cursor: pointer;
+}
+
+.switch {
+  margin: var(--space-5) 0 0;
+  padding-top: var(--space-4);
+  border-top: var(--border-width-card) solid var(--colour-line);
+  color: var(--colour-body);
+  font-size: var(--text-sm);
+  text-align: center;
 }
 
 .submit:hover {

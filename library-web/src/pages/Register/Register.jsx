@@ -181,7 +181,7 @@ function Register() {
         </button>
       </form>
 
-      <p>
+      <p className={styles.switch}>
         Already have an account? <Link to="/login">Log in</Link>
       </p>
     </main>

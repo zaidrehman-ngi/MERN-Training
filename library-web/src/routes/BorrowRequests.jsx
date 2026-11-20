@@ -24,6 +24,7 @@ function DueDateForm({ request, disabled, onSave }) {
 
   return (
     <form
+      className="dueDateForm"
       onSubmit={(event) => {
         event.preventDefault();
         onSave(dueDate);
@@ -70,6 +71,10 @@ function BorrowRequests() {
     status: requestStatus,
   });
   const filtered = debouncedSearch.trim() !== "" || requestStatus !== "all";
+
+  if (status === "succeeded" && page > pageCount) {
+    setPage(pageCount);
+  }
   const [positions, setPositions] = useState({});
 
   useEffect(() => {

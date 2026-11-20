@@ -39,6 +39,12 @@ function Books() {
     dispatch(fetchBooks({ filter, search: debouncedSearchText, page }));
   }, [dispatch, filter, debouncedSearchText, page]);
 
+  useEffect(() => {
+    if (status === "succeeded" && page > pageCount) {
+      dispatch(pageChanged(pageCount));
+    }
+  }, [dispatch, status, page, pageCount]);
+
   const handleSelect = useCallback(
     (selectedBook) => {
       navigate(`/books/${selectedBook.id}`);

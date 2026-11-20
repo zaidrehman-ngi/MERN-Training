@@ -71,7 +71,9 @@ export const borrowBookThunk = createAsyncThunk(
   {
     condition: ({ bookId }, { getState }) => {
       const status = getState().books.borrowStatusByBookId[bookId];
-      return !["pending", "succeeded", "queued"].includes(status);
+      return !["pending", "succeeded", "queued", "held", "approved"].includes(
+        status,
+      );
     },
   },
 );
@@ -131,6 +133,9 @@ const booksSlice = createSlice({
         const book = state.byId[bookId];
         if (book) {
           book.onShelf = available;
+          if (book.status === "available" || book.status === "out") {
+            book.status = available > 0 ? "available" : "out";
+          }
         }
       },
       prepare: (payload) => ({

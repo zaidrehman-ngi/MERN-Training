@@ -5,16 +5,19 @@ import { runDueReminders } from "../api/jobs";
 
 function Home() {
   const { user, can } = useCurrentUser();
-  const [jobMessage, setJobMessage] = useState("");
+  const [job, setJob] = useState(null);
 
   const handleRunReminders = async () => {
-    setJobMessage("Running...");
+    setJob({ status: "running", text: "Sending reminders..." });
     try {
       const response = await runDueReminders();
       const { found, sent } = response.data.data;
-      setJobMessage(`Done: ${sent} of ${found} loans reminded.`);
+      setJob({
+        status: "done",
+        text: `Done: ${sent} of ${found} loans reminded.`,
+      });
     } catch (error) {
-      setJobMessage(error.message);
+      setJob({ status: "failed", text: error.message });
     }
   };
 
@@ -41,12 +44,20 @@ function Home() {
       </div>
 
       {can("jobs:run") && (
-        <section>
+        <section className="adminTools">
           <h2>Admin tools</h2>
-          <button type="button" onClick={handleRunReminders}>
+          <button
+            type="button"
+            onClick={handleRunReminders}
+            disabled={job?.status === "running"}
+          >
             Send due reminders now
           </button>
-          {jobMessage && <p role="status">{jobMessage}</p>}
+          {job && (
+            <p role={job.status === "failed" ? "alert" : "status"}>
+              {job.text}
+            </p>
+          )}
         </section>
       )}
     </main>

@@ -91,7 +91,7 @@ function Login() {
         </button>
       </form>
 
-      <p>
+      <p className={styles.switch}>
         Don&apos;t have an account? <Link to="/register">Register</Link>
       </p>
     </main>

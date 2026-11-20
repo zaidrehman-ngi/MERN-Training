@@ -5,7 +5,10 @@
   border-radius: var(--radius-md);
   background: var(--colour-surface-raised);
   box-shadow: var(--shadow-card);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .card:hover {
@@ -36,4 +39,39 @@
   border-radius: 999px;
   background: var(--colour-info-soft);
   color: var(--colour-info);
+}
+
+.status[data-status="queued"] {
+  background: var(--colour-warning-soft);
+  color: var(--colour-warning);
+}
+
+.status[data-status="approved"] {
+  background: var(--colour-success-soft);
+  color: var(--colour-success);
+}
+
+.status[data-status="rejected"],
+.status[data-status="cancelled"],
+.status[data-status="expired"] {
+  background: var(--colour-danger-soft);
+  color: var(--colour-danger);
+}
+
+.status[data-status="returned"] {
+  background: var(--colour-surface-sunk);
+  color: var(--colour-body);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.actions > p {
+  flex-basis: 100%;
+  margin: 0;
 }

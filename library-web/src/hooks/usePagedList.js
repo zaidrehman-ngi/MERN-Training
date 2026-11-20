@@ -10,7 +10,7 @@ export function usePagedList(load, params) {
   useEffect(() => {
     let active = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setStatus("loading");
+    setStatus((current) => (current === "succeeded" ? current : "loading"));
     setError(null);
 
     load(JSON.parse(key))

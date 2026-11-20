@@ -4,14 +4,19 @@ function Pagination({ page, pageCount, onPageChange }) {
   }
 
   return (
-    <nav aria-label="Pages">
-      <button disabled={page === 1} onClick={() => onPageChange(page - 1)}>
+    <nav className="pagination" aria-label="Pages">
+      <button
+        type="button"
+        disabled={page === 1}
+        onClick={() => onPageChange(page - 1)}
+      >
         Previous
-      </button>{" "}
+      </button>
       <span>
         Page {page} of {pageCount}
-      </span>{" "}
+      </span>
       <button
+        type="button"
         disabled={page === pageCount}
         onClick={() => onPageChange(page + 1)}
       >

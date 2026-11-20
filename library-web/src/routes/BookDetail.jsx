@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { getBook } from "../api/books";
 import { listMyRequestsForBook } from "../api/borrowRequests";
 import { useCurrentUser } from "../hooks/useCurrentUser";
+import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog";
 import { useSocket } from "../hooks/useSocket";
 import { SOCKET_EVENTS } from "../constants/socketEvents";
 import {
@@ -17,6 +18,14 @@ import {
 
 const OPEN_STATUSES = ["pending", "queued", "held", "approved"];
 
+const BORROW_LABELS = {
+  pending: "Requesting...",
+  succeeded: "Request sent",
+  queued: "You're in the queue",
+  held: "Held for you at the desk",
+  approved: "You have this book",
+};
+
 function BookDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -27,6 +36,7 @@ function BookDetail() {
   // the book itself lives in the store; this only tracks loading it
   const [loadState, setLoadState] = useState(null);
   const [attempt, setAttempt] = useState(0);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const book = useSelector((state) => selectBookById(state, id));
   const error = loadState?.id === id ? loadState.error : null;
   const loadStatus = loadState?.id === id ? loadState.status : "loading";
@@ -57,7 +67,7 @@ function BookDetail() {
           dispatch(
             borrowStatusLoaded({
               bookId: id,
-              status: open.status === "queued" ? "queued" : "succeeded",
+              status: open.status === "pending" ? "succeeded" : open.status,
             }),
           );
         }
@@ -131,6 +141,7 @@ function BookDetail() {
   };
 
   const handleDelete = () => {
+    setConfirmingDelete(false);
     dispatch(deleteBookThunk(id)).then((result) => {
       if (deleteBookThunk.fulfilled.match(result)) {
         navigate("/books");
@@ -171,6 +182,18 @@ function BookDetail() {
 
   return (
     <main>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this book?"
+        message={`"${book.title}" will be removed from the catalogue.`}
+        confirmLabel="Delete book"
+        danger
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
+      <Link className="backLink" to="/books">
+        ← Back to books
+      </Link>
       <section className="detailPanel">
         <h1>{book.title}</h1>
         {user && ["reconnecting", "offline"].includes(liveStatus) && (
@@ -213,20 +236,16 @@ function BookDetail() {
           {can("requests:create") ? (
             <button
               type="button"
+              className={
+                ["held", "approved"].includes(borrowStatus)
+                  ? "borrowDone"
+                  : undefined
+              }
               onClick={handleBorrow}
-              disabled={["pending", "succeeded", "queued"].includes(
-                borrowStatus,
-              )}
+              disabled={borrowStatus in BORROW_LABELS}
             >
-              {borrowStatus === "pending"
-                ? "Requesting..."
-                : borrowStatus === "succeeded"
-                  ? "Request sent"
-                  : borrowStatus === "queued"
-                    ? "You're in the queue"
-                    : Number(book.onShelf) < 1
-                      ? "Join the queue"
-                      : "Borrow"}
+              {BORROW_LABELS[borrowStatus] ??
+                (Number(book.onShelf) < 1 ? "Join the queue" : "Borrow")}
             </button>
           ) : (
             !user && (
@@ -236,13 +255,15 @@ function BookDetail() {
             )
           )}
           {can("books:edit") && (
-            <Link to={`/books/${book.id}/edit`}>Edit book</Link>
+            <Link className="secondaryButton" to={`/books/${book.id}/edit`}>
+              Edit book
+            </Link>
           )}
           {can("books:delete") && (
             <button
               className="dangerButton"
               type="button"
-              onClick={handleDelete}
+              onClick={() => setConfirmingDelete(true)}
               disabled={
                 deleteStatus === "loading" || deleteStatus === "succeeded"
               }

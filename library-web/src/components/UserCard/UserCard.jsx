@@ -1,3 +1,4 @@
+import { Children } from "react";
 import { formatDay } from "../../utils/dates";
 import styles from "./UserCard.module.css";
 
@@ -10,7 +11,9 @@ function UserCard({ user, children }) {
       <p className={styles.detail}>Role: {user.role}</p>
       <p className={styles.detail}>Branch: {user.branch}</p>
       <p className={styles.detail}>Joined: {formatDay(user.joined)}</p>
-      {children}
+      {Children.count(children) > 0 && (
+        <div className={styles.actions}>{children}</div>
+      )}
     </article>
   );
 }

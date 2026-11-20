@@ -47,6 +47,9 @@ const authSlice = createSlice({
       state.user = null;
       state.status = "expired";
     },
+    sessionRefreshed: (state, action) => {
+      state.user = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -69,7 +72,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { sessionEnded } = authSlice.actions;
+export const { sessionEnded, sessionRefreshed } = authSlice.actions;
 
 export const selectUser = (state) => state.auth.user;
 export const selectAuthStatus = (state) => state.auth.status;

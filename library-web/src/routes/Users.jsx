@@ -3,6 +3,7 @@ import { useUsers } from "../hooks/useUsers";
 import useDebounce from "../hooks/useDebounce";
 import UserCard from "../components/UserCard/UserCard";
 import Pagination from "../components/Pagination";
+import ConfirmDialog from "../components/ConfirmDialog/ConfirmDialog";
 import { ADMIN_ROLES, ROLES } from "../constants/roles";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { assignableRoles, canManageMember } from "../constants/permissions";
@@ -33,6 +34,10 @@ function Users({ adminsOnly = false }) {
   });
   const filtered = debouncedSearch.trim() !== "" || role !== "all";
 
+  if (status === "succeeded" && page > pageCount) {
+    setPage(pageCount);
+  }
+
   const runAction = async (id, action) => {
     setBusyId(id);
     setActionError(null);
@@ -46,10 +51,18 @@ function Users({ adminsOnly = false }) {
     }
   };
 
-  const handleDeactivate = (member) => {
-    if (
-      window.confirm(`Deactivate ${member.name}? They won't be able to log in.`)
-    ) {
+  const [confirming, setConfirming] = useState(null);
+
+  const handleDeactivate = (member) => setConfirming({ member });
+
+  const handleRoleChange = (member, role) => setConfirming({ member, role });
+
+  const handleConfirm = () => {
+    const { member, role } = confirming;
+    setConfirming(null);
+    if (role) {
+      runAction(member.id, () => updateUser(member.id, { role }));
+    } else {
       runAction(member.id, () => deactivateUser(member.id));
     }
   };
@@ -69,11 +82,7 @@ function Users({ adminsOnly = false }) {
           id={`role-${member.id}`}
           value={member.role}
           disabled={busyId === member.id}
-          onChange={(event) =>
-            runAction(member.id, () =>
-              updateUser(member.id, { role: event.target.value }),
-            )
-          }
+          onChange={(event) => handleRoleChange(member, event.target.value)}
         >
           {roles.map((item) => (
             <option key={item} value={item}>
@@ -98,6 +107,19 @@ function Users({ adminsOnly = false }) {
 
   return (
     <main>
+      <ConfirmDialog
+        open={confirming !== null}
+        title={confirming?.role ? "Change role?" : "Deactivate member?"}
+        message={
+          confirming?.role
+            ? `${confirming.member.name} goes from ${confirming.member.role} to ${confirming.role}. Their access changes right away.`
+            : `${confirming?.member.name} won't be able to log in any more.`
+        }
+        confirmLabel={confirming?.role ? "Change role" : "Deactivate"}
+        danger={!confirming?.role}
+        onConfirm={handleConfirm}
+        onCancel={() => setConfirming(null)}
+      />
       <h1>
         {adminsOnly
           ? "Manage admins"
