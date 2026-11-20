@@ -125,6 +125,7 @@ The collection changes some rows, so seed again before the next run.
 
 ## Production
 
-The deployed API runs on Railway with a Neon PostgreSQL database. All the
+The deployed API runs on Railway with a Neon PostgreSQL database, from the
+`master` branch with root directory `week8/library-api`. All the
 production variables are listed in `.env.production.example`. Build command
 `npm run build && npm run db:migrate`, start command `npm start`.
